@@ -34,26 +34,43 @@ export function direntIsFile(abs: string, entry: fs.Dirent): boolean {
   }
 }
 
+/**
+ * `fs.promises.realpath` on Windows is the native call and may return a
+ * `\\?\` path. `fs.realpathSync` does not. Strip the prefix so both compare.
+ */
+function stripExtendedPathPrefix(p: string): string {
+  if (process.platform !== 'win32') return p;
+  if (p.startsWith('\\\\?\\UNC\\')) return `\\\\${p.slice('\\\\?\\UNC\\'.length)}`;
+  if (p.startsWith('\\\\?\\')) return p.slice('\\\\?\\'.length);
+  return p;
+}
+
 export function isPathInsideRoot(rootReal: string, candidateReal: string): boolean {
   const rel = path.relative(
-    path.resolve(rootReal),
-    path.resolve(candidateReal),
+    path.resolve(stripExtendedPathPrefix(rootReal)),
+    path.resolve(stripExtendedPathPrefix(candidateReal)),
   );
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+/** Windows paths compare case-insensitively. Linux paths do not. */
+function fsPathKey(p: string): string {
+  const resolved = stripExtendedPathPrefix(path.resolve(p));
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 function rootRealKey(root: string): string {
   const resolved = path.resolve(root);
   try {
-    return fs.realpathSync(resolved).toLowerCase();
+    return fsPathKey(fs.realpathSync(resolved));
   } catch {
-    return resolved.toLowerCase();
+    return fsPathKey(resolved);
   }
 }
 
 function rememberVisited(visited: Set<string>, abs: string, real: string): boolean {
-  const key = path.resolve(abs).toLowerCase();
-  const realKey = path.resolve(real).toLowerCase();
+  const key = fsPathKey(abs);
+  const realKey = fsPathKey(real);
   if (visited.has(key) || visited.has(realKey)) return false;
   visited.add(key);
   visited.add(realKey);
@@ -89,7 +106,7 @@ export function isSafeWalkDirectory(
   } catch {
     return false;
   }
-  return !visited.has(path.resolve(real).toLowerCase());
+  return !visited.has(fsPathKey(real));
 }
 
 async function isSafeWalkDirectoryAsync(
@@ -116,7 +133,7 @@ async function isSafeWalkDirectoryAsync(
   } catch {
     return false;
   }
-  return !visited.has(path.resolve(real).toLowerCase());
+  return !visited.has(fsPathKey(real));
 }
 
 function enterDir(abs: string, rootReal: string, visited: Set<string>): boolean {

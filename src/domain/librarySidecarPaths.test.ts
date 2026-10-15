@@ -52,8 +52,12 @@ describe('librarySidecarPaths', () => {
 
   it('places wildcards sidecars in a sibling <basename>.wcm folder', () => {
     const root = path.join('D:', 'ComfyUI', 'wildcards');
-    const sidecar = wildcardsSidecarRoot(root);
-    expect(sidecar).toBe(path.join('D:', 'ComfyUI', `wildcards${WILDCARDS_SIDECAR_SUFFIX}`));
+    const resolved = path.resolve(root);
+    const sidecar = path.join(
+      path.dirname(resolved),
+      `wildcards${WILDCARDS_SIDECAR_SUFFIX}`,
+    );
+    expect(wildcardsSidecarRoot(root)).toBe(sidecar);
     expect(libraryJsonPath(root)).toBe(path.join(sidecar, 'library.json'));
     expect(validationJsonPath(root)).toBe(path.join(sidecar, 'validation.json'));
     expect(promptCoverageJsonPath(root)).toBe(
@@ -78,7 +82,7 @@ describe('librarySidecarPaths', () => {
   it('falls back to AppData libraries id when wildcards root is a drive root', () => {
     const drive = path.parse(process.cwd()).root;
     expect(isFilesystemRootPath(drive)).toBe(true);
-    const appDataLibs = path.join('C:', 'AppData', 'libraries');
+    const appDataLibs = path.resolve(path.join('C:', 'AppData', 'libraries'));
     configureWildcardsSidecarAppDataDir(appDataLibs);
     const id = stableWildcardsSidecarId(drive);
     expect(wildcardsSidecarRoot(drive)).toBe(path.join(appDataLibs, id));

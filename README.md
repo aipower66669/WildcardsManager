@@ -23,6 +23,7 @@ and [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts)
 
 ![Wildcards Manager — dependency graph, file list, and in-app editor](docs/screenshot.jpg)
 ![Wildcards Manager — dependency graph, file list, and in-app editor](docs/screenshot2.jpg)
+![Wildcards Manager — CivitAI UI, in-app model downloader](docs/screenshot3.jpg)
 
 ## Why this exists
 

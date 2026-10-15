@@ -68,6 +68,7 @@ describe('generationFormStore', () => {
       height: 1600,
       additionalPositivePrompt: 'photo',
       negativePrompt: 'bad',
+      benchmark: false,
     });
   });
 

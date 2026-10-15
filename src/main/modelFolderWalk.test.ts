@@ -25,6 +25,16 @@ afterEach(() => {
 });
 
 describe('modelFolderWalk', () => {
+  it('treats extended-length Windows paths as inside the same root', () => {
+    if (process.platform !== 'win32') return;
+    expect(
+      isPathInsideRoot(
+        'C:\\Temp\\models',
+        '\\\\?\\C:\\Temp\\models\\a\\two.safetensors',
+      ),
+    ).toBe(true);
+  });
+
   it('treats regular files as files without needing a junction stat', () => {
     const root = makeTemp();
     const file = path.join(root, 'a.safetensors');
@@ -60,6 +70,18 @@ describe('modelFolderWalk', () => {
       onProgress: (files) => counts.push(files),
     });
     expect(counts.at(-1)).toBe(2);
+  });
+
+  it('async walk finds files under a mixed-case directory', async () => {
+    const parent = makeTemp();
+    const root = path.join(parent, 'MiXeD');
+    fs.mkdirSync(path.join(root, 'a'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'a', 'two.safetensors'), 'x');
+    const found: string[] = [];
+    await walkModelFolderEntriesAsync(root, root, (_abs, rel) => {
+      found.push(rel);
+    });
+    expect(found).toEqual(['a/two.safetensors']);
   });
 
   it('async walk finds the same files and yields', async () => {

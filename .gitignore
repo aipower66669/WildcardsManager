@@ -9,6 +9,9 @@ Thumbs.db
 .idea/
 *.tmp
 
+sample_wildcards.wcm/
+sample_wildcards.wcm/cache/civitai-catalog/meta.json
+
 /WildcardsManager.code-workspace
 
 # electron-vite writes a temporary bundled config beside electron.vite.config.ts

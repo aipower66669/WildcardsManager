@@ -1,3 +1,4 @@
+import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -14,17 +15,31 @@ import {
 
 const win = process.platform === 'win32';
 
+/**
+ * Drive-letter paths are absolute on Windows and relative on POSIX, where
+ * `path.resolve('D:/ComfyUI')` prefixes the cwd. Anchor each fake drive under
+ * a real absolute root so prefix math is the same on both.
+ */
+function abs(...parts: string[]): string {
+  if (win) return path.win32.join(...parts);
+  const [head, ...rest] = parts;
+  if (head?.endsWith(':')) {
+    return path.join(os.tmpdir(), 'wcm-migrate', head.slice(0, -1), ...rest);
+  }
+  return path.join(...parts);
+}
+
 describe('normalizePathPrefix', () => {
   it('strips trailing separators', () => {
-    const base = path.join('D:', 'ComfyUI');
+    const base = abs('D:', 'ComfyUI');
     expect(normalizePathPrefix(base + path.sep)).toBe(normalizePathPrefix(base));
   });
 });
 
 describe('isPathEqualOrUnder / remapPathUnderPrefix', () => {
   it('remaps nested paths under a shared prefix', () => {
-    const oldPrefix = path.join('D:', 'ComfyUI');
-    const newPrefix = path.join('E:', 'AI', 'ComfyUI');
+    const oldPrefix = abs('D:', 'ComfyUI');
+    const newPrefix = abs('E:', 'AI', 'ComfyUI');
     const oldLora = path.join(oldPrefix, 'models', 'loras');
     const expected = path.join(newPrefix, 'models', 'loras');
     expect(isPathEqualOrUnder(oldLora, oldPrefix)).toBe(true);
@@ -32,17 +47,17 @@ describe('isPathEqualOrUnder / remapPathUnderPrefix', () => {
   });
 
   it('returns null when path is outside the prefix', () => {
-    const oldPrefix = path.join('D:', 'ComfyUI');
-    const other = path.join('C:', 'Elsewhere', 'loras');
+    const oldPrefix = abs('D:', 'ComfyUI');
+    const other = abs('C:', 'Elsewhere', 'loras');
     expect(isPathEqualOrUnder(other, oldPrefix)).toBe(false);
-    expect(remapPathUnderPrefix(other, oldPrefix, path.join('E:', 'x'))).toBe(
+    expect(remapPathUnderPrefix(other, oldPrefix, abs('E:', 'x'))).toBe(
       null,
     );
   });
 
   it('remaps the prefix itself', () => {
-    const oldPrefix = path.join('D:', 'ComfyUI');
-    const newPrefix = path.join('E:', 'ComfyUI');
+    const oldPrefix = abs('D:', 'ComfyUI');
+    const newPrefix = abs('E:', 'ComfyUI');
     expect(remapPathUnderPrefix(oldPrefix, oldPrefix, newPrefix)).toBe(
       newPrefix,
     );
@@ -51,10 +66,10 @@ describe('isPathEqualOrUnder / remapPathUnderPrefix', () => {
   if (win) {
     it('compares drive letters case-insensitively on Windows', () => {
       const oldPrefix = 'd:\\ComfyUI';
-      const abs = 'D:\\ComfyUI\\models\\checkpoints';
-      expect(isPathEqualOrUnder(abs, oldPrefix)).toBe(true);
-      expect(remapPathUnderPrefix(abs, oldPrefix, 'E:\\ComfyUI')).toBe(
-        path.join('E:', 'ComfyUI', 'models', 'checkpoints'),
+      const checkpoint = 'D:\\ComfyUI\\models\\checkpoints';
+      expect(isPathEqualOrUnder(checkpoint, oldPrefix)).toBe(true);
+      expect(remapPathUnderPrefix(checkpoint, oldPrefix, 'E:\\ComfyUI')).toBe(
+        abs('E:', 'ComfyUI', 'models', 'checkpoints'),
       );
     });
   }
@@ -62,11 +77,11 @@ describe('isPathEqualOrUnder / remapPathUnderPrefix', () => {
 
 describe('longestCommonPathPrefix', () => {
   it('finds the shared parent of sibling folders', () => {
-    const a = path.join('D:', 'ComfyUI', 'models', 'loras');
-    const b = path.join('D:', 'ComfyUI', 'models', 'checkpoints');
-    const c = path.join('D:', 'ComfyUI', 'wildcards');
+    const a = abs('D:', 'ComfyUI', 'models', 'loras');
+    const b = abs('D:', 'ComfyUI', 'models', 'checkpoints');
+    const c = abs('D:', 'ComfyUI', 'wildcards');
     expect(longestCommonPathPrefix([a, b, c])).toBe(
-      path.join('D:', 'ComfyUI'),
+      abs('D:', 'ComfyUI'),
     );
   });
 
@@ -74,8 +89,8 @@ describe('longestCommonPathPrefix', () => {
     if (!win) return;
     expect(
       longestCommonPathPrefix([
-        path.join('D:', 'ComfyUI', 'loras'),
-        path.join('E:', 'ComfyUI', 'loras'),
+        abs('D:', 'ComfyUI', 'loras'),
+        abs('E:', 'ComfyUI', 'loras'),
       ]),
     ).toBe(null);
   });
@@ -83,26 +98,26 @@ describe('longestCommonPathPrefix', () => {
 
 describe('suggestMigrationOldPrefix', () => {
   it('matches LCP when all folders share a tree', () => {
-    const a = path.join('D:', 'ComfyUI', 'models', 'loras');
-    const b = path.join('D:', 'ComfyUI', 'models', 'checkpoints');
-    const c = path.join('D:', 'ComfyUI', 'wildcards');
+    const a = abs('D:', 'ComfyUI', 'models', 'loras');
+    const b = abs('D:', 'ComfyUI', 'models', 'checkpoints');
+    const c = abs('D:', 'ComfyUI', 'wildcards');
     expect(suggestMigrationOldPrefix([a, b, c], c)).toBe(
-      path.join('D:', 'ComfyUI'),
+      abs('D:', 'ComfyUI'),
     );
   });
 
   it('falls back to the preferred drive when folders span roots', () => {
     if (!win) return;
-    const wildcards = path.join('D:', 'ComfyUI', 'wildcards');
-    const lora = path.join('E:', 'models', 'loras');
-    const ckpt = path.join('D:', 'ComfyUI', 'models', 'checkpoints');
+    const wildcards = abs('D:', 'ComfyUI', 'wildcards');
+    const lora = abs('E:', 'models', 'loras');
+    const ckpt = abs('D:', 'ComfyUI', 'models', 'checkpoints');
     expect(suggestMigrationOldPrefix([wildcards, lora, ckpt], wildcards)).toBe(
-      path.join('D:', 'ComfyUI'),
+      abs('D:', 'ComfyUI'),
     );
   });
 
   it('returns a single configured folder when that is all there is', () => {
-    const wildcards = path.join('D:', 'ComfyUI', 'wildcards');
+    const wildcards = abs('D:', 'ComfyUI', 'wildcards');
     expect(suggestMigrationOldPrefix([wildcards, null, ''], wildcards)).toBe(
       wildcards,
     );
@@ -111,8 +126,8 @@ describe('suggestMigrationOldPrefix', () => {
 
 describe('planLibraryPathMigration', () => {
   it('rewrites folders under the prefix and leaves outsiders alone', () => {
-    const oldPrefix = path.join('D:', 'ComfyUI');
-    const newPrefix = path.join('E:', 'AI', 'ComfyUI');
+    const oldPrefix = abs('D:', 'ComfyUI');
+    const newPrefix = abs('E:', 'AI', 'ComfyUI');
     const plan = planLibraryPathMigration({
       oldPrefix,
       newPrefix,
@@ -122,7 +137,7 @@ describe('planLibraryPathMigration', () => {
         checkpointFolder: path.join(oldPrefix, 'models', 'checkpoints'),
         imagesFolder: path.join(oldPrefix, 'images'),
         videosFolder: path.join(oldPrefix, 'videos'),
-        mastersFolder: path.join('F:', 'masters'),
+        mastersFolder: abs('F:', 'masters'),
         trainingLibraryFolder: path.join(oldPrefix, 'training'),
         promptsFolder: null,
         generationOutputRealistic: null,
@@ -143,9 +158,9 @@ describe('planLibraryPathMigration', () => {
   });
 
   it('honors folder overrides', () => {
-    const oldPrefix = path.join('D:', 'ComfyUI');
-    const newPrefix = path.join('E:', 'ComfyUI');
-    const override = path.join('G:', 'masters-new');
+    const oldPrefix = abs('D:', 'ComfyUI');
+    const newPrefix = abs('E:', 'ComfyUI');
+    const override = abs('G:', 'masters-new');
     const plan = planLibraryPathMigration({
       oldPrefix,
       newPrefix,
@@ -155,7 +170,7 @@ describe('planLibraryPathMigration', () => {
         checkpointFolder: null,
         imagesFolder: null,
         videosFolder: null,
-        mastersFolder: path.join('F:', 'masters'),
+        mastersFolder: abs('F:', 'masters'),
         trainingLibraryFolder: null,
         promptsFolder: null,
         generationOutputRealistic: null,
@@ -174,8 +189,8 @@ describe('planLibraryPathMigration', () => {
 
 describe('remapMasterImagesStore', () => {
   it('rewrites byPath keys and absolute fields', () => {
-    const oldPrefix = path.join('D:', 'ComfyUI');
-    const newPrefix = path.join('E:', 'ComfyUI');
+    const oldPrefix = abs('D:', 'ComfyUI');
+    const newPrefix = abs('E:', 'ComfyUI');
     const ckpt = path.join(oldPrefix, 'models', 'checkpoints', 'a.safetensors');
     const master = path.join(oldPrefix, 'masters', 'a.jpg');
     const { store, remappedEntries } = remapMasterImagesStore(
@@ -206,8 +221,8 @@ describe('remapMasterImagesStore', () => {
 
 describe('remapTrainingLibraryRoot / remapRecentRoots', () => {
   it('remaps training root and recent roots under the prefix', () => {
-    const oldPrefix = path.join('D:', 'ComfyUI');
-    const newPrefix = path.join('E:', 'ComfyUI');
+    const oldPrefix = abs('D:', 'ComfyUI');
+    const newPrefix = abs('E:', 'ComfyUI');
     const training = path.join(oldPrefix, 'training');
     const { next, changed } = remapTrainingLibraryRoot(
       training,
@@ -218,12 +233,12 @@ describe('remapTrainingLibraryRoot / remapRecentRoots', () => {
     expect(next).toBe(path.join(newPrefix, 'training'));
 
     const recent = remapRecentRoots(
-      [path.join(oldPrefix, 'wildcards'), path.join('C:', 'other')],
+      [path.join(oldPrefix, 'wildcards'), abs('C:', 'other')],
       oldPrefix,
       newPrefix,
     );
     expect(recent.remappedCount).toBe(1);
     expect(recent.next[0]).toBe(path.join(newPrefix, 'wildcards'));
-    expect(recent.next[1]).toBe(path.join('C:', 'other'));
+    expect(recent.next[1]).toBe(abs('C:', 'other'));
   });
 });
