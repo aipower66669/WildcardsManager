@@ -11,6 +11,10 @@ and uses [Semantic Versioning](https://semver.org/).
 
 - Version tags build the Windows NSIS installer in GitHub Actions and attach
   the `.exe` (plus blockmap and `latest.yml`) to the GitHub Release.
+- **Generation install guide.** `ComfyUI-Workflow/` ships the
+  `comfyui-lora-training` node zip and a ComfyUI graph
+  (`WildcardManager-ComfyUI-Generation-Workflow.json`). The user guide explains
+  how to install both and save the graph so the Generation tab can queue.
 
 ## [0.7.0] - 2026-10-15
 

@@ -39,7 +39,7 @@ turning into a ComfyUI or A1111 plugin.
 | --- | --- |
 | **Open & remember libraries** | Recursively index `.txt`, `.yaml`, `.yml`, and `.json`; restore the last library/file and window layout; keep recent roots; watch for filesystem changes and rebuild on demand |
 | **Switch workspaces** | Top-level tabs for **Wildcard files**, **LoRA files**, **Checkpoint files**, **Prompts**, **Generation**, and **Search** — same app shell, resizable panels |
-| **Generate with ComfyUI** | **Generation** tab: typed prompt or prompt-folder `!gen.txt`, style profiles, Edit/Save Workflow, collapsible last-output preview; needs ComfyUI + the LT node pack (Settings → AI) |
+| **Generate with ComfyUI** | **Generation** tab: typed prompt or prompt-folder `!gen.txt`, style profiles, Edit/Save Workflow. Install [`ComfyUI-Workflow/`](ComfyUI-Workflow/) into your ComfyUI, open the sample graph, then **Save Workflow** ([steps](docs/user-guide.md#install-the-nodes-and-the-sample-graph)) |
 | **Search the library** | Toolbar search launcher + **Search** tab across wildcard names/content and LoRA / checkpoint filenames |
 | **Explore dependencies** | Root-to-descendant graph plus direct callers; focused ancestor path with depth/breadth caps; drillable `+N more` frontiers; viewport culling; minimap, pan/zoom, and click-to-center on selection |
 | **Choose a graph layout** | Persisted Default alphabetical grid or Optimized Dagre layered layout that reduces crossings and keeps related nodes closer |

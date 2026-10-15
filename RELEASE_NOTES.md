@@ -67,9 +67,20 @@ Browse works without an API key. Many model downloads do not.
 
 ## Generation and LM Studio
 
-Generation talks to ComfyUI through the `comfyui-lora-training` node pack in
-this repo (`custom_nodes/`). Settings → AI holds the host, a launch shortcut,
-and Test / Check install.
+Generation talks to a ComfyUI you already run. Settings → AI holds the host,
+a launch shortcut, and Test / Check install. The node pack and a ready graph
+are in [`ComfyUI-Workflow/`](ComfyUI-Workflow/):
+
+1. Unzip `comfyui-lora-training.zip` into ComfyUI `custom_nodes/` and restart.
+2. Install the other packs that sample graph uses (Dynamic Prompts, LoRA tag
+   loader, Corza LoRA loader, Krea 2 enhancer, `SaveImageToFolder`).
+3. Open `WildcardManager-ComfyUI-Generation-Workflow.json` in ComfyUI. It is a
+   Krea 2 graph — change the UNET, CLIP, and VAE filenames if you use other
+   models.
+4. In the app, **Generation → Save Workflow**, then queue a typed prompt or a
+   prompt folder.
+
+Step-by-step: [user guide](docs/user-guide.md#install-the-nodes-and-the-sample-graph).
 
 - Typed prompt or prompt-folder `!gen.txt` (optional recursive sub-folders).
 - Style profiles with separate output folders.
@@ -113,8 +124,9 @@ Libraries and sidecars do not need a manual migration for this release. If you
 moved model or wildcard folders onto another drive, use Library Manager →
 **Migrate library paths…** instead of editing paths by hand in every field.
 
-Install or update `comfyui-lora-training` in ComfyUI if Generation reports
-missing LT nodes.
+Install `ComfyUI-Workflow/comfyui-lora-training.zip` into ComfyUI
+`custom_nodes/` if Generation reports missing LT nodes, then load
+`WildcardManager-ComfyUI-Generation-Workflow.json` and **Save Workflow**.
 
 ## Known limitations
 

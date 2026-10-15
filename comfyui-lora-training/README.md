@@ -1,7 +1,10 @@
 # LoraTraining — ComfyUI contract nodes
 
 Shared custom-node pack for **LoraTraining** and **Wildcards Manager**. Copy (or
-symlink) this folder into ComfyUI `custom_nodes/`, then restart ComfyUI.
+symlink) this folder into ComfyUI `custom_nodes/`, then restart ComfyUI. A zip
+of this folder and a wired Generation graph live in
+[`../ComfyUI-Workflow/`](../ComfyUI-Workflow/). Install steps:
+[user guide](../docs/user-guide.md#install-the-nodes-and-the-sample-graph).
 
 Both apps must ship the **same** package. When adding nodes, append new classes
 only — do not change existing LT node class names, inputs, or behaviour.

@@ -75,5 +75,7 @@ jobs:
             release/WildcardsManager-*.exe
             release/*.exe.blockmap
             release/latest.yml
+            ComfyUI-Workflow/comfyui-lora-training.zip
+            ComfyUI-Workflow/WildcardManager-ComfyUI-Generation-Workflow.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

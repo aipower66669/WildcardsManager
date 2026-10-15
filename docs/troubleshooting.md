@@ -146,11 +146,22 @@ the end of the Civitai feed.
 ## Generation tab will not start / workflow missing nodes
 
 1. Set **Settings → AI** ComfyUI host/port and use **Test** / **Check install**.
-2. Install the shared **comfyui-lora-training** custom node pack and restart
-   ComfyUI.
-3. Open **Edit Workflow** once and **Save Workflow** so the app has an API +
-   LiteGraph graph under `%AppData%/wildcards-manager/`.
-4. Configure a **prompts folder** if you generate from folder `!gen.txt` lines.
+2. Install [`ComfyUI-Workflow/comfyui-lora-training.zip`](../ComfyUI-Workflow/comfyui-lora-training.zip)
+   into ComfyUI `custom_nodes/comfyui-lora-training/` and restart ComfyUI.
+   Red nodes on the canvas are packs that are still missing — the sample graph
+   also needs Dynamic Prompts, `comfyui_lora_tag_loader`,
+   `CoreyCorza/comfyui-lora-loader`, `comfyui-krea2t-enhancer`, and
+   `SaveImageToFolder`. Install steps are in the
+   [user guide](user-guide.md#install-the-nodes-and-the-sample-graph).
+3. Open `WildcardManager-ComfyUI-Generation-Workflow.json` in ComfyUI, then
+   **Save Workflow** in the Generation tab. That writes
+   `%AppData%/Roaming/wildcards-manager/comfy-workflow.json`. Generation has
+   no graph until that save succeeds. If you edit the graph later, save again.
+4. If the queue starts and then reports no output image, the save node is not
+   receiving **LT · Output Folder** / **LT · Output Filename**. The sample
+   graph already wires those into `SaveImageToFolder`.
+5. Configure a **prompts folder** if you generate from folder `!gen.txt` lines.
+   Typed prompts still need a style output folder in Library Manager.
 
 ## In-app update finds nothing / Install does nothing
 
