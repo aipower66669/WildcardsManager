@@ -21,9 +21,10 @@ and [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts)
 > [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 > See [`LICENSE.md`](LICENSE.md).
 
-![Wildcards Manager — dependency graph, file list, and in-app editor](docs/screenshot.jpg)
-![Wildcards Manager — dependency graph, file list, and in-app editor](docs/screenshot2.jpg)
-![Wildcards Manager — CivitAI UI, in-app model downloader](docs/screenshot3.jpg)
+![Wildcards Manager — dependency graph, file list, and in-app editor](docs/screenshot1.jpg)
+![Wildcards Manager — CivitAI UI, in-app model downloader](docs/screenshot2.jpg)
+![Wildcards Manager — generation UI](docs/screenshot3.jpg)
+
 
 ## Why this exists
 
