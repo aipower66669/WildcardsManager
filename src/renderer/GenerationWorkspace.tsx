@@ -933,7 +933,7 @@ export function GenerationWorkspace({
               className={profile === 'hentai' ? 'active' : undefined}
               onClick={() => selectProfile('hentai')}
             >
-              Hentai
+              Anime
             </button>
             <button
               type="button"
