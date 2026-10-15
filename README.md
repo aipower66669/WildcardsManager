@@ -111,26 +111,62 @@ development notes, troubleshooting, and the [roadmap](docs/roadmap.md).
 
 ## Contributing
 
-PRs are welcome — especially bug fixes, clearer diagnostics, sample library
-improvements, and packaging polish.
+This is a public project and it gets better when people who use it help shape
+it. Code, docs, install notes, and guides all count. Contributions are accepted
+under the same noncommercial terms as the repo ([`LICENSE.md`](LICENSE.md)).
+
+The part that needs the most outside help right now is **getting started**:
+installing the app, installing the ComfyUI nodes, loading the Generation
+workflow, and explaining the wildcard graph to someone who has not opened the
+app before. If a step confused you, that is a useful contribution.
+
+### Ways to help
+
+- **Easier install and first run.** Clearer steps for the Windows installer,
+  `npm run dev`, ComfyUI custom nodes, and
+  [saving a Generation workflow](docs/user-guide.md#install-the-nodes-and-the-sample-graph).
+  Screenshots of the screen you were stuck on are enough to start.
+- **Guides.** A short article, a forum post, or a video that walks through
+  opening a library, fixing a missing wildcard, or generating from a prompt
+  folder. Link it so other people can find it (see below).
+- **Bug reports.** OS, app version, what you expected, and what happened. A
+  minimal wildcard folder or one of the
+  [`fixtures/wildcards`](fixtures/wildcards) cases is ideal. Open an
+  [issue](https://github.com/aipower66669/WildcardsManager/issues).
+- **Code.** Bug fixes, clearer diagnostics, sample-library improvements, tests,
+  and packaging polish. Check [`docs/roadmap.md`](docs/roadmap.md) before a
+  large feature so the work does not duplicate something already planned.
+  Development setup is in [`docs/development.md`](docs/development.md).
+
+### Guides, videos, and articles
+
+Community guides will be listed here. To add one, open an
+[issue](https://github.com/aipower66669/WildcardsManager/issues) with the link,
+title, and a one-line description of what it covers — or open a pull request
+that adds the link under this heading.
+
+Topics that would help most:
+
+- installing Wildcards Manager and opening `sample_wildcards/`
+- installing `comfyui-lora-training` and getting the Generation tab to queue
+- how Dynamic Prompts wildcards, `!gen.txt` folders, and the graph fit together
+
+Please keep linked material noncommercial-friendly and free of personal library
+dumps (real LoRA trees, prompt folders, or model catalogs).
+
+### Pull requests
 
 1. Fork the repository and create a branch from `main`.
-2. Keep changes focused; match existing TypeScript / React style.
-3. Put domain logic in `src/domain` with tests when behavior changes.
-4. Run before opening a PR:
+2. Keep the change focused. Match the existing TypeScript and React style.
+3. Put domain logic in `src/domain`, with tests when behavior changes.
+4. Run this before opening the PR:
 
    ```powershell
    npm run check
    ```
 
-5. Describe the *why* in the PR, not only the diff. Screenshots help for UI work.
-
-Ideas that land well: unused-file reporting, structured-key compatibility cases,
-split/merge tools, better fixtures, docs/screenshots, and CI packaging fixes. Check
-[`docs/roadmap.md`](docs/roadmap.md) before large features so we do not duplicate work.
-
-Bug reports are also useful — include OS, Node version, a minimal wildcard folder
-(or fixture), and what you expected vs. what happened.
+5. Describe the *why* in the PR, not only the diff. Screenshots help for UI
+   and docs changes.
 
 ## Releases
 
