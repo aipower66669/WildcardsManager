@@ -92,19 +92,20 @@ graph are in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/). The
 list of extra packs the sample graph needs.
 
 1. Unzip `ComfyUI-Workflow/comfyui-lora-training.zip` into ComfyUI
-   `custom_nodes/` so you get `custom_nodes/comfyui-lora-training/`. Restart
-   ComfyUI. (A clone can copy the repo’s `comfyui-lora-training/` folder
-   instead of the zip.)
-2. Install the other custom nodes that graph uses (Dynamic Prompts, LoRA tag
-   loader, Corza LoRA loader, Krea 2 enhancer, and `SaveImageToFolder`), then
+   `custom_nodes/` so you get `custom_nodes/comfyui-lora-training/`. 
+2. Unzip `ComfyUI-Workflow/comfyui-custom-save-node.zip` into ComfyUI
+   `custom_nodes/` so you get `custom_nodes/comfyui-custom-save-node/`. Restart
+   ComfyUI. 
+3. Install the other custom nodes that graph uses (Dynamic Prompts, LoRA tag
+   loader, Corza LoRA loader and Krea 2 enhancer), then
    restart ComfyUI again. See the user guide for the pack names.
-3. In ComfyUI, open
+4. In ComfyUI, open
    `ComfyUI-Workflow/WildcardManager-ComfyUI-Generation-Workflow.json`. The
    sample expects Krea 2 UNET / CLIP / VAE filenames — change those loader
    widgets if your models differ.
-4. In the app: **Settings → AI** host, port, **Test**, **Check install**.
+5. In the app: **Settings → AI** host, port, **Test**, **Check install**.
    Library Manager: prompts folder and a Generation output folder per style.
-5. **Generation → Save Workflow** (this stores the graph the app will queue),
+6. **Generation → Save Workflow** (this stores the graph the app will queue),
    then generate from **Use this prompt** or a prompt folder with `!gen.txt`.
 
 ### Wildcard files (three columns)
