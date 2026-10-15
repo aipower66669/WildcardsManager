@@ -1,0 +1,39 @@
+blouse
+button-up shirt
+t-shirt
+sweater
+cardigan
+hoodie
+dress
+sundress
+midi dress
+maxi dress
+skirt
+pleated skirt
+jeans
+trousers
+wide-leg pants
+shorts
+jumpsuit
+overalls
+blazer
+coat
+trench coat
+jacket
+raincoat
+kimono-inspired wrap
+hanbok-inspired outfit
+business suit
+athletic wear
+school uniform style outfit
+cottagecore dress
+formal evening dress
+wrap dress
+shirt dress
+pencil skirt
+cargo pants
+leggings with a tunic
+peacoat
+parka
+bomber jacket
+vest over a blouse

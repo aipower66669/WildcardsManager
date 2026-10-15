@@ -1,0 +1,4 @@
+__outdoor-city__
+__outdoor-nature__
+__outdoor-water__
+__outdoor-rural__

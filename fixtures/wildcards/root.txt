@@ -1,0 +1,3 @@
+# Sample Dynamic Prompts root
+A portrait of __people__ wearing __clothing/hats__, colors {2$$__colors-warm__|__colors-cold__}
+Structured examples: __palette/warm__, __materials/natural__

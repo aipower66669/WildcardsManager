@@ -1,0 +1,5 @@
+{|, __weather__}
+{|, __props__}
+{|, __architecture-details__}
+{|, __activity__}
+{|, __mood__}

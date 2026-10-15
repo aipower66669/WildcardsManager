@@ -1,0 +1,2 @@
+# Portrait-focused sample root.
+one person, __age__, __race__, {__gender-male__, __hairstyle-male__ | __gender-female__, __hairstyle-female__ {|, __makeup__}}, __expression__, __view__, {|, __lighting__}, {|, __style__}

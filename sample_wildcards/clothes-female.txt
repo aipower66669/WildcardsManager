@@ -1,0 +1,5 @@
+{|__color__,} {|__print-patterns__,} {|,__time-period__} __clothes-female-type__
+{|__color__,} {|__fabric__,} __clothes-female-type__
+{|__color__,} __clothes-female-type__ with __clothes-female-layer__
+__clothes-female-outfit__
+{|__color__,} {|__print-patterns__,} __clothes-female-type__, __shoes-female__ {|, __accessories__}

@@ -1,0 +1,4 @@
+__indoor-home__
+__indoor-work__
+__indoor-public__
+__indoor-architecture__

@@ -1,0 +1,7 @@
+{
+  "materials": {
+    "natural": ["linen", "wool"],
+    "synthetic": "nylon"
+  },
+  "accent": "__structured/palette/cool__"
+}

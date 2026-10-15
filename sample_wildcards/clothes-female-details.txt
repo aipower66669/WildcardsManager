@@ -1,0 +1,1 @@
+__clothes-female__, {|with __clothes-female-details-trim__}

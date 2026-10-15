@@ -1,0 +1,3 @@
+__asia__
+__africa__
+__missing_place__

@@ -1,0 +1,16 @@
+medieval
+renaissance
+victorian
+edwardian
+1920s
+1950s
+1960s
+1970s
+1980s
+1990s
+modern
+contemporary
+futuristic
+cyberpunk-inspired
+steampunk-inspired
+fantasy historical

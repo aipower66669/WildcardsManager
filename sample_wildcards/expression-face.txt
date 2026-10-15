@@ -1,0 +1,12 @@
+smiling
+gentle smile
+soft smile
+laughing
+serious expression
+thoughtful expression
+calm expression
+surprised look
+curious look
+confident expression
+warm expression
+neutral expression

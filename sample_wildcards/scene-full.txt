@@ -1,0 +1,2 @@
+# Richer composition demo using optional extras.
+__people-count__, __age__, __race__, {__gender-male__, __clothes-male__, __hairstyle-male__ | __gender-female__, __clothes-female__, __hairstyle-female__ {|, __jewelry__}} {|, __expression__} {|, __view__} {|, __pose__} {|, __location__} {|, __lighting__} {|, __style__} __scene-extras__

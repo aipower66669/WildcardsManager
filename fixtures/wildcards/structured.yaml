@@ -1,0 +1,10 @@
+# Structured wildcard fixture
+palette:
+  warm:
+    - crimson
+    - amber
+  cool:
+    - cobalt
+    - teal
+outfit:
+  formal: "a tailored __clothing/hats__ outfit"

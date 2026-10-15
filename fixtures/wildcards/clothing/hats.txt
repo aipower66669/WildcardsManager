@@ -1,0 +1,3 @@
+beanie
+cap
+{fedora|trilby}

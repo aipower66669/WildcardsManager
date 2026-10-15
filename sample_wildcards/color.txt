@@ -1,0 +1,27 @@
+red
+crimson
+green
+emerald
+blue
+navy blue
+sky blue
+yellow
+gold
+pink
+rose
+orange
+purple
+violet
+black
+white
+ivory
+gray
+charcoal
+brown
+beige
+tan
+teal
+turquoise
+maroon
+olive
+{light|dark|vivid|pastel|muted} {red|blue|green|pink|purple|yellow|orange}

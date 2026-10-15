@@ -1,0 +1,22 @@
+asian
+east asian
+southeast asian
+south asian
+korean
+japanese
+chinese
+indian
+caucasian
+white
+european
+black
+african
+african american
+latino
+hispanic
+mexican
+brazilian
+middle eastern
+arabic
+persian
+mixed ethnicity

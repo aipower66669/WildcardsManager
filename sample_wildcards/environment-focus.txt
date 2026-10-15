@@ -1,0 +1,2 @@
+# Environment-focused sample root.
+__location__, __lighting__, __weather__, __style__

@@ -1,0 +1,17 @@
+soft lighting
+hard lighting
+diffused lighting
+high-key lighting
+low-key lighting
+dramatic lighting
+even lighting
+rim lighting
+backlighting
+silhouette lighting
+volumetric lighting
+cinematic lighting
+studio lighting
+bokeh background lights
+overexposed highlights
+underexposed mood lighting
+high dynamic range look

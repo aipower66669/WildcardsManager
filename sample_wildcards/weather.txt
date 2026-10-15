@@ -1,0 +1,10 @@
+clear sky
+partly cloudy
+overcast
+light rain
+heavy rain
+snowfall
+fog
+mist
+windy
+after the rain

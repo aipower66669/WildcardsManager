@@ -1,0 +1,24 @@
+standing
+standing casually
+standing with arms crossed
+sitting
+sitting upright
+sitting on a {chair|stool|bench|box|steps|sofa}
+one foot resting on a {chair|stool|bench|box}
+leaning against a wall
+leaning on a railing
+walking
+walking toward the camera
+running
+crouching
+kneeling
+looking over the shoulder
+hands in pockets
+holding a book
+holding a cup
+waving
+stretching
+reading
+writing
+working at a desk
+posing for a portrait

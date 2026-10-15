@@ -1,0 +1,3 @@
+# Sample master prompt for Wildcards Manager.
+# Open this folder as a library root and select 0main.txt.
+__people-count__, __age__, __race__, {__gender-male__, __clothes-male__, __hairstyle-male__ | __gender-female__, __clothes-female__, __hairstyle-female__ {|, __jewelry__}} {|, __expression__} {|, __view__} {|, __pose__} {|, __location__} {|, __lighting__} {|, __style__} 

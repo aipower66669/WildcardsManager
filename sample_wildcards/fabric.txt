@@ -1,0 +1,17 @@
+cotton
+linen
+denim
+wool
+flannel
+tweed
+jersey
+fleece
+corduroy
+suede
+leather
+silk
+satin
+chiffon
+knit
+canvas
+velvet

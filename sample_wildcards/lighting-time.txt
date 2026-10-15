@@ -1,0 +1,10 @@
+daytime
+bright midday sun
+golden hour
+blue hour
+sunrise light
+sunset light
+overcast daylight
+nighttime
+moonlit night
+twilight

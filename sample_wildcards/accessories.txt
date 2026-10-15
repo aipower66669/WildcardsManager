@@ -1,0 +1,11 @@
+{glasses|__glasses__}
+{jewelry|__jewelry__}
+scarf
+belt
+watch
+backpack
+handbag
+tote bag
+hat
+beanie
+cap

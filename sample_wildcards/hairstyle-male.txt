@@ -1,0 +1,14 @@
+short hair
+crew cut
+fade haircut
+side part
+messy hair
+slicked back hair
+wavy hair
+curly hair
+buzz cut
+undercut
+medium-length hair
+long hair tied back
+bald head
+{black|brown|blonde|auburn|gray|silver} hair

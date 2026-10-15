@@ -1,0 +1,4 @@
+{|__color__,} {|__fabric__,} {|,__time-period__} __clothes-male-type__
+{|__color__,} __clothes-male-type__ with __clothes-male-layer__
+__clothes-male-outfit__
+{|__color__,} __clothes-male-type__, __shoes-male__ {|, __accessories__}

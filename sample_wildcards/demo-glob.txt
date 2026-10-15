@@ -1,0 +1,2 @@
+# Demonstrates glob references for the graph viewer.
+in the style of __artists/*__

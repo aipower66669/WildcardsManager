@@ -1,0 +1,5 @@
+__lighting-quality__
+__lighting-time__
+__lighting-source__
+__lighting-quality__, __lighting-source__
+__lighting-time__, __lighting-quality__

@@ -1,0 +1,3 @@
+{modern|historic|minimalist} interior with __architecture-walls__ and __architecture-floors__
+grand hall with __architecture-ceilings__
+corridor featuring __architecture-details__

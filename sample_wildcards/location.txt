@@ -1,0 +1,3 @@
+{__indoor__|__outdoor__}
+indoors, __indoor__
+outdoors, __outdoor__

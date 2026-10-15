@@ -1,0 +1,20 @@
+t-shirt
+polo shirt
+button-up shirt
+oxford shirt
+sweater
+hoodie
+jeans
+chinos
+trousers
+shorts
+suit
+blazer
+jacket
+bomber jacket
+coat
+trench coat
+vest
+overalls
+workwear shirt
+flannel shirt

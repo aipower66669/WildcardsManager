@@ -1,0 +1,17 @@
+long straight hair
+long wavy hair
+curly hair
+bob haircut
+pixie cut
+ponytail
+high ponytail
+braided hair
+twin braids
+bun
+messy bun
+half-up hairstyle
+shoulder-length hair
+layered hair
+bangs
+side-swept bangs
+{black|brown|blonde|auburn|red|silver} hair
