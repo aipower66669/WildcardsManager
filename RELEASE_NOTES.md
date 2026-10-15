@@ -101,10 +101,11 @@ npm ci
 npm run dev
 ```
 
-`npm run check` is the typecheck and test gate used in GitHub Actions.
-`npm run dist` bumps the patch, builds a local installer into `release/`, and
-drops older installers. Point **Settings → App updates** at that folder to
-install from inside the app. Updates do not download from GitHub.
+Pushing a version tag (`v0.7.0`) runs the checks, builds
+`WildcardsManager-<version>-win-x64.exe`, and attaches it to that GitHub
+Release. `npm run dist` still bumps the patch and builds a local installer
+into `release/` for in-app updates. In-app update does not download from
+GitHub.
 
 ## Upgrading from v0.6
 

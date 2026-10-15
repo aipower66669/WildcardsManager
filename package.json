@@ -24,8 +24,9 @@
     "check": "npm run typecheck && npm test",
     "bump:patch": "node scripts/bump-patch.mjs",
     "clean:old-releases": "node scripts/clean-old-releases.mjs",
+    "build:win": "npm run build && electron-builder --win --publish never",
     "dist": "npm run bump:patch && npm run build && electron-builder --publish never && npm run clean:old-releases",
-    "dist:win": "npm run bump:patch && npm run build && electron-builder --win --publish never && npm run clean:old-releases",
+    "dist:win": "npm run bump:patch && npm run build:win && npm run clean:old-releases",
     "dist:mac": "npm run bump:patch && npm run build && electron-builder --mac --publish never && npm run clean:old-releases",
     "dist:linux": "npm run bump:patch && npm run build && electron-builder --linux --publish never && npm run clean:old-releases"
   },
@@ -92,6 +93,7 @@
     "artifactName": "WildcardsManager-${version}-${os}-${arch}.${ext}",
     "win": {
       "icon": "resources/icon.ico",
+      "signExecutable": false,
       "target": [
         {
           "target": "nsis",

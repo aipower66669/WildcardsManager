@@ -7,6 +7,11 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Version tags build the Windows NSIS installer in GitHub Actions and attach
+  the `.exe` (plus blockmap and `latest.yml`) to the GitHub Release.
+
 ## [0.7.0] - 2026-10-15
 
 First public release. The app already included these workflows; this version

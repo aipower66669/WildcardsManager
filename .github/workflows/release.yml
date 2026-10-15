@@ -1,32 +1,79 @@
-name: Release
+# Check + ship the NSIS installer only for version tags (GitHub Release).
+# Branch / PR pushes are covered by tests.yml.
+name: Build Windows
 
 on:
   push:
-    tags:
-      - "v[0-9]+.[0-9]+"
-      - "v[0-9]+.[0-9]+.[0-9]+"
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: build-windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  check:
+    name: Typecheck and test
+    runs-on: windows-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Create release
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check
+        run: npm run check
+
+  release:
+    name: Windows installer → GitHub Release
+    needs: check
+    # Tags ship an installer; workflow_dispatch is check-only (no release attach).
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build NSIS installer
+        env:
+          # No code-signing cert in CI. signExecutable is also false in package.json.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run build:win
+
+      - name: Verify installer
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem release -Filter "WildcardsManager-*.exe" -File
+          if (-not $exe) { throw "release/ is missing WildcardsManager-*.exe" }
+          $exe | Format-List Name, Length
+
+      - name: Attach installer to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
           name: Wildcards Manager ${{ github.ref_name }}
-          draft: false
-          prerelease: false
           body_path: RELEASE_NOTES.md
-          # Notes only — installers are built locally, not in CI.
           generate_release_notes: false
+          fail_on_unmatched_files: true
+          files: |
+            release/WildcardsManager-*.exe
+            release/*.exe.blockmap
+            release/latest.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

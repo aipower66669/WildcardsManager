@@ -324,8 +324,9 @@ unsigned artifacts. Signing and notarization are roadmap items. In-app **App
 updates** only launches an installer you already placed in the configured
 folder — it does not download releases from GitHub automatically.
 
-Platform packages should be built locally on their matching operating system
-(`npm run dist:win` / `dist:mac` / `dist:linux`). CI does not produce installers.
+A version tag builds the Windows installer in GitHub Actions and attaches the
+`.exe` to that release. macOS and Linux packages are still built locally
+(`npm run dist:mac` / `dist:linux`).
 
 ## Reporting a bug
 

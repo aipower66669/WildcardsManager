@@ -199,17 +199,20 @@ notarization. In-app updates launch a local installer from a configured
 `.github/workflows/tests.yml` runs `npm ci`, typecheck, and tests on Windows and
 Ubuntu for pushes/PRs to `dev`, `main`, or `master`.
 
-`.github/workflows/release.yml` creates a GitHub Release when you push a tag
-matching `vX.Y` or `vX.Y.Z`. It attaches `RELEASE_NOTES.md` as the body only —
-no installers, no Actions artifacts. Package locally (`npm run dist` /
-`dist:win` / …) when you need binaries.
+`.github/workflows/release.yml` runs on version tags (`v*`) and on manual
+dispatch. A tag push typechecks and tests, then builds the Windows NSIS
+installer (`npm run build:win`, no version bump) and attaches
+`WildcardsManager-*.exe`, the blockmap, and `latest.yml` to that GitHub
+Release, using `RELEASE_NOTES.md` as the body. Manual dispatch only runs the
+check. macOS and Linux installers are still packaged locally.
 
 Before tagging:
 
 1. set `package.json` version to the release you want (or rely on local
    `npm run dist` patch bumps during dogfooding, then set the final
    Major.Minor.0 / .Z explicitly before the tag);
-2. run tests/typecheck and package locally if you need installers;
+2. run tests/typecheck locally if you want them before the tag (the tag workflow
+   runs them again, then builds the Windows installer);
 3. move completed entries from `CHANGELOG.md`'s Unreleased section into the new
    version and update `RELEASE_NOTES.md`;
 4. commit and push (include the version bump);

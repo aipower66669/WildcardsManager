@@ -105,9 +105,8 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - Deterministic 69-file SFW `sample_wildcards/` with `0main`.
 - Windows NSIS, macOS DMG (x64/arm64), and Linux AppImage packaging config.
 - Test workflow on Windows/Linux for pushes and pull requests.
-- Tagged `vX.Y` / `vX.Y.Z` release workflow that publishes `RELEASE_NOTES.md`
-  as the GitHub Release body. Installers are built locally (`npm run dist`),
-  not in CI.
+- Tagged `v*` release workflow: Windows NSIS installer attached to the GitHub
+  Release (`RELEASE_NOTES.md` is the body). macOS and Linux packages stay local.
 - User/developer documentation and README screenshot.
 - PolyForm Noncommercial licensing for code and CC BY-NC-SA for sample content.
 
