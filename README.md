@@ -22,6 +22,7 @@ and [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts)
 > See [`LICENSE.md`](LICENSE.md).
 
 ![Wildcards Manager — dependency graph, file list, and in-app editor](docs/screenshot.jpg)
+![Wildcards Manager — dependency graph, file list, and in-app editor](docs/screenshot2.jpg)
 
 ## Why this exists
 
