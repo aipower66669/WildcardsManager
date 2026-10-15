@@ -75,14 +75,16 @@ root (not inside it). LoRA / checkpoint apps data use `!.wcm/` and
 `!Thumbnails/` next to those folders. Civitai community image downloads use a
 configured **images folder** (Settings) and an AppData download registry.
 
-### Civitai / updates extras (v0.5+)
+### Civitai / updates extras
 
-- Top bar **Civitai** → **Images** for community gallery browse/download.
-- **Hugging Face** button for Hub search/downloads.
+- Top bar **Civitai** → **Images** or **Videos** for community gallery
+  browse/download. Set the matching folder in Settings first.
+- **Hugging Face** button for Hub search/downloads (token under Settings → AI
+  when a repo is gated).
 - **Settings → General → App updates** to install a newer build from your local
   `release/` folder without launching the installer by hand.
 
-### Generation (v0.6)
+### Generation
 
 1. Set **prompts folder** and **ComfyUI** host under Settings / Library Manager
    / Settings → AI.

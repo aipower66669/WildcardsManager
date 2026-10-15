@@ -7,6 +7,27 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-15
+
+First public release. The app already included these workflows; this version
+documents them and fixes the cross-platform test failures that blocked CI.
+
+### Added
+
+- **Public documentation** for Library Manager (multiple libraries and every
+  folder pointer), path migration when a tree moves, Civitai **Videos**, LoRA
+  training-library series, LM Studio prompt assist, blocked Civitai authors,
+  checkpoint ratings, and the 3D generation output root.
+- Sample `artists/` files used by `demo-glob.txt`.
+
+### Fixed
+
+- Linux CI path tests no longer treat `D:\…` as a relative path under the
+  workspace.
+- Async model-folder walk uses the same directory checks as the sync walk, so
+  subfolders are not skipped when native `realpath` returns a different path
+  form (`\\?\` on Windows, symlink targets on Linux).
+
 ## [0.6.0] - 2026-10-05
 
 Dedicated Generation workspace, stronger Prompts tab, faster library analysis,
@@ -319,7 +340,8 @@ First public release.
 - Mutations validate supported extensions and use atomic replacement.
 - Ambiguous glob references are reported rather than silently rewritten.
 
-[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/aipower66669/WildcardsManager/releases/tag/v0.7.0
 [0.6.0]: https://github.com/aipower66669/WildcardsManager/releases/tag/v0.6.0
 [0.5.0]: https://github.com/aipower66669/WildcardsManager/releases/tag/v0.5.0
 [0.4.0]: https://github.com/aipower66669/WildcardsManager/releases/tag/v0.4.0

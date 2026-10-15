@@ -35,6 +35,33 @@ Notify lists or category definitions. Opening an older install migrates those
 datasets into the folder sidecars automatically (including moving any legacy
 in-tree `!.wcm` / `!Cache` under wildcards into the sibling layout).
 
+## Library Manager
+
+**Library Manager** (toolbar) holds more than one library. Each library has its
+own wildcards root, model folders, Civitai site (`civitai.com` or
+`civitai.red`), and validation platform (ComfyUI or Stable Diffusion). Switching
+libraries reloads that library’s sidecar lists; it does not mix them.
+
+Folder pointers on a library:
+
+| Pointer | Used for |
+| --- | --- |
+| **Wildcards folder** | Dynamic Prompts library (the graph) |
+| **LoRA folder** | Installed LoRAs, existence checks, downloads |
+| **Checkpoint folder** | Installed checkpoints and benchmark source files |
+| **LoRA training library** | Dataset folders with `dataset.json` for multi-step LoRA series previews |
+| **Prompts folder** | `!gen.txt` trees and sample images (shared by every Generation style) |
+| **Generation output (Realistic / Hentai / 3D)** | Where that style writes images. Realistic may fall back to the Prompts folder. Hentai and 3D need their own roots before you generate with that style |
+| **Checkpoint Benchmark folder** | WCG samples and `benchmark-stats.json` from Generation → Benchmark |
+| **Images folder** / **Videos folder** | Civitai community downloads (`<folder>/<base model>/…`), set in Settings |
+
+**Migrate library paths…** rewrites those pointers when a whole tree
+changes drive or parent — for example `D:\ComfyUI\…` to `E:\AI\ComfyUI\…`.
+Preview the plan first. Paths outside the old prefix stay put unless you set an
+override for that field. The tool rewrites folder pointers and stored absolute
+paths (master images, recent roots, training root). It does not move the files
+on disk; move the folders yourself, then apply the plan.
+
 ## Files sidebar
 
 Typing in **Filter files…** matches keys/paths. The mode selector narrows the
@@ -146,6 +173,18 @@ the app reads a sibling **`ModelName.txt`** (same stem as the model file — not
 `ModelName.safetensors.txt`) for `HASH256` / `SHA256` / `AutoV2` lines and
 derives AutoV2 from those when available.
 
+Checkpoints can take a local **half-star rating** stored in that model root’s
+`!.wcm/models.json` (not in AppData). The right pane has a **Benchmark** tab
+when Generation → Benchmark has written samples for that file, and a
+**Website** tab for the embedded Civitai page.
+
+#### LoRA training series
+
+Point **LoRA training library** at the dataset root. A multi-step series
+(`Name_000250`, `Name_000500`, …) can show the validation images recorded in
+that dataset’s `dataset.json`. Open a thumb to view the file. This is a
+preview of training output, not a trainer.
+
 ### Prompts workspace
 
 The **Prompts** tab manages prompt folders under the configured prompts root
@@ -213,6 +252,25 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   reveal that image, or the trash icon to delete it.
 - **Categorize** appends the current prompt into a chosen folder’s `!gen.txt`.
 
+Generation can start ComfyUI from the launch shortcut in **Settings → AI** when
+the server is offline. The workflow is stored under
+`%AppData%/Roaming/wildcards-manager/` (API graph plus LiteGraph UI JSON). The
+graph must include the LT nodes from `comfyui-lora-training/` (Prompt, Negative,
+Seed, Model, optional CLIP / VAE, Width, Height, Save Output). Copy or symlink
+that folder into ComfyUI `custom_nodes/` and restart ComfyUI before the first
+run. See that folder’s README for wiring.
+
+### LM Studio prompt assist
+
+On a wildcard’s details pane, **Prompt** opens a local LM Studio assist
+(OpenAI-compatible server). Configure host, model, and an optional API key
+under **Settings → AI → LM Studio**, then Test.
+
+Presets (add variations, and the others in the dialog) plus a free-text
+instruction propose a new file body. Saved prompts are a personal library of
+those instructions. **Nothing is written until you apply the proposal** into
+the open editor. The assist reads the editor draft, not a hidden copy on disk.
+
 ### Search workspace
 
 Use the toolbar **Search** button (magnifying glass) or the **Search** tab to
@@ -260,7 +318,7 @@ Also configure **LoRA folder**, **checkpoint folder**, and (for Images)
   detached next time). **Attach** docks it back as a modal. Size, position,
   maximized state, and attach/detach preference are remembered. Closing the
   main app also closes the Civitai window and quits.
-- Mode chips: **LoRA**, **Checkpoint**, **Images** (remembered per library).
+- Mode chips: **LoRA**, **Checkpoint**, **Images**, **Videos** (remembered per library).
 - Model tabs: **Browse**, **Queued**, **Downloaded**, **Maybe**, **Archive**,
   **Notify me**. Badges and status tags include **New**, **Installed** (local
   file match by **AutoV2** hash or filename; or manually marked), **Archived**,
@@ -304,6 +362,19 @@ Also configure **LoRA folder**, **checkpoint folder**, and (for Images)
   holds too early, use **Continue to end** to ignore the tip for that walk.
 - Saved files get **Date modified** set to the creator’s Civitai upload time.
 - Sub-tabs: Browse / Downloaded / Archive; filters are remembered.
+
+#### Videos tab
+
+Same shape as Images, aimed at community **videos**:
+
+- Set **Videos folder** in Settings. Files land under
+  `<videosFolder>/<base model>/…`.
+- Sort feeds, SFW/NSFW mode, and **Download all** with the same per-feed tip
+  watermarks and catch-up summary as Images.
+- Downloaded ids are tracked separately from images. Changing the videos folder
+  does not clear that registry.
+- **Blocked authors** (Settings → Civitai) hide that creator’s model and media
+  cards. Blocking is per library.
 
 #### LoRA download categories and the download dialog
 

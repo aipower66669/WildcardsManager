@@ -108,6 +108,8 @@ Shipped today:
 - Global search across wildcards and model folders; Prompts workspace; Generation
   tab (ComfyUI + LT node pack);
 - Civitai Images / Videos Download all with feed frontiers and Browse catch-up;
+- Library Manager (multiple libraries, path migration), LoRA training-series
+  previews, LM Studio prompt assist, checkpoint ratings, blocked authors;
 - Per-library sidecars (wildcards sibling `.wcm/`; model-root `!.wcm` /
   `!Thumbnails`);
 - a deterministic, validated, SFW sample library.

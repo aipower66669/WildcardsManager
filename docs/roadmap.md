@@ -43,8 +43,14 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
   samples (v0.6).
 - **Generation** tab — ComfyUI queue, Edit/Save Workflow, style profiles,
   categorize into prompts (v0.6).
-- **Civitai Images** browse/download/archive + background Download all (v0.5);
-  feed frontiers / Browse catch-up (v0.6).
+- **Civitai Images and Videos** browse/download/archive + background Download
+  all (v0.5); feed frontiers / Browse catch-up (v0.6).
+- **Library Manager** with multiple libraries, per-style generation output
+  roots, checkpoint benchmark folder, LoRA training library, and path migration
+  when a tree moves (documented in v0.7).
+- **LM Studio** prompt assist on the wildcard editor (local server; writes only
+  after you apply a proposal).
+- Checkpoint half-star ratings; blocked Civitai authors.
 - **Hugging Face Hub** browser and download queue (v0.5).
 - **In-app updates** from a local electron-builder `release/` folder (v0.5).
 
@@ -99,8 +105,9 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - Deterministic 69-file SFW `sample_wildcards/` with `0main`.
 - Windows NSIS, macOS DMG (x64/arm64), and Linux AppImage packaging config.
 - Test workflow on Windows/Linux for pushes and pull requests.
-- Tagged `vX.Y` / `vX.Y.Z` release workflow producing platform artifacts and a
-  GitHub Release.
+- Tagged `vX.Y` / `vX.Y.Z` release workflow that publishes `RELEASE_NOTES.md`
+  as the GitHub Release body. Installers are built locally (`npm run dist`),
+  not in CI.
 - User/developer documentation and README screenshot.
 - PolyForm Noncommercial licensing for code and CC BY-NC-SA for sample content.
 

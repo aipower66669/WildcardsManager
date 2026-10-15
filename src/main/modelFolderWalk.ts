@@ -109,33 +109,6 @@ export function isSafeWalkDirectory(
   return !visited.has(fsPathKey(real));
 }
 
-async function isSafeWalkDirectoryAsync(
-  abs: string,
-  rootReal: string,
-  visited: Set<string>,
-): Promise<boolean> {
-  let lst: fs.Stats;
-  try {
-    lst = await fs.promises.lstat(abs);
-  } catch {
-    return false;
-  }
-  if (!lst.isDirectory() && !lst.isSymbolicLink()) return false;
-  let real: string;
-  try {
-    real = await fs.promises.realpath(abs);
-  } catch {
-    return false;
-  }
-  if (!isPathInsideRoot(rootReal, real)) return false;
-  try {
-    if (!(await fs.promises.stat(real)).isDirectory()) return false;
-  } catch {
-    return false;
-  }
-  return !visited.has(fsPathKey(real));
-}
-
 function enterDir(abs: string, rootReal: string, visited: Set<string>): boolean {
   let real: string;
   try {
@@ -208,8 +181,13 @@ export function walkModelFolderEntries(
 const DEFAULT_YIELD_EVERY = 32;
 
 /**
- * Same walk as `walkModelFolderEntries`, but uses async fs and yields so
+ * Same walk as `walkModelFolderEntries`, yielding between weight files so
  * Electron IPC / the editor stay responsive during a large folder scan.
+ *
+ * Listing and directory checks stay on the sync walker. `fs.promises.realpath`
+ * is the native Windows call and can return a `\\?\` path (or a different
+ * symlink target) than `fs.realpathSync`, which made this walk skip every
+ * subdirectory on CI while the sync walk succeeded.
  */
 export async function walkModelFolderEntriesAsync(
   root: string,
@@ -229,7 +207,7 @@ export async function walkModelFolderEntriesAsync(
 
     let names: string[];
     try {
-      names = await fs.promises.readdir(current);
+      names = fs.readdirSync(current);
     } catch {
       return;
     }
@@ -240,19 +218,19 @@ export async function walkModelFolderEntriesAsync(
       const kind = classifyModelWalkName(name, weightExts);
       if (kind === 'skip') continue;
       const abs = path.join(current, name);
-      sinceYield += 1;
-      if (sinceYield >= yieldEvery) {
-        sinceYield = 0;
-        opts?.onProgress?.(files);
-        await new Promise<void>((resolve) => setImmediate(resolve));
-      }
       if (kind === 'weight') {
         const relative = path.relative(root, abs).split(path.sep).join('/');
         files += 1;
         onFile(abs, relative);
+        sinceYield += 1;
+        if (sinceYield >= yieldEvery) {
+          sinceYield = 0;
+          opts?.onProgress?.(files);
+          await new Promise<void>((resolve) => setImmediate(resolve));
+        }
         continue;
       }
-      if (await isSafeWalkDirectoryAsync(abs, rootReal, visited)) {
+      if (isSafeWalkDirectory(abs, rootReal, visited)) {
         await visit(abs);
       }
     }

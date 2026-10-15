@@ -1,72 +1,98 @@
-# Wildcards Manager v0.6
+# Wildcards Manager v0.7
 
-Package version: **0.6.0**  
-Release date: **October 5, 2026**
+Package version: **0.7.0**  
+Release date: **October 15, 2026**
 
-Wildcards Manager v0.6 focuses on a full **Generation** workspace with ComfyUI,
-a much stronger **Prompts** tab, faster library analysis, and more reliable
-Civitai **Images / Videos** Download-all catch-up.
+v0.7 is the first public release. It documents the full desktop app — wildcard
+graph, model libraries, Civitai, generation — and fixes the test failures that
+showed up on GitHub Actions.
 
-## Highlights
+The [user guide](docs/user-guide.md) is the complete reference. This note is the
+map.
 
-### Generation tab
+## What the app is
 
-A dedicated **Generation** tab drives ComfyUI from the app:
+A desktop manager for Dynamic Prompts wildcard libraries used by
+[Stable Diffusion WebUI Dynamic Prompts](https://github.com/adieyal/sd-dynamic-prompts)
+and [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts).
 
-- Prompt source: typed **Use this prompt** or a selected prompt folder’s
-  `!gen.txt` (multi-line decode, comments, random pick with seed).
-- Style profiles (Realistic / Hentai), checkpoint / CLIP / VAE, size, seed, and
-  extra positive / negative text.
-- **Edit Workflow** / **Save Workflow** for the ComfyUI graph (API + LiteGraph
-  UI JSON under `%AppData%/wildcards-manager/`).
-- Shared **comfyui-lora-training** node pack (LT Negative / CLIP / VAE / Width /
-  Height / Save Output, plus existing LT nodes).
-- ComfyUI host / Test / Check install under **Settings → AI**.
-- Collapsible **Last output** preview (persisted) for long unattended runs.
-- **Categorize** a generated prompt into a prompt folder’s `!gen.txt`.
+Open a folder. See dependencies as a graph. Fix missing files and cycles. Edit
+in place. Refactor references with undo. Browse and download models. Generate
+through ComfyUI from prompt folders.
 
-### Prompts workspace
+Noncommercial only. See [LICENSE.md](LICENSE.md).
 
-- Folder tree with **Rename**, **Delete** (native confirm), and **Add
-  sub-folder** (Explorer-style inline rename); **+** on the root path for
-  top-level folders.
-- Validate every `!gen.txt` for missing / invalid wildcards; filter folders with
-  issues.
-- Collapsible **Samples** panel — while collapsed, folder selection does **not**
-  scan for random sample images.
+## Workspaces
 
-### Library performance
+| Tab | What you do there |
+| --- | --- |
+| **Wildcard files** | Graph, filters, diagnostics, editor, refactors, expansion, simulation |
+| **LoRA files** | Installed LoRAs, Civitai match, wildcard callers, training-step series |
+| **Checkpoint files** | Installed checkpoints, hash, rating, benchmark samples, Civitai page |
+| **Prompts** | `!gen.txt` folders, validation, coverage, samples |
+| **Generation** | ComfyUI queue from a typed prompt or a prompt folder |
+| **Search** | Wildcard names/content and LoRA / checkpoint filenames |
 
-- Analyze / wildcard and LoRA reference resolution moved onto workers and
-  caches so large libraries stay responsive with far fewer UI freezes.
+## Library Manager
 
-### Civitai Images / Videos catch-up
+One app, many libraries. Each library stores its own:
 
-- Per-feed **tip watermarks** so Download all / Browse stop once they re-enter
-  already-covered Newest (or ranked) territory.
-- Browse catch-up no longer promotes the live first page into the tip (which
-  caused “Caught up through …” while older unarchived cards still existed).
-- Newest Browse requires a streak of settled pages before holding; **Continue
-  to end** ignores the tip for that run.
-- Empty / error tip pages no longer poison `feedExhaustedAt`.
-- Sort-finished **insight panel** (saved/skipped, pages, date span, session
-  totals, pause countdown).
+- wildcards, LoRA, and checkpoint folders
+- LoRA training library (`dataset.json` previews for multi-step series)
+- prompts folder and separate Generation output roots for **Realistic**,
+  **Hentai**, and **3D**
+- checkpoint benchmark folder
+- Civitai site (`civitai.com` or `civitai.red`) and validation platform
 
-### Other
+**Migrate library paths…** rewrites those pointers after you relocate a tree
+(drive or parent change). It does not move the files. Preview first; override
+any folder that should not follow the prefix.
 
-- Custom separators in choice / variant semantics.
-- Local `npm run dist` / `dist:*` auto-increment the **patch** before packaging
-  (skipped in CI) and prune older `WildcardsManager-*` files from `release/`.
+Wildcard lists live in a sibling `<name>.wcm/` folder so ComfyUI Dynamic
+Prompts does not scan them. Model hashes, ratings, and thumbnails stay next to
+the model roots (`!.wcm/`, `!Thumbnails/`).
+
+## Civitai and Hugging Face
+
+- LoRA and checkpoint browse, queue, Archive / Maybe / Notify, download
+  categories, Shift+click download.
+- **Images** and **Videos** community feeds, Download all, and per-feed
+  catch-up. Each needs its own folder in Settings.
+- **Blocked authors** hide a creator’s cards for that library.
+- Early-access models sit on **Notify me** until you check that they unlocked.
+- Hugging Face Hub search and download queue. Gated repos need a token under
+  Settings → AI.
+
+Browse works without an API key. Many model downloads do not.
+
+## Generation and LM Studio
+
+Generation talks to ComfyUI through the `comfyui-lora-training` node pack in
+this repo (`custom_nodes/`). Settings → AI holds the host, a launch shortcut,
+and Test / Check install.
+
+- Typed prompt or prompt-folder `!gen.txt` (optional recursive sub-folders).
+- Style profiles with separate output folders.
+- **Benchmark** walks checkpoint files and records timings.
+- **Edit Workflow** / **Save Workflow**.
+- **Categorize** appends a prompt into a folder’s `!gen.txt`.
+
+**LM Studio** (local server) can propose edits to the open wildcard file.
+Nothing is saved until you apply the proposal.
+
+## Prompts coverage
+
+**Coverage** expands every decoded `!gen.txt` line and reports wildcards that
+are never reached or over-used. Results stay in the library sidecar. Ignore a
+file to keep it off the “never used” list.
 
 ## Installation
 
-Download the appropriate artifact from the
-[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.6.0).
+Download an installer from the
+[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.7.0)
+when one is attached, or build it yourself. Installers are unsigned.
 
-Installers are not code-signed or notarized. Your operating system may display
-an unknown-publisher warning.
-
-To run from source:
+From source (Node.js 22.12+):
 
 ```powershell
 git clone https://github.com/aipower66669/WildcardsManager.git
@@ -75,50 +101,34 @@ npm ci
 npm run dev
 ```
 
-Node.js 22.12 or newer is required.
+`npm run check` is the typecheck and test gate used in GitHub Actions.
+`npm run dist` bumps the patch, builds a local installer into `release/`, and
+drops older installers. Point **Settings → App updates** at that folder to
+install from inside the app. Updates do not download from GitHub.
 
-After packaging (`npm run dist:win`), set **Settings → App updates** to the
-`release/` folder so later builds can be installed from inside the app. Each
-local `dist` run bumps the patch (`0.6.0` → `0.6.1` → …) so Check for update
-detects the new installer.
+## Upgrading from v0.6
 
-## Upgrading from v0.5
+Libraries and sidecars do not need a manual migration for this release. If you
+moved model or wildcard folders onto another drive, use Library Manager →
+**Migrate library paths…** instead of editing paths by hand in every field.
 
-- Configure **ComfyUI** under **Settings → AI** (host/port, optional launch
-  path) before using the Generation tab.
-- Install / update the shared **comfyui-lora-training** custom node pack if you
-  use Generation workflows.
-- Set a **prompts folder** (Library Manager / Settings) for the Prompts and
-  Generation folder pickers.
-- Existing Image Download-all frontiers keep working; Browse catch-up tip
-  rewrites from older builds are corrected by this release’s tip rules.
-- In-app updates still use your local `release/` folder (same as v0.5).
+Install or update `comfyui-lora-training` in ComfyUI if Generation reports
+missing LT nodes.
 
 ## Known limitations
 
-- Compatibility intentionally covers a documented subset of Dynamic Prompts;
-  fuzzy globbing and extension-specific constructs can differ.
-- Undo/redo history does not survive an app restart.
-- Nested YAML/JSON keys can be edited manually but are not independent refactor
-  targets.
-- Folder-level wildcards refactors, split/merge, bulk cleanup, and the dedicated
-  library health report are not yet available.
-- Civitai model “Include NSFW” / site choice still matters: use **`civitai.red`**
-  for mature **model** catalogs; Images has its own SFW/NSFW mode on the Images
-  tab.
-- The catalog **index** count is the synced type/base-model slice and still
-  includes installed/hidden entries — it is not “how many Archive shown clicks
-  remain.”
-- Generation requires a running ComfyUI with the LT node pack and a saved
-  workflow; it is not a full ComfyUI studio replacement.
-- Installers are unsigned. In-app update only launches a local installer you
-  already built into the configured folder (not auto-download from GitHub).
-- On Windows, file **Date created** may still show download time; **Date
-  modified** is stamped to the Civitai upload time for Images downloads.
+- Documented Dynamic Prompts subset only. Fuzzy globs and extension-only syntax
+  can differ from A1111 or ComfyUI.
+- Undo/redo does not survive a restart.
+- Nested YAML/JSON keys are not independent refactor targets.
+- No folder-level refactor, split/merge, bulk cleanup, or single library-health
+  report yet.
+- Generation is a queue plus a saved workflow, not a ComfyUI replacement.
+- In-app update only runs an installer you already built into the configured
+  folder.
+- Installers are unsigned.
 
 ## Licensing
 
 - Software: PolyForm Noncommercial License 1.0.0.
 - `sample_wildcards/`: CC BY-NC-SA 4.0.
-
-See [LICENSE.md](LICENSE.md) for complete terms.

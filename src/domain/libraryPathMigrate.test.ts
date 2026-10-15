@@ -193,11 +193,14 @@ describe('remapMasterImagesStore', () => {
     const newPrefix = abs('E:', 'ComfyUI');
     const ckpt = path.join(oldPrefix, 'models', 'checkpoints', 'a.safetensors');
     const master = path.join(oldPrefix, 'masters', 'a.jpg');
+    // Stored keys are lowercased. On Windows that still matches a prefix;
+    // on POSIX, lowercasing `.../D/ComfyUI` makes it a different path.
+    const storedKey = win ? ckpt.toLowerCase() : ckpt;
     const { store, remappedEntries } = remapMasterImagesStore(
       {
         version: 1,
         byPath: {
-          [ckpt.toLowerCase()]: {
+          [storedKey]: {
             masterAbsolutePath: master,
             genAbsolutePaths: [path.join(oldPrefix, 'masters', 'a_01.jpg')],
             mastersFolder: path.join(oldPrefix, 'masters'),

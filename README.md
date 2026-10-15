@@ -48,7 +48,7 @@ turning into a ComfyUI or A1111 plugin.
 | **Validate and navigate** | Missing exact references, unmatched globs, cycles, malformed wildcard/brace/pipe/`$$` syntax, empty files, node vs other graph issues, and source-aware line/column jumps |
 | **Check LoRAs** | Optional LoRA folder for `<lora:name:weight>` existence checks; search installed models by name; warn on invalid/empty tags and unused models; ignore expected unused LoRAs |
 | **Manage LoRA / checkpoint folders** | List installed models (follows folder symlinks/junctions); filters (used/unused, sidecars, Civitai match, missing hash); identity panel with AutoV2, size, folder preview, and Civitai cover; embedded Civitai model page; LoRA reverse-refs into wildcards plus in-panel editing; **training-step series** (`Name_000250` …) for unused ignore and compact pick snippets; **LoRA download category manager** (folder + wildcard + weights) from LoRA or Wildcard tabs, including **Set/Edit as Category** on a selected wildcard |
-| **Browse Civitai** | In-app browser for LoRAs, checkpoints, and **community Images**. **`civitai.com` = SFW catalog**; **`civitai.red` = NSFW catalog** (choose the site in Settings). Browse/search works without an API key; **many model downloads need an API key**. Detachable window; category/architecture/SDXL-family filters; **windowed catalog** with local search; Archive / Maybe / Notify; Installed via **AutoV2**; **persistent download queue** with Queued tab, pause/resume, **download console**; **LoRA download categories**; optional extra comment/prompt; **Shift+click Download**; Images: sort feeds, SFW/NSFW modes, tool filter, Download all (background + sort cycling), upload-time file dates |
+| **Browse Civitai** | In-app browser for LoRAs, checkpoints, and **community Images and Videos**. **`civitai.com` = SFW catalog**; **`civitai.red` = NSFW catalog** (choose the site in Settings). Browse/search works without an API key; **many model downloads need an API key**. Detachable window; category/architecture/SDXL-family filters; **windowed catalog** with local search; Archive / Maybe / Notify; Installed via **AutoV2**; **persistent download queue** with Queued tab, pause/resume, **download console**; **LoRA download categories**; optional extra comment/prompt; **Shift+click Download**; Images: sort feeds, SFW/NSFW modes, tool filter, Download all (background + sort cycling), upload-time file dates |
 | **Browse Hugging Face** | In-app Hub search with persisted filters and a download queue |
 | **Keep library data with the library** | Per-library lists (Archive / Maybe / Notify / categories) and wildcards caches live in a sibling `<wildcardsBasename>.wcm/` folder (outside the ComfyUI-scanned tree); LoRA / checkpoint use `!.wcm/` and `!Thumbnails/` next to those roots; AppData stores path pointers and UI prefs only |
 | **Update from inside the app** | Settings → App updates: point at your local `release/` folder, check for a newer installer, install and relaunch |
@@ -134,7 +134,7 @@ Bug reports are also useful — include OS, Node version, a minimal wildcard fol
 
 ## Releases
 
-See the [release notes](RELEASE_NOTES.md) for **v0.6** and the
+See the [release notes](RELEASE_NOTES.md) for **v0.7** and the
 [changelog](CHANGELOG.md) for the complete version history.
 
 ## License

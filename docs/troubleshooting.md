@@ -131,6 +131,10 @@ weights, or extra comment/prompt.
    Settings once on the old images folder (or restore AppData) so migration can
    merge a legacy `!.wcm/downloaded-images.json` if present.
 
+**Videos** use the same pattern with a **videos folder** and a separate download
+registry. A missing videos folder disables video download the same way a missing
+images folder disables image download.
+
 **Download all** continues in the background when you leave the Images tab; use
 **Stop** on Images (or wait for the between-sort pause) to halt it.
 
