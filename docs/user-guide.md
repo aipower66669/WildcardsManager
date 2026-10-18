@@ -12,7 +12,7 @@ library/
   collections.yaml        -> keys declared inside the document
 
 library.wcm/              -> sibling app-data folder (not scanned by ComfyUI DP)
-  library.json            -> per-library lists & download categories
+  library.json            -> per-library lists, download categories, prompt substitutions
   validation.json
   prompt-coverage.json    -> Prompts Coverage simulation report
   backups/
@@ -31,9 +31,12 @@ previews.
 
 **AppData** (`%AppData%/Roaming/wildcards-manager` on Windows) stores path
 pointers, UI preferences, and the Civitai API key — not Archive / Maybe /
-Notify lists or category definitions. Opening an older install migrates those
-datasets into the folder sidecars automatically (including moving any legacy
-in-tree `!.wcm` / `!Cache` under wildcards into the sibling layout).
+Notify lists or category definitions. `npm run dev` and the installed app
+share that folder: startup pins it, and if an older build left files under
+`Wildcards Manager`, files the shared folder does not already have are copied
+in once. Opening an older install migrates library datasets into the folder
+sidecars automatically (including moving any legacy in-tree `!.wcm` / `!Cache`
+under wildcards into the sibling layout).
 
 ## Library Manager
 
@@ -174,7 +177,13 @@ the app reads a sibling **`ModelName.txt`** (same stem as the model file — not
 derives AutoV2 from those when available.
 
 Checkpoints can take a local **half-star rating** stored in that model root’s
-`!.wcm/models.json` (not in AppData). The right pane has a **Benchmark** tab
+`!.wcm/models.json` (not in AppData). Each file has a **Use in this library**
+tick, on by default. Untick a model this library should not run: it leaves
+that library’s Generation checkpoint list and is skipped by its Benchmark.
+Another library that shares the same checkpoint folder keeps its own tick.
+Those paths are `ignoredCheckpoints` in the library’s `library.json` (the
+sibling `<wildcards folder name>.wcm` next to the wildcards root). A bare
+filename matches that file in any subfolder. The right pane has a **Benchmark** tab
 when Generation → Benchmark has written samples for that file, and a
 **Website** tab for the embedded Civitai page.
 
@@ -199,9 +208,10 @@ The **Prompts** tab manages prompt folders under the configured prompts root
   can debug one line without commenting out the others. Prefix with `[xN]`,
   `[W=N]`, or `[WEIGHT=N]` (integer N) to weigh that prompt — decode expands it
   into N copies so it is relatively more likely to be picked (tag stripped).
-- **Coverage** (toolbar) runs a background simulation over **every** decoded
-  prompt line in every `!gen.txt`: each line is expanded with the usual Monte
-  Carlo wildcard walk (`iterations` times, same seed setting as Analyze
+- **Coverage** (toolbar) switches to **Generation** and runs a background
+  simulation over **every** decoded prompt line in every `!gen.txt`: each line
+  is expanded with the usual Monte Carlo wildcard walk (`iterations` times,
+  same seed setting as Analyze
   simulation). It reports which wildcard **files** are never reached, which are
   hot / over-used, and which prompt folders drive them. The run uses a worker
   thread so the UI stays responsive; close the dialog anytime — the toolbar
@@ -227,20 +237,36 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   selected prompt folder. With a folder selected, **Recursive** includes
   sub-folders that have `!gen.txt`; off uses only that folder.
 - Style profiles (**Realistic** / **Hentai** / **3D**), checkpoint / CLIP / VAE,
-  size, seed, and extra prompts. Each style has its own Generation output root
+  size, seed, and extra prompts. Seed ≤ 0 (the dice button) rolls a new seed
+  on every run. **Randomize**, next to it, writes one random number into Seed
+  and keeps that number. Each style has its own Generation output root
   in **Library Manager** (Realistic defaults to the Prompts folder). Folder mode
   writes `{styleOutput}/{prompt folder}/New`; typed prompts write to the style
   root.
 - **Benchmark** (checkbox next to Checkpoint) walks every `.safetensors` file in
-  the library Checkpoint folder. Set **Checkpoint Benchmark folder** in Library
+  the library Checkpoint folder that is still ticked **Use in this library**.
+  Set **Checkpoint Benchmark folder** in Library
   Manager first. Each job writes one WCG image under
   `{benchmarkRoot}/{fileStem}/` (duplicate stems share a folder). **Once** = one
   image; **Infinite** continues until every checkpoint has **10** images (or
-  Cancel). Timings land in `{benchmarkRoot}/benchmark-stats.json`. Those samples
+  Cancel). Deleting a sample image drops that timing and leaves the slot open,
+  so the next Benchmark run replaces it. Each saved timing is the sampler’s own steps, from the first step
+  through the last, so model load and the file save are not part of the number.
+  A run that never reports that full range is not saved — the image is removed
+  and the benchmark tries again. Every saved timing is drawn. The blue average
+  and the min–max bar use only the **5 fastest** runs. Timings land in
+  `{benchmarkRoot}/benchmark-stats.json`. Those samples
   also appear on **Checkpoint files** in the right pane **Benchmark** tab
   (selected by default when samples exist; **Website** is the Civitai page).
   Use the graph button next to the Benchmark checkbox for a sortable avg-time
-  line graph (movable/resizable window) — hover a point for the name, click to
+  line graph (movable/resizable window). Filter the names (case-insensitive).
+  Rating order uses `field_rating` from each sample folder’s `mfe_meta` stream,
+  hides folders that have no rating, and draws the number under each point.
+  Weight order mixes that rating with the average time: 100 means the checkpoint
+  is both the fastest and the highest rated, and a fast weak result or a slow
+  top-rated one scores lower. The weight is drawn under each point.
+  The name filter and the sort are remembered when the window is closed.
+  Hover a point for the name, click to
   load that checkpoint in the dropdown.
 - **Edit Workflow** / **Save Workflow** for the Comfy graph. **Save Workflow**
   writes the graph the app queues. Until that file exists, Generation has
@@ -252,6 +278,16 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   `comment` — same source My File Explorer uses). Use the folder icon to
   reveal that image, or the trash icon to delete it.
 - **Categorize** appends the current prompt into a chosen folder’s `!gen.txt`.
+- **Substitutions** (next to Categorize) edits this library’s prompt
+  replacements. Drag the title to move the window, drag the corner to resize,
+  or double-click the title to maximize — the size is remembered. Before wildcards expand, each rule whose keyword is in the
+  selected checkpoint’s file name (case-insensitive; folders and the extension
+  are ignored) replaces every exact Find text. That applies to **Use this
+  prompt** and to the line picked from the selected prompt folder. Example:
+  model contains `Kroma`, find `__loraname__`, replace
+  `__loraname-KromaVersion__`. A Benchmark run uses the checkpoint being
+  timed. Rules are stored as `promptSubstitutions` in that library’s
+  `library.json`.
 
 Generation can start ComfyUI from the launch shortcut in **Settings → AI** when
 the server is offline. The saved graph lives under

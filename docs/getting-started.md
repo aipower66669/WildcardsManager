@@ -183,7 +183,24 @@ under Electron's per-user `userData/backups/` directory and survive restarts.
 
 ## Preview prompts
 
-With a text or structured root selected, click **Expand**:
+**Expand** follows the tab you are on:
+
+- **Wildcard files:** with a text or structured file selected, expand that file.
+- **Prompts:** expand the selected folder’s `!gen.txt`. Every decoded line is a
+  prompt (the same lines Coverage walks), including unsaved editor text.
+- **Generation:** expand the single prompt **Once** would queue. The dialog
+  uses the Generation seed, **Use this prompt** or **Use selected prompt
+  folder** (including Randomize and Recursive), applies this library’s
+  checkpoint prompt substitutions, then shows wildcard expansions of that
+  line. Additional positive text is included. Seed `≤ 0` rolls a new
+  seed each time you click Generate, the same way Once does.
+- **LoRA files, Checkpoint files, and Search:** Expand switches to **Wildcard
+  files** and expands the selected wildcard file.
+
+**Simulate** always runs on **Wildcard files** and switches to that tab.
+**Coverage** always opens on **Generation** and switches to that tab.
+
+Inside the dialog:
 
 - **Random:** generate repeatable samples from a numeric seed; weights affect
   selection.

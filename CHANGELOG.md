@@ -9,12 +9,53 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Generation **Randomize** (next to the seed dice) writes one random number
+  into Seed and keeps it. The dice button still sets −1, which rolls a new
+  seed on every run.
+- Generation **Substitutions** opens as a movable, resizable window (size
+  remembered). It stores per-library prompt
+  replacements. When the checkpoint file name contains a keyword, Find text in
+  the selected prompt — typed or picked from a prompt folder — is replaced
+  before wildcards expand. Rules live in `promptSubstitutions` in that
+  library’s `library.json`.
+- Checkpoint files can be unticked per library (**Use in this library**). An
+  unticked model stays on disk, drops out of that library’s Generation list,
+  and is skipped by its Benchmark. Other libraries that share the checkpoint
+  folder keep their own ticks. Paths live in `ignoredCheckpoints` in that
+  library’s `library.json`.
 - Version tags build the Windows NSIS installer in GitHub Actions and attach
   the `.exe` (plus blockmap and `latest.yml`) to the GitHub Release.
 - **Generation install guide.** `ComfyUI-Workflow/` ships the
   `comfyui-lora-training` node zip and a ComfyUI graph
   (`WildcardManager-ComfyUI-Generation-Workflow.json`). The user guide explains
   how to install both and save the graph so the Generation tab can queue.
+
+### Fixed
+
+- `npm run dev` and the installed app share
+  `%AppData%/Roaming/wildcards-manager`. Startup pins that folder so a
+  packaged build cannot keep a separate `Wildcards Manager` profile. If that
+  older folder exists, files it has and the shared folder lacks are copied
+  in; files already saved from dev stay as they are.
+- When both the sibling `library.json` and a leftover in-tree `!.wcm`
+  `library.json` exist, fields present on only one of them are kept. Prompt
+  substitutions saved beside the library stay visible even when the older
+  file still has the longer membership lists.
+- Benchmark results can filter by checkpoint name. Rating order reads
+  `field_rating` from each sample folder’s `mfe_meta` stream, hides folders
+  with no rating, and shows that number under each point. Weight order mixes
+  that rating with average time (100 = fastest and top rated). The name filter
+  and sort are remembered.
+- Deleting a Checkpoint Benchmark image removes that timing. The next
+  Benchmark run generates a replacement until the checkpoint has 10 images
+  again.
+- Checkpoint benchmark timings measure the sampler steps from the first step
+  through the last. A run that never reports that full range is not saved
+  (the image is discarded and retried). The chart still keeps every saved
+  timing; the average and the min–max range use the 5 fastest.
+- **Expand** on Prompts expands the selected `!gen.txt`. On Generation it
+  expands the prompt **Once** would queue for the current seed and prompt
+  source.
 
 ## [0.7.0] - 2026-10-15
 

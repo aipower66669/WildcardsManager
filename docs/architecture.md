@@ -210,7 +210,7 @@ Per-library **datasets** are written next to the user’s folders, for example:
 
 | Location | Contents |
 | --- | --- |
-| Sibling `<wildcardsBasename>.wcm/library.json` | Archive / Maybe / Notify / marked-installed, LoRA download categories |
+| Sibling `<wildcardsBasename>.wcm/library.json` | Archive / Maybe / Notify / marked-installed, LoRA download categories, generation prompt substitutions |
 | Same sibling `validation.json`, `backups/` | Validation cache, mutation backups |
 | Same sibling `cache/` | Paged Civitai catalog, slim AutoV2 index, hash-miss cache |
 | `<lora or checkpoint>/!.wcm/models.json` | Hashes, ratings, manual Civitai links |
