@@ -40,7 +40,13 @@ export type ExecutionEvent =
   | { type: 'status'; queueRemaining?: number }
   | { type: 'execution_start'; promptId: string }
   | { type: 'executing'; promptId: string; node: string | null }
-  | { type: 'progress'; value: number; max: number }
+  | {
+      type: 'progress';
+      value: number;
+      max: number;
+      promptId?: string;
+      node?: string | null;
+    }
   | { type: 'executed'; promptId: string; node: string; images: ComfyImageRef[] }
   | { type: 'execution_success'; promptId: string }
   | { type: 'execution_error'; promptId: string; message: string }
@@ -365,11 +371,39 @@ export class ComfyAdapter {
   }
 
   /**
-   * Open a WebSocket and stream execution events until `onEvent` returns true
-   * (done) or the connection closes. Returns a disposer.
+   * Open a WebSocket and stream execution events. `opened` resolves once the
+   * socket is up so the caller can queue a prompt without missing the first
+   * sampler steps.
    */
-  monitor(clientId: string, onEvent: (event: ExecutionEvent) => void): () => void {
+  monitor(
+    clientId: string,
+    onEvent: (event: ExecutionEvent) => void,
+  ): { dispose: () => void; opened: Promise<void> } {
     const ws = new WebSocket(comfyWsUrl(this.connection, clientId), { headers: this.headers() });
+    let settledOpen = false;
+    let rejectOpen: (error: Error) => void = () => {};
+    const opened = new Promise<void>((resolve, reject) => {
+      rejectOpen = reject;
+      const timer = setTimeout(() => {
+        if (settledOpen) return;
+        settledOpen = true;
+        reject(new Error('ComfyUI WebSocket did not open'));
+      }, 8000);
+      ws.once('open', () => {
+        if (settledOpen) return;
+        settledOpen = true;
+        clearTimeout(timer);
+        resolve();
+      });
+      ws.once('error', () => {
+        if (settledOpen) return;
+        settledOpen = true;
+        clearTimeout(timer);
+        reject(new Error('ComfyUI WebSocket failed'));
+      });
+    });
+    // A failure after open, or a rejected open nobody awaited, must not crash.
+    void opened.catch(() => {});
     ws.on('message', (raw: WebSocket.RawData, isBinary: boolean) => {
       if (isBinary) {
         return; // preview blobs; ignored — do not decode them on the main thread
@@ -386,14 +420,17 @@ export class ComfyAdapter {
       }
     });
     ws.on('error', () => {
-      /* connection errors surface via closed monitor */
+      if (!settledOpen) rejectOpen(new Error('ComfyUI WebSocket failed'));
     });
-    return () => {
-      try {
-        ws.close();
-      } catch {
-        /* noop */
-      }
+    return {
+      opened,
+      dispose: () => {
+        try {
+          ws.close();
+        } catch {
+          /* noop */
+        }
+      },
     };
   }
 
@@ -414,7 +451,13 @@ export class ComfyAdapter {
           node: d['node'] == null ? null : String(d['node']),
         };
       case 'progress':
-        return { type: 'progress', value: Number(d['value'] ?? 0), max: Number(d['max'] ?? 1) };
+        return {
+          type: 'progress',
+          value: Number(d['value'] ?? 0),
+          max: Number(d['max'] ?? 1),
+          ...(d['prompt_id'] != null ? { promptId: String(d['prompt_id']) } : {}),
+          node: d['node'] == null ? null : String(d['node']),
+        };
       case 'executed': {
         const output = (d['output'] ?? {}) as Record<string, unknown>;
         const images = Array.isArray(output['images'])

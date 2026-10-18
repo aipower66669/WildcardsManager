@@ -67,6 +67,9 @@ export {
 export type { LoraFileEntry, LoraIndex, LoraRef, LoraSearchHit } from './lora.js';
 export {
   BENCHMARK_IMAGES_PER_CHECKPOINT,
+  BENCHMARK_MAX_DISCARDED_TIMINGS,
+  BENCHMARK_OUTLIER_SIGMA,
+  BENCHMARK_REPRESENTATIVE_RUNS,
   BENCHMARK_STATS_FILENAME,
   BENCHMARK_STATS_VERSION,
   checkpointBenchmarkStem,
@@ -77,7 +80,9 @@ export {
   parseBenchmarkStats,
   pickNextBenchmarkCheckpoint,
   pruneStaleBenchmarkCheckpoints,
+  representativeBenchmarkDurations,
   runDurationRange,
+  settleBenchmarkOutliers,
   summarizeBenchmarkStats,
 } from './checkpointBenchmark.js';
 export type {

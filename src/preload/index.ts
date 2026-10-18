@@ -154,8 +154,12 @@ const api: WcmDesktopApi = {
       ipcRenderer.invoke(IPC.uiSetGenerationPreviewCollapsed, collapsed),
     setPromptCoverageWindow: (state) =>
       ipcRenderer.invoke(IPC.uiSetPromptCoverageWindow, state),
+    setPromptSubstitutionsWindow: (state) =>
+      ipcRenderer.invoke(IPC.uiSetPromptSubstitutionsWindow, state),
     setBenchmarkResultsWindow: (state) =>
       ipcRenderer.invoke(IPC.uiSetBenchmarkResultsWindow, state),
+    setBenchmarkResultsView: (view) =>
+      ipcRenderer.invoke(IPC.uiSetBenchmarkResultsView, view),
     setSimulationSettings: (iterations, seed) =>
       ipcRenderer.invoke(IPC.uiSetSimulationSettings, iterations, seed),
     setGraphLayoutStyle: (style) =>
@@ -258,6 +262,10 @@ const api: WcmDesktopApi = {
     setHfBrowseFilters: (filters) =>
       ipcRenderer.invoke(IPC.uiSetHfBrowseFilters, filters),
     clearHfBrowseFilters: () => ipcRenderer.invoke(IPC.uiClearHfBrowseFilters),
+    getPromptSubstitutions: () =>
+      ipcRenderer.invoke(IPC.uiGetPromptSubstitutions),
+    setPromptSubstitutions: (rules) =>
+      ipcRenderer.invoke(IPC.uiSetPromptSubstitutions, rules),
     ignoreUnusedLora: (relativePath) =>
       ipcRenderer.invoke(IPC.uiIgnoreUnusedLora, relativePath),
     categorizeUnusedLora: (opts) =>
@@ -314,6 +322,8 @@ const api: WcmDesktopApi = {
     clearCivitaiLink: (opts) =>
       ipcRenderer.invoke(IPC.modelFilesClearCivitaiLink, opts),
     setRating: (opts) => ipcRenderer.invoke(IPC.modelFilesSetRating, opts),
+    setCheckpointEnabled: (opts) =>
+      ipcRenderer.invoke(IPC.modelFilesSetCheckpointEnabled, opts),
     resolveMasterImages: (opts) =>
       ipcRenderer.invoke(IPC.modelFilesResolveMasterImages, opts),
     readMasterImage: (absolutePath) =>

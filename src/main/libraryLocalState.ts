@@ -10,6 +10,10 @@ import type {
 } from '../domain/civitaiBaseModels.js';
 import type { CivitaiModelCategoryId } from '../domain/civitaiModelCategories.js';
 import type { LoraDownloadCategory } from '../domain/loraDownloadCategory.js';
+import {
+  normalizePromptSubstitutions,
+  type PromptSubstitution,
+} from '../domain/promptSubstitution.js';
 import type { CivitaiOrigin } from '../domain/civitaiSnippet.js';
 import { libraryJsonPath, legacyWildcardsWcmDir } from '../domain/librarySidecarPaths.js';
 import { atomicWriteFile, readJsonFile } from './librarySidecarIo.js';
@@ -73,6 +77,17 @@ export type LibraryLocalPayload = {
   version: typeof LIBRARY_LOCAL_VERSION;
   lastRootFile?: string;
   ignoredUnusedLoras?: string[];
+  /**
+   * Checkpoint relative paths this library does not use. Other libraries that
+   * share the same checkpoint folder keep their own list. Missing means all
+   * checkpoints are in use.
+   */
+  ignoredCheckpoints?: string[];
+  /**
+   * Generation prompt replacements for this library. A rule runs when the
+   * checkpoint file name contains `modelContains`.
+   */
+  promptSubstitutions?: PromptSubstitution[];
   archivedCivitaiModels?: ArchivedCivitaiModel[];
   archivedCivitaiImages?: Array<{ origin: CivitaiOrigin; imageId: number }>;
   archivedCivitaiVideos?: Array<{ origin: CivitaiOrigin; imageId: number }>;
@@ -104,6 +119,8 @@ export type LibraryLocalSource = {
   wildcardsRoot: string | null;
   lastRootFile?: string;
   ignoredUnusedLoras?: string[];
+  ignoredCheckpoints?: string[];
+  promptSubstitutions?: PromptSubstitution[];
   archivedCivitaiModels?: ArchivedCivitaiModel[];
   archivedCivitaiImages?: Array<{ origin: CivitaiOrigin; imageId: number }>;
   archivedCivitaiVideos?: Array<{ origin: CivitaiOrigin; imageId: number }>;
@@ -135,6 +152,8 @@ export function libraryConfigToPayload(
     version: LIBRARY_LOCAL_VERSION,
     lastRootFile: lib.lastRootFile,
     ignoredUnusedLoras: lib.ignoredUnusedLoras ?? [],
+    ignoredCheckpoints: lib.ignoredCheckpoints ?? [],
+    promptSubstitutions: lib.promptSubstitutions ?? [],
     archivedCivitaiModels: lib.archivedCivitaiModels ?? [],
     archivedCivitaiImages: lib.archivedCivitaiImages ?? [],
     archivedCivitaiVideos: lib.archivedCivitaiVideos ?? [],
@@ -169,6 +188,11 @@ export function applyPayloadToLibrary<T extends LibraryLocalSource>(
     ...lib,
     lastRootFile: payload.lastRootFile ?? lib.lastRootFile,
     ignoredUnusedLoras: payload.ignoredUnusedLoras ?? lib.ignoredUnusedLoras,
+    ignoredCheckpoints: payload.ignoredCheckpoints ?? lib.ignoredCheckpoints,
+    promptSubstitutions:
+      payload.promptSubstitutions !== undefined
+        ? normalizePromptSubstitutions(payload.promptSubstitutions)
+        : lib.promptSubstitutions,
     archivedCivitaiModels:
       payload.archivedCivitaiModels ?? lib.archivedCivitaiModels,
     archivedCivitaiImages:
@@ -213,6 +237,7 @@ export function applyPayloadToLibrary<T extends LibraryLocalSource>(
 /** List fields that must not be clobbered by an empty in-memory flush. */
 const PROTECTED_LIST_KEYS = [
   'ignoredUnusedLoras',
+  'ignoredCheckpoints',
   'archivedCivitaiModels',
   'archivedCivitaiImages',
   'archivedCivitaiVideos',
@@ -240,9 +265,14 @@ export function readLibraryLocalPayload(
     path.join(legacyWildcardsWcmDir(wildcardsRoot), 'library.json'),
   );
   if (sibling && legacy) {
+    // Membership lists pick which file wins when both still exist. Keys that
+    // exist on only one file (prompt substitutions saved on the sibling while
+    // the in-tree file still has the longer archive lists) must survive.
     const score = (p: LibraryLocalPayload) =>
       PROTECTED_LIST_KEYS.reduce((sum, key) => sum + listLen(p[key]), 0);
-    return score(sibling) >= score(legacy) ? sibling : legacy;
+    const primary = score(sibling) >= score(legacy) ? sibling : legacy;
+    const secondary = primary === sibling ? legacy : sibling;
+    return { ...secondary, ...primary };
   }
   return sibling ?? legacy;
 }

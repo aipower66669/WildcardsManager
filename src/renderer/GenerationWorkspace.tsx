@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MutableRefObject,
 } from 'react';
 import {
   CheckCircle2,
@@ -12,7 +13,9 @@ import {
   Crosshair,
   Dices,
   FilePlus2,
+  Shuffle,
   FolderOpen,
+  Replace,
   Loader2,
   PanelRightClose,
   PanelRightOpen,
@@ -37,11 +40,13 @@ import type {
   PromptTreeDto,
 } from '../shared/contracts';
 import { appendGenPromptIfMissing } from '../domain/genPrompts.js';
+import { randomFixedGenerationSeed } from '../domain/generationPromptPick.js';
 import { PanelSplitter, type PanelSplitterHandlers } from './PanelSplitter';
 import { loadWorkflowIntoComfyEditor } from './comfyWorkflowEditor';
 import { comfyHttpBase } from '../shared/comfy';
 import { WildcardEditor, type WildcardEditorHandle } from './WildcardEditor';
 import { CategorizePromptModal } from './CategorizePromptModal';
+import { PromptSubstitutionsModal } from './PromptSubstitutionsModal';
 import { CheckpointBenchmarkResultsModal } from './CheckpointBenchmarkResultsModal';
 import type { ParsedCivitaiModelPageUrl } from '../domain/civitaiSnippet.js';
 
@@ -60,6 +65,17 @@ type Props = {
   onRenameLora?: (name: string) => void;
   onOpenLora?: (name: string) => void;
   onOpenLoraInCivitaiCatalog?: (model: ParsedCivitaiModelPageUrl) => void;
+  /** Live Once inputs so Expand previews the prompt that would be queued. */
+  expandSnapshotRef?: MutableRefObject<{
+    kind: 'generation';
+    promptSource: 'text' | 'folder';
+    promptText: string;
+    relativeFolder: string | null;
+    promptFoldersRecursive: boolean;
+    additionalPositivePrompt: string;
+    seed: number;
+    checkpoint: string;
+  } | null>;
 };
 
 type PromptSource = 'text' | 'folder';
@@ -165,6 +181,7 @@ export function GenerationWorkspace({
   onRenameLora,
   onOpenLora,
   onOpenLoraInCivitaiCatalog,
+  expandSnapshotRef,
 }: Props) {
   const webviewRef = useRef<HTMLElement | null>(null);
   const workflowLoadGen = useRef(0);
@@ -204,12 +221,26 @@ export function GenerationWorkspace({
   const [promptIssues, setPromptIssues] = useState<IssueDto[]>([]);
   const promptEditorRef = useRef<WildcardEditorHandle | null>(null);
   const [promptSource, setPromptSource] = useState<PromptSource>('folder');
+  if (expandSnapshotRef) {
+    expandSnapshotRef.current = {
+      kind: 'generation',
+      promptSource,
+      promptText,
+      relativeFolder: selectedFolder,
+      promptFoldersRecursive,
+      additionalPositivePrompt: additionalPositive,
+      seed,
+      checkpoint,
+    };
+  }
   const [middleMode, setMiddleMode] = useState<MiddleMode>('prompt');
   const [hasWorkflow, setHasWorkflow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [promptSaveNote, setPromptSaveNote] = useState<string | null>(null);
   const [categorizeOpen, setCategorizeOpen] = useState(false);
+  const [substitutionsOpen, setSubstitutionsOpen] = useState(false);
+  const [substitutionCount, setSubstitutionCount] = useState(0);
   const [contract, setContract] = useState<ComfyContractCheckDto | null>(null);
   const [progress, setProgress] = useState<GenerationProgressDto | null>(null);
   /** Keep showing the last finished image until a newer one arrives. */
@@ -251,6 +282,37 @@ export function GenerationWorkspace({
     () => checkpoints.filter(isSafetensorsCheckpoint),
     [checkpoints],
   );
+  const usableCheckpoints = useMemo(
+    () => safetensorCheckpoints.filter((file) => file.enabled !== false),
+    [safetensorCheckpoints],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.wcm.ui
+      .getPromptSubstitutions()
+      .then((rules) => {
+        if (!cancelled) setSubstitutionCount(rules.length);
+      })
+      .catch(() => {
+        if (!cancelled) setSubstitutionCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!checkpoint) return;
+    const match = checkpoints.find(
+      (file) =>
+        isSafetensorsCheckpoint(file) &&
+        checkpointOptionValue(file) === checkpoint,
+    );
+    if (!match || match.enabled !== false) return;
+    const next = usableCheckpoints[0];
+    setCheckpoint(next ? checkpointOptionValue(next) : '');
+  }, [checkpoint, checkpoints, usableCheckpoints]);
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -269,8 +331,26 @@ export function GenerationWorkspace({
       setHasWorkflow(Boolean(profile));
       setCheckpoints(ckptList.files);
       setCheckpoint((prev) => {
+        const usable = ckptList.files.filter(
+          (file) => isSafetensorsCheckpoint(file) && file.enabled !== false,
+        );
+        if (
+          prev &&
+          usable.some((file) => checkpointOptionValue(file) === prev)
+        ) {
+          return prev;
+        }
+        const known = ckptList.files.some(
+          (file) =>
+            isSafetensorsCheckpoint(file) &&
+            checkpointOptionValue(file) === prev,
+        );
+        if (prev && known) {
+          const first = usable[0];
+          return first ? checkpointOptionValue(first) : '';
+        }
         if (prev || formHydratedRef.current) return prev;
-        const first = ckptList.files.find(isSafetensorsCheckpoint);
+        const first = usable[0];
         return first ? checkpointOptionValue(first) : '';
       });
       // A saved folder stays selected when the tree has not loaded yet.
@@ -1050,7 +1130,7 @@ export function GenerationWorkspace({
                 {checkpoint.replace(/^.*[\\/]/, '').replace(/\.safetensors$/i, '')}
               </option>
             ) : null}
-            {safetensorCheckpoints.map((file) => {
+            {usableCheckpoints.map((file) => {
               const value = checkpointOptionValue(file);
               return (
                 <option key={value} value={value}>
@@ -1136,11 +1216,20 @@ export function GenerationWorkspace({
             <button
               type="button"
               className="icon-btn"
-              title="Random seed (−1)"
+              title="Random seed (−1) — a new seed on every run"
               aria-label="Random seed"
               onClick={() => setSeed(-1)}
             >
               <Dices size={14} />
+            </button>
+            <button
+              type="button"
+              className="generation-action-btn"
+              title="Randomize seed — write one random number and keep it"
+              aria-label="Randomize seed"
+              onClick={() => setSeed(randomFixedGenerationSeed())}
+            >
+              <Shuffle size={14} /> Randomize
             </button>
           </div>
 
@@ -1366,6 +1455,17 @@ export function GenerationWorkspace({
                   </label>
                 </div>
                 <div className="generation-prompt-actions">
+                  <button
+                    type="button"
+                    className="generation-action-btn"
+                    title="Replace prompt text when the checkpoint file name contains a keyword"
+                    onClick={() => setSubstitutionsOpen(true)}
+                  >
+                    <Replace size={14} />{' '}
+                    {substitutionCount > 0
+                      ? `Substitutions (${substitutionCount})…`
+                      : 'Substitutions…'}
+                  </button>
                   <button
                     type="button"
                     className="generation-action-btn"
@@ -1609,6 +1709,15 @@ export function GenerationWorkspace({
           <p className="hint pad">Generate to preview here.</p>
         )}
       </aside>
+      {substitutionsOpen ? (
+        <PromptSubstitutionsModal
+          checkpoint={checkpoint}
+          promptSource={promptSource}
+          promptText={promptText}
+          onClose={() => setSubstitutionsOpen(false)}
+          onSaved={(count) => setSubstitutionCount(count)}
+        />
+      ) : null}
       {categorizeOpen ? (
         <CategorizePromptModal
           promptText={promptText}

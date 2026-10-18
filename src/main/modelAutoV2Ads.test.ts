@@ -93,6 +93,7 @@ describe('migrateModelHashesToAds basename rematch', () => {
       },
       ratings: { byAutoV2: {}, byPath: {} },
       links: { byAutoV2: {}, byPath: {} },
+      ignored: [],
     });
   });
 

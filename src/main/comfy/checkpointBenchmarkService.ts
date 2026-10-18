@@ -10,11 +10,13 @@ import {
   checkpointBenchmarkStem,
   countBenchmarkImages,
   emptyBenchmarkStats,
+  isBenchmarkOutputImageName,
+  omitBenchmarkRunsForMissingImages,
   mergeBenchmarkRun,
   parseBenchmarkStats,
   pickNextBenchmarkCheckpoint,
   pruneStaleBenchmarkCheckpoints,
-  runDurationRange,
+  representativeBenchmarkDurations,
   summarizeBenchmarkStats,
   type CheckpointBenchmarkCandidate,
   type CheckpointBenchmarkStats,
@@ -24,7 +26,9 @@ import type {
   CheckpointBenchmarkResultsDto,
   CheckpointBenchmarkStatusDto,
 } from '../../shared/contracts.js';
+import { checkpointEnabledForRelativePath } from '../checkpointEnabled.js';
 import { getConfiguredCheckpointIndex } from '../checkpointService.js';
+import { readMfeFieldRating } from '../mfeMetaAds.js';
 import { getActiveLibrary } from '../settingsStore.js';
 
 export function resolveBenchmarkOutputRoot(): string {
@@ -45,6 +49,9 @@ export function listBenchmarkCandidates(): CheckpointBenchmarkCandidate[] {
   for (const file of index.files) {
     if (!file.relativePath.toLowerCase().endsWith('.safetensors')) continue;
     const relativePath = file.relativePath.replaceAll('\\', '/');
+    if (!checkpointEnabledForRelativePath(relativePath)) {
+      continue;
+    }
     out.push({
       stem: checkpointBenchmarkStem(relativePath),
       relativePath,
@@ -104,17 +111,44 @@ export function writeBenchmarkStats(
  * Remove JSON rows for stems that no longer exist in the Checkpoint folder.
  * Persists only when something was dropped. Idempotent.
  */
+function benchmarkImageNamesOnDisk(root: string, stem: string): string[] {
+  const dir = stemFolder(root, stem);
+  try {
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return [];
+    return fs.readdirSync(dir).filter((name) => isBenchmarkOutputImageName(name));
+  } catch {
+    return [];
+  }
+}
+
 export function pruneBenchmarkStatsToCandidates(
   root: string,
   candidates: readonly CheckpointBenchmarkCandidate[],
 ): CheckpointBenchmarkStats {
   const liveStems = new Set(candidates.map((c) => c.stem));
   const prev = readBenchmarkStats(root);
-  const { stats, removedStems } = pruneStaleBenchmarkCheckpoints(
+  const { stats: stemmed, removedStems } = pruneStaleBenchmarkCheckpoints(
     prev,
     liveStems,
   );
-  if (removedStems.length > 0) {
+  let removedRuns = false;
+  const checkpoints: CheckpointBenchmarkStats['checkpoints'] = {};
+  for (const [stem, entry] of Object.entries(stemmed.checkpoints)) {
+    const next = omitBenchmarkRunsForMissingImages(
+      entry,
+      benchmarkImageNamesOnDisk(root, stem),
+    );
+    if (next !== entry) removedRuns = true;
+    checkpoints[stem] = next;
+  }
+  const stats = removedRuns
+    ? {
+        ...stemmed,
+        updatedAt: new Date().toISOString(),
+        checkpoints,
+      }
+    : stemmed;
+  if (removedStems.length > 0 || removedRuns) {
     writeBenchmarkStats(root, stats);
   }
   return stats;
@@ -159,11 +193,15 @@ export function resolveNextBenchmarkSlot(): BenchmarkJobSlot | null {
   const root = resolveBenchmarkOutputRoot();
   const candidates = listBenchmarkCandidates();
   if (candidates.length === 0) {
+    const any = getConfiguredCheckpointIndex()?.files.some((file) =>
+      file.relativePath.toLowerCase().endsWith('.safetensors'),
+    );
     throw new Error(
-      'No .safetensors checkpoints in the Checkpoint files folder',
+      any
+        ? 'Every checkpoint is unticked, so Benchmark has nothing to run'
+        : 'No .safetensors checkpoints in the Checkpoint files folder',
     );
   }
-  // Same pass as filling missing images: drop stats for deleted checkpoints.
   pruneBenchmarkStatsToCandidates(root, candidates);
   const counts = imageCountsByStem(root, candidates);
   const progress = pickNextBenchmarkCheckpoint(
@@ -206,7 +244,9 @@ export function getCheckpointBenchmarkResults(): CheckpointBenchmarkResultsDto {
     if (entry.runs.length === 0) continue;
     if (!byStem.has(stem)) continue;
     const diskCount = counts.get(stem);
-    const { minDurationMs, maxDurationMs } = runDurationRange(entry.runs);
+    const representative = representativeBenchmarkDurations(
+      entry.runs.map((run) => run.durationMs),
+    );
     rows.push({
       stem,
       relativePath:
@@ -216,11 +256,12 @@ export function getCheckpointBenchmarkResults(): CheckpointBenchmarkResultsDto {
       imageCount:
         typeof diskCount === 'number' ? diskCount : entry.imageCount,
       runCount: entry.runs.length,
-      avgDurationMs: entry.avgDurationMs,
+      avgDurationMs: representative.avgDurationMs,
       totalDurationMs: entry.totalDurationMs,
-      minDurationMs,
-      maxDurationMs,
+      minDurationMs: representative.minDurationMs,
+      maxDurationMs: representative.maxDurationMs,
       runDurationsMs: entry.runs.map((r) => r.durationMs),
+      rating: readMfeFieldRating(stemFolder(root, stem)),
     });
   }
   return {

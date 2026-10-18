@@ -28,6 +28,10 @@ import {
   parseLoraDownloadCategories,
   type LoraDownloadCategory,
 } from '../domain/loraDownloadCategory.js';
+import {
+  normalizePromptSubstitutions,
+  type PromptSubstitution,
+} from '../domain/promptSubstitution.js';
 import { versionFileIsMarkedInstalled } from '../domain/civitaiVersionMark.js';
 import type {
   GraphLayoutStyle,
@@ -40,11 +44,13 @@ import type {
   CivitaiModelTypeDto,
   CivitaiSdxlFamilyToggleIdDto,
   HfBrowseFiltersDto,
+  BenchmarkResultsViewDto,
   TabPanelWidthsDto,
   WorkspaceListFiltersDto,
   WorkspaceListFilterTab,
   WorkspaceTabId,
 } from '../shared/contracts.js';
+import { parseBenchmarkResultsView } from '../shared/benchmarkResultsView.js';
 import {
   parseWorkspaceListFilters,
   normalizeWorkspaceListFilter,
@@ -168,6 +174,16 @@ export type LibraryConfig = {
   benchmarkOutputFolder: string | null;
   lastRootFile?: string;
   ignoredUnusedLoras?: string[];
+  /**
+   * Checkpoints this library does not use (root-relative paths). Lives in
+   * `library.json`, not on the shared checkpoint folder.
+   */
+  ignoredCheckpoints?: string[];
+  /**
+   * Before a Generation prompt is expanded, replace text when the checkpoint
+   * file name contains a keyword. Lives in this library’s `library.json`.
+   */
+  promptSubstitutions?: PromptSubstitution[];
   archivedCivitaiModels?: ArchivedCivitaiModel[];
   /** Shelved Civitai community image ids for this library. */
   archivedCivitaiImages?: ArchivedCivitaiImage[];
@@ -237,6 +253,14 @@ type Settings = {
     height: number;
     maximized: boolean;
   };
+  /** Generation prompt-substitutions dialog floating window geometry. */
+  promptSubstitutionsWindow?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    maximized: boolean;
+  };
   /** Checkpoint Benchmark results chart floating window geometry. */
   benchmarkResultsWindow?: {
     x: number;
@@ -245,6 +269,8 @@ type Settings = {
     height: number;
     maximized: boolean;
   };
+  /** Checkpoint Benchmark results name filter and sort. */
+  benchmarkResultsView?: BenchmarkResultsViewDto;
   simulationIterations?: number;
   simulationSeed?: number;
   graphLayoutStyle?: GraphLayoutStyle;
@@ -1020,6 +1046,17 @@ function parseLibraryConfig(
           ),
         ]
       : [],
+    ignoredCheckpoints: Array.isArray(row.ignoredCheckpoints)
+      ? [
+          ...new Set(
+            row.ignoredCheckpoints
+              .filter((value): value is string => typeof value === 'string')
+              .map((value) => value.trim().replaceAll('\\', '/'))
+              .filter(Boolean),
+          ),
+        ]
+      : [],
+    promptSubstitutions: normalizePromptSubstitutions(row.promptSubstitutions),
     archivedCivitaiModels: parseArchivedCivitaiModels(row.archivedCivitaiModels),
     archivedCivitaiImages: parseArchivedCivitaiImages(row.archivedCivitaiImages),
     archivedCivitaiVideos: parseArchivedCivitaiImages(row.archivedCivitaiVideos),
@@ -1111,6 +1148,8 @@ function createEmptyLibrary(name: string): LibraryConfig {
     generationOutput3d: null,
     benchmarkOutputFolder: null,
     ignoredUnusedLoras: [],
+    ignoredCheckpoints: [],
+    promptSubstitutions: [],
     archivedCivitaiModels: [],
     archivedCivitaiImages: [],
     archivedCivitaiVideos: [],
@@ -1296,7 +1335,11 @@ function readSettingsFromDisk(): Settings {
           ? raw.generationPreviewCollapsed
           : undefined,
       promptCoverageWindow: parseFloatingWindow(raw.promptCoverageWindow),
+      promptSubstitutionsWindow: parseFloatingWindow(
+        raw.promptSubstitutionsWindow,
+      ),
       benchmarkResultsWindow: parseFloatingWindow(raw.benchmarkResultsWindow),
+      benchmarkResultsView: parseBenchmarkResultsView(raw.benchmarkResultsView),
       simulationIterations:
         typeof raw.simulationIterations === 'number' &&
         Number.isFinite(raw.simulationIterations)
@@ -2292,6 +2335,24 @@ export function setPromptCoverageWindow(state: {
   return next;
 }
 
+export function setPromptSubstitutionsWindow(state: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  maximized: boolean;
+}): NonNullable<Settings['promptSubstitutionsWindow']> {
+  const next = {
+    x: Math.round(state.x),
+    y: Math.round(state.y),
+    width: Math.max(320, Math.round(state.width)),
+    height: Math.max(240, Math.round(state.height)),
+    maximized: state.maximized === true,
+  };
+  saveSettings({ promptSubstitutionsWindow: next });
+  return next;
+}
+
 export function getBenchmarkResultsWindow(): Settings['benchmarkResultsWindow'] {
   return loadSettings().benchmarkResultsWindow;
 }
@@ -2311,6 +2372,20 @@ export function setBenchmarkResultsWindow(state: {
     maximized: state.maximized === true,
   };
   saveSettings({ benchmarkResultsWindow: next });
+  return next;
+}
+
+export function getBenchmarkResultsView(): BenchmarkResultsViewDto {
+  return (
+    loadSettings().benchmarkResultsView ?? parseBenchmarkResultsView(undefined)
+  );
+}
+
+export function setBenchmarkResultsView(
+  view: unknown,
+): BenchmarkResultsViewDto {
+  const next = parseBenchmarkResultsView(view);
+  saveSettings({ benchmarkResultsView: next });
   return next;
 }
 

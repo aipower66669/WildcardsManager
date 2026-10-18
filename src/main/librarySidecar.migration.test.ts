@@ -120,6 +120,7 @@ describe('library sidecar layout (sample_wildcards only)', () => {
       },
       ratings: { byAutoV2: {}, byPath: { 'demo.safetensors': 4 } },
       links: { byAutoV2: {}, byPath: {} },
+      ignored: [],
     });
     const store = loadModelsStore(loraRoot);
     expect(store.hashes['demo.safetensors']?.autoV2).toBe('AABBCCDDEE');

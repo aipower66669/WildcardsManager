@@ -9,6 +9,21 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pinSharedUserData } from './userDataPath.js';
+
+// Before any userData read. Dev and the packaged app both use
+// `%AppData%/Roaming/wildcards-manager`, even when the installer product
+// name would otherwise select a second folder.
+pinSharedUserData({
+  appDataDir: app.getPath('appData'),
+  mkdir: (dir) => {
+    fs.mkdirSync(dir, { recursive: true });
+  },
+  exists: (dir) => fs.existsSync(dir),
+  setPath: (name, dir) => {
+    app.setPath(name, dir);
+  },
+});
 
 // Must be before ready — large catalog / preview work needs headroom.
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=8192');

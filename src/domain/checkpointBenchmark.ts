@@ -2,15 +2,25 @@
  * Checkpoint visual/speed benchmark helpers.
  *
  * Layout under the benchmark root:
- *   {stem}/WCG*.png  (10 images per checkpoint)
+ *   {stem}/WCG*.png
  *   benchmark-stats.json
+ *
+ * Every recorded timing is kept. A timing is the sampler's step counter from
+ * the first step through the last (model load and file save are not included).
+ * The chart average and min–max range use the five fastest of those runs.
  */
 
 import { GENERATION_OUTPUT_FILENAME } from '../shared/comfy.js';
 
 export const BENCHMARK_IMAGES_PER_CHECKPOINT = 10;
+/** Fastest runs used for the chart average and min–max range. */
+export const BENCHMARK_REPRESENTATIVE_RUNS = 5;
 export const BENCHMARK_STATS_FILENAME = 'benchmark-stats.json';
 export const BENCHMARK_STATS_VERSION = 1 as const;
+/** A timing this many sample standard deviations from the mean is outside the cluster. */
+export const BENCHMARK_OUTLIER_SIGMA = 2;
+/** Replacements for dropped timings. Stops a wide cluster from generating forever. */
+export const BENCHMARK_MAX_DISCARDED_TIMINGS = 5;
 
 const IMAGE_EXT_RE = /\.(png|jpe?g|webp)$/i;
 
@@ -34,6 +44,8 @@ export type CheckpointBenchmarkEntryStat = {
   runs: CheckpointBenchmarkRunStat[];
   totalDurationMs: number;
   avgDurationMs: number;
+  /** Timings removed for sitting outside the cluster. */
+  discardedCount?: number;
 };
 
 export type CheckpointBenchmarkStats = {
@@ -131,6 +143,124 @@ export function emptyBenchmarkStats(
   };
 }
 
+function discardedCountFrom(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(value));
+}
+
+function sampleStdev(values: readonly number[], mean: number): number {
+  if (values.length < 2) return 0;
+  let acc = 0;
+  for (const value of values) {
+    const delta = value - mean;
+    acc += delta * delta;
+  }
+  return Math.sqrt(acc / (values.length - 1));
+}
+
+/**
+ * Indexes of timings that sit outside the cluster.
+ * Uses the sample mean and standard deviation, then repeats on what remains
+ * so one extreme point cannot hide another. `maxDrop` caps how many indexes
+ * are returned (farthest first).
+ */
+export function benchmarkOutlierIndexes(
+  durations: readonly number[],
+  maxDrop: number = BENCHMARK_MAX_DISCARDED_TIMINGS,
+): number[] {
+  if (durations.length < 3 || maxDrop <= 0) return [];
+  const dropped: number[] = [];
+  let active = durations.map((_, index) => index);
+  for (let pass = 0; pass < 4 && dropped.length < maxDrop; pass += 1) {
+    if (active.length < 3) break;
+    const values = active.map((index) => durations[index]!);
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    const sd = sampleStdev(values, mean);
+    if (!(sd > 0)) break;
+    const limit = BENCHMARK_OUTLIER_SIGMA * sd;
+    const outside = active.filter(
+      (index) => Math.abs(durations[index]! - mean) > limit,
+    );
+    if (outside.length === 0) break;
+    outside.sort(
+      (a, b) =>
+        Math.abs(durations[b]! - mean) - Math.abs(durations[a]! - mean),
+    );
+    const room = Math.min(maxDrop - dropped.length, 3, active.length - 3);
+    const take = outside.slice(0, room);
+    if (take.length === 0) break;
+    dropped.push(...take);
+    const taken = new Set(take);
+    active = active.filter((index) => !taken.has(index));
+  }
+  return dropped;
+}
+
+function entryFromRuns(
+  entry: CheckpointBenchmarkEntryStat,
+  runs: CheckpointBenchmarkRunStat[],
+  discardedCount: number,
+): CheckpointBenchmarkEntryStat {
+  const totalDurationMs = runs.reduce((sum, run) => sum + run.durationMs, 0);
+  return {
+    relativePath: entry.relativePath,
+    imageCount: entry.imageCount,
+    runs,
+    totalDurationMs,
+    avgDurationMs: runs.length > 0 ? Math.round(totalDurationMs / runs.length) : 0,
+    ...(discardedCount > 0 ? { discardedCount } : {}),
+  };
+}
+
+/**
+ * When a checkpoint has a full set of timings, drop durations outside the
+ * cluster so the average is not set by a cold model load. Fewer than `target`
+ * kept timings means more samples are still required.
+ */
+export function omitBenchmarkOutlierRuns(
+  entry: CheckpointBenchmarkEntryStat,
+  target: number = BENCHMARK_IMAGES_PER_CHECKPOINT,
+): CheckpointBenchmarkEntryStat {
+  if (entry.runs.length < target) return entry;
+  const discardedCount = entry.discardedCount ?? 0;
+  const room = BENCHMARK_MAX_DISCARDED_TIMINGS - discardedCount;
+  if (room <= 0) return entry;
+  const indexes = benchmarkOutlierIndexes(
+    entry.runs.map((run) => run.durationMs),
+    room,
+  );
+  if (indexes.length === 0) return entry;
+  const drop = new Set(indexes);
+  const runs = entry.runs.filter((_, index) => !drop.has(index));
+  return entryFromRuns(entry, runs, discardedCount + indexes.length);
+}
+
+/** Apply {@link omitBenchmarkOutlierRuns} to every checkpoint that has a full set. */
+export function settleBenchmarkOutliers(
+  stats: CheckpointBenchmarkStats,
+): { stats: CheckpointBenchmarkStats; changed: boolean } {
+  let changed = false;
+  const checkpoints: Record<string, CheckpointBenchmarkEntryStat> = {};
+  for (const [stem, entry] of Object.entries(stats.checkpoints)) {
+    const next = omitBenchmarkOutlierRuns(
+      entry,
+      stats.targetImagesPerCheckpoint,
+    );
+    if (next !== entry) changed = true;
+    checkpoints[stem] = next;
+  }
+  if (!changed) return { stats, changed: false };
+  return {
+    changed: true,
+    stats: {
+      version: BENCHMARK_STATS_VERSION,
+      updatedAt: new Date().toISOString(),
+      targetImagesPerCheckpoint: stats.targetImagesPerCheckpoint,
+      checkpoints,
+    },
+  };
+}
+
 /** Parse stats JSON; returns empty stats when invalid. */
 export function parseBenchmarkStats(raw: unknown): CheckpointBenchmarkStats {
   const empty = emptyBenchmarkStats();
@@ -176,6 +306,7 @@ export function parseBenchmarkStats(raw: unknown): CheckpointBenchmarkStats {
       });
     }
     const totalDurationMs = runs.reduce((sum, r) => sum + r.durationMs, 0);
+    const discardedCount = discardedCountFrom(entry.discardedCount);
     checkpoints[stem] = {
       relativePath:
         typeof entry.relativePath === 'string' ? entry.relativePath : '',
@@ -187,6 +318,7 @@ export function parseBenchmarkStats(raw: unknown): CheckpointBenchmarkStats {
       totalDurationMs,
       avgDurationMs:
         runs.length > 0 ? Math.round(totalDurationMs / runs.length) : 0,
+      ...(discardedCount > 0 ? { discardedCount } : {}),
     };
   }
   return {
@@ -228,6 +360,7 @@ export function mergeBenchmarkRun(
   };
   const runs = [...(prev?.runs ?? []), run];
   const totalDurationMs = runs.reduce((sum, r) => sum + r.durationMs, 0);
+  const discardedCount = prev?.discardedCount ?? 0;
   return {
     version: BENCHMARK_STATS_VERSION,
     updatedAt: run.at,
@@ -240,6 +373,7 @@ export function mergeBenchmarkRun(
         runs,
         totalDurationMs,
         avgDurationMs: Math.round(totalDurationMs / runs.length),
+        ...(discardedCount > 0 ? { discardedCount } : {}),
       },
     },
   };
@@ -276,6 +410,61 @@ export function pruneStaleBenchmarkCheckpoints(
   };
 }
 
+/**
+ * Drop timings whose image file is gone, and set `imageCount` to the files
+ * still in the folder. A later benchmark run fills the hole back to 10.
+ * Timings saved without a filename are trimmed oldest-first when they
+ * outnumber the remaining images.
+ */
+export function omitBenchmarkRunsForMissingImages(
+  entry: CheckpointBenchmarkEntryStat,
+  imageNames: readonly string[],
+): CheckpointBenchmarkEntryStat {
+  const present = new Set(
+    imageNames
+      .filter((name) => isBenchmarkOutputImageName(name))
+      .map((name) => name.toLowerCase()),
+  );
+  const imageCount = present.size;
+  let runs = entry.runs.filter((run) => {
+    const file = run.outputFile?.trim();
+    if (!file) return true;
+    return present.has(file.toLowerCase());
+  });
+  if (runs.length > imageCount) {
+    let extra = runs.length - imageCount;
+    const kept: CheckpointBenchmarkRunStat[] = [];
+    for (const run of runs) {
+      if (extra > 0 && !run.outputFile?.trim()) {
+        extra -= 1;
+        continue;
+      }
+      kept.push(run);
+    }
+    runs = kept;
+  }
+  if (runs.length > imageCount) {
+    runs = runs.slice(runs.length - imageCount);
+  }
+  if (
+    runs.length === entry.runs.length &&
+    runs.every((run, index) => run === entry.runs[index]) &&
+    entry.imageCount === imageCount
+  ) {
+    return entry;
+  }
+  const totalDurationMs = runs.reduce((sum, run) => sum + run.durationMs, 0);
+  const discardedCount = entry.discardedCount ?? 0;
+  return {
+    relativePath: entry.relativePath,
+    imageCount,
+    runs,
+    totalDurationMs,
+    avgDurationMs: runs.length > 0 ? Math.round(totalDurationMs / runs.length) : 0,
+    ...(discardedCount > 0 ? { discardedCount } : {}),
+  };
+}
+
 /** Min/max duration across runs (0/0 when empty). */
 export function runDurationRange(
   runs: readonly CheckpointBenchmarkRunStat[],
@@ -293,6 +482,29 @@ export function runDurationRange(
   return { minDurationMs: min, maxDurationMs: max };
 }
 
+/**
+ * Average and min/max of the fastest runs. Slow outliers stay in the raw
+ * sample list; they do not move the summary.
+ */
+export function representativeBenchmarkDurations(
+  durations: readonly number[],
+  count: number = BENCHMARK_REPRESENTATIVE_RUNS,
+): { avgDurationMs: number; minDurationMs: number; maxDurationMs: number } {
+  if (durations.length === 0) {
+    return { avgDurationMs: 0, minDurationMs: 0, maxDurationMs: 0 };
+  }
+  const take = Math.max(1, Math.floor(count));
+  const fastest = [...durations]
+    .sort((a, b) => a - b)
+    .slice(0, Math.min(take, durations.length));
+  const total = fastest.reduce((sum, value) => sum + value, 0);
+  return {
+    avgDurationMs: Math.round(total / fastest.length),
+    minDurationMs: fastest[0]!,
+    maxDurationMs: fastest[fastest.length - 1]!,
+  };
+}
+
 /** Summary for UI: completed count + fastest/slowest by average duration. */
 export function summarizeBenchmarkStats(stats: CheckpointBenchmarkStats): {
   completedCheckpoints: number;
@@ -308,7 +520,9 @@ export function summarizeBenchmarkStats(stats: CheckpointBenchmarkStats): {
   for (const [stem, entry] of entries) {
     if (entry.imageCount >= target) completedCheckpoints += 1;
     if (entry.runs.length === 0) continue;
-    const avg = entry.avgDurationMs;
+    const avg = representativeBenchmarkDurations(
+      entry.runs.map((run) => run.durationMs),
+    ).avgDurationMs;
     if (!fastest || avg < fastest.avgDurationMs) {
       fastest = { stem, avgDurationMs: avg };
     }

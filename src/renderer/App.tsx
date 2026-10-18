@@ -97,6 +97,7 @@ import type {
   CycleFixPreviewDto,
   CycleFixSuggestionDto,
   ExpandMode,
+  ExpandRequestDto,
   ExpandResultDto,
   FileContentDto,
   FileEntryDto,
@@ -694,6 +695,20 @@ function flowElements(
   };
 }
 
+type ExpandTarget =
+  | { kind: 'wildcard'; relativePath: string }
+  | { kind: 'gen-file'; relativeFolder: string; content?: string }
+  | {
+      kind: 'generation';
+      promptSource: 'text' | 'folder';
+      promptText: string;
+      relativeFolder: string | null;
+      promptFoldersRecursive: boolean;
+      additionalPositivePrompt: string;
+      seed: number;
+      checkpoint: string;
+    };
+
 export function App() {
   const [root, setRoot] = useState<string | null>(null);
   const [files, setFiles] = useState<FileEntryDto[]>([]);
@@ -813,7 +828,15 @@ export function App() {
     string | null
   >(null);
   const [createInitialPath, setCreateInitialPath] = useState('');
-  const [expandOpen, setExpandOpen] = useState(false);
+  const [expandTarget, setExpandTarget] = useState<ExpandTarget | null>(null);
+  const promptsGenRef = useRef<{
+    relativeFolder: string | null;
+    content: string;
+  } | null>(null);
+  const generationExpandRef = useRef<Extract<
+    ExpandTarget,
+    { kind: 'generation' }
+  > | null>(null);
   const [simSettingsOpen, setSimSettingsOpen] = useState(false);
   const [globalSearchLauncherOpen, setGlobalSearchLauncherOpen] =
     useState(false);
@@ -3047,7 +3070,7 @@ export function App() {
     Boolean(simSettingsOpen) ||
     Boolean(globalSearchLauncherOpen) ||
     Boolean(civitaiOpen) ||
-    Boolean(expandOpen) ||
+    Boolean(expandTarget) ||
     Boolean(coverageOpen) ||
     Boolean(ignoreLoraIssue) ||
     Boolean(categorizeLoraIssue) ||
@@ -4020,17 +4043,70 @@ export function App() {
           </button>
           <button
             type="button"
-            onClick={() => setExpandOpen(true)}
-            disabled={!rootFile}
-            title="Preview prompt expansions"
+            onClick={() => {
+              const expandTab =
+                workspaceTab === 'prompts' ||
+                workspaceTab === 'generation' ||
+                workspaceTab === 'wildcards'
+                  ? workspaceTab
+                  : 'wildcards';
+              if (expandTab !== workspaceTab) setWorkspaceTab('wildcards');
+              if (expandTab === 'prompts') {
+                if (!promptsSelectedFolder) return;
+                const snap = promptsGenRef.current;
+                setExpandTarget({
+                  kind: 'gen-file',
+                  relativeFolder: promptsSelectedFolder,
+                  content:
+                    snap?.relativeFolder === promptsSelectedFolder
+                      ? snap.content
+                      : undefined,
+                });
+                return;
+              }
+              if (expandTab === 'generation') {
+                const snap = generationExpandRef.current;
+                if (!snap) return;
+                setExpandTarget(snap);
+                return;
+              }
+              if (rootFile) {
+                setExpandTarget({ kind: 'wildcard', relativePath: rootFile });
+              }
+            }}
+            disabled={
+              workspaceTab === 'prompts'
+                ? !promptsSelectedFolder
+                : workspaceTab === 'generation'
+                  ? false
+                  : !rootFile
+            }
+            title={
+              workspaceTab === 'prompts'
+                ? promptsSelectedFolder
+                  ? `Expand ${promptsSelectedFolder}/!gen.txt`
+                  : 'Select a prompt folder to expand'
+                : workspaceTab === 'generation'
+                  ? 'Expand the prompt Once would queue for this seed and source'
+                  : workspaceTab === 'wildcards'
+                    ? 'Preview prompt expansions for the selected wildcard file'
+                    : 'Expand the selected wildcard file (opens Wildcard files)'
+            }
           >
             <Sparkles size={16} /> Expand
           </button>
           <button
             type="button"
-            onClick={() => void runSimulation()}
+            onClick={() => {
+              if (workspaceTab !== 'wildcards') setWorkspaceTab('wildcards');
+              void runSimulation();
+            }}
             disabled={!rootFile || simBusy}
-            title={`Run simulation now (${simSettings.iterations.toLocaleString()} iterations, seed ${simSettings.seed})`}
+            title={
+              workspaceTab === 'wildcards'
+                ? `Run simulation now (${simSettings.iterations.toLocaleString()} iterations, seed ${simSettings.seed})`
+                : `Simulate the selected wildcard (opens Wildcard files, ${simSettings.iterations.toLocaleString()} iterations, seed ${simSettings.seed})`
+            }
           >
             {simBusy ? (
               <RefreshCw size={16} className="spin" />
@@ -4041,11 +4117,16 @@ export function App() {
           </button>
           <button
             type="button"
-            onClick={() => setCoverageOpen(true)}
+            onClick={() => {
+              if (workspaceTab !== 'generation') setWorkspaceTab('generation');
+              setCoverageOpen(true);
+            }}
             title={
               coverageRunning
                 ? `Coverage running — ${coverageProgress?.percent?.toFixed(0) ?? 0}%`
-                : 'Coverage — simulate all !gen.txt prompts and measure wildcard usage'
+                : workspaceTab === 'generation'
+                  ? 'Coverage — simulate all !gen.txt prompts and measure wildcard usage'
+                  : 'Coverage — opens Generation and measures wildcard usage from every !gen.txt'
             }
           >
             {coverageRunning ? (
@@ -4206,7 +4287,11 @@ export function App() {
               wildcardKeys={wildcardKeys}
               selectedFolder={promptsSelectedFolder}
               onSelectedFolderChange={setPromptsSelectedFolder}
-              onOpenCoverage={() => setCoverageOpen(true)}
+              genTextRef={promptsGenRef}
+              onOpenCoverage={() => {
+                setWorkspaceTab('generation');
+                setCoverageOpen(true);
+              }}
               coverageRunning={coverageRunning}
               coveragePercent={coverageProgress?.percent ?? 0}
               onOpenWildcard={(name) => {
@@ -4252,6 +4337,7 @@ export function App() {
               detailsWidth={detailsWidth}
               selectedFolder={generationSelectedFolder}
               onSelectedFolderChange={setGenerationSelectedFolder}
+              expandSnapshotRef={generationExpandRef}
               wildcardKeys={wildcardKeys}
               onOpenWildcard={(name) => {
                 setWorkspaceTab('wildcards');
@@ -5594,8 +5680,11 @@ export function App() {
           }}
         />
       ) : null}
-      {expandOpen && rootFile ? (
-        <ExpandModal relativePath={rootFile} onClose={() => setExpandOpen(false)} />
+      {expandTarget ? (
+        <ExpandModal
+          target={expandTarget}
+          onClose={() => setExpandTarget(null)}
+        />
       ) : null}
 
       {globalSearchLauncherOpen ? (
@@ -6872,31 +6961,65 @@ function CleanupMissingModal({
 }
 
 function ExpandModal({
-  relativePath,
+  target,
   onClose,
 }: {
-  relativePath: string;
+  target: ExpandTarget;
   onClose: () => void;
 }) {
   const [mode, setMode] = useState<ExpandMode>('random');
   const [count, setCount] = useState(20);
-  const [seed, setSeed] = useState(1);
+  const [seed, setSeed] = useState(
+    target.kind === 'generation' ? target.seed : 1,
+  );
   const [result, setResult] = useState<ExpandResultDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const title =
+    target.kind === 'wildcard'
+      ? target.relativePath
+      : target.kind === 'gen-file'
+        ? `${target.relativeFolder}/!gen.txt`
+        : 'Generation · Once';
 
   const generate = useCallback(
     async (overrideSeed?: number) => {
       setBusy(true);
       setErr(null);
+      const sampleSeed = overrideSeed ?? seed;
+      const request: ExpandRequestDto =
+        target.kind === 'wildcard'
+          ? {
+              source: 'wildcard',
+              relativePath: target.relativePath,
+              mode,
+              limit: count,
+              seed: mode === 'random' ? sampleSeed : undefined,
+            }
+          : target.kind === 'gen-file'
+            ? {
+                source: 'gen-file',
+                relativeFolder: target.relativeFolder,
+                content: target.content,
+                mode,
+                limit: count,
+                seed: mode === 'random' ? sampleSeed : undefined,
+              }
+            : {
+                source: 'generation',
+                promptSource: target.promptSource,
+                promptText: target.promptText,
+                relativeFolder: target.relativeFolder ?? undefined,
+                promptFoldersRecursive: target.promptFoldersRecursive,
+                additionalPositivePrompt: target.additionalPositivePrompt,
+                checkpoint: target.checkpoint,
+                generationSeed: sampleSeed,
+                mode,
+                limit: count,
+              };
       try {
-        const r = await window.wcm.expand.preview({
-          relativePath,
-          mode,
-          limit: count,
-          seed: mode === 'random' ? overrideSeed ?? seed : undefined,
-        });
+        const r = await window.wcm.expand.preview(request);
         setResult(r);
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
@@ -6904,7 +7027,7 @@ function ExpandModal({
         setBusy(false);
       }
     },
-    [count, mode, relativePath, seed],
+    [count, mode, seed, target],
   );
 
   useEffect(() => {
@@ -6928,7 +7051,7 @@ function ExpandModal({
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
           <h2>
-            <Sparkles size={18} /> Expand · {relativePath}
+            <Sparkles size={18} /> Expand · {title}
           </h2>
           <button type="button" className="icon-btn" onClick={onClose}>
             <X size={16} />
@@ -7001,6 +7124,7 @@ function ExpandModal({
                 {result.totalCombinations.toLocaleString()} combination
                 {result.totalCombinations === 1 ? '' : 's'}
               </span>
+              {result.detail ? <span>{result.detail}</span> : null}
               <span>
                 showing {result.samples.length}
                 {result.truncated ? ' (truncated)' : ''}

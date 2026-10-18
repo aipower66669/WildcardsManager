@@ -43,6 +43,8 @@ function libraryJsonListScore(file: string): number {
     >;
     const keys = [
       'ignoredUnusedLoras',
+      'ignoredCheckpoints',
+      'promptSubstitutions',
       'archivedCivitaiModels',
       'archivedCivitaiImages',
       'maybeCivitaiModels',

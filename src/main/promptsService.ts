@@ -686,6 +686,42 @@ export function getLoadedGenPrompts(relativeFolder: string): string[] {
   return genPromptsCache!.prompts;
 }
 
+const GEN_EXPAND_PATH = '__wcm_gen_line__.txt';
+
+/**
+ * Expand prompt templates against the active wildcards library.
+ * Each entry is one line, the same way a wildcard file offers alternatives.
+ */
+export function expandPromptTemplates(
+  lines: string[],
+  options: {
+    mode: 'random' | 'exhaustive';
+    limit: number;
+    seed?: number;
+    countCombinations?: boolean;
+  },
+): ReturnType<typeof expandPrompts> {
+  const files = libraryService.loadAllFiles();
+  return expandPrompts({
+    rootRelativePath: GEN_EXPAND_PATH,
+    files: [
+      ...files,
+      {
+        relativePath: GEN_EXPAND_PATH,
+        absolutePath: GEN_EXPAND_PATH,
+        name: '__wcm_gen_line__',
+        ext: '.txt',
+        key: '__wcm_gen_line__',
+        text: lines.join('\n'),
+      },
+    ],
+    mode: options.mode,
+    limit: options.limit,
+    seed: options.seed,
+    countCombinations: options.countCombinations,
+  });
+}
+
 /**
  * Expand one Dynamic Prompts line against the active wildcards library.
  */
@@ -695,21 +731,7 @@ export function expandGenLine(
 ): { text: string; issues: string[] } {
   const trimmed = line.trim();
   if (!trimmed) return { text: '', issues: ['Empty prompt line'] };
-  const files = libraryService.loadAllFiles();
-  const virtualPath = '__wcm_gen_line__.txt';
-  const result = expandPrompts({
-    rootRelativePath: virtualPath,
-    files: [
-      ...files,
-      {
-        relativePath: virtualPath,
-        absolutePath: virtualPath,
-        name: '__wcm_gen_line__',
-        ext: '.txt',
-        key: '__wcm_gen_line__',
-        text: trimmed,
-      },
-    ],
+  const result = expandPromptTemplates([trimmed], {
     mode: 'random',
     limit: 1,
     seed: seed >>> 0,

@@ -47,7 +47,9 @@ export const IPC = {
   uiSetPromptsSamplesCollapsed: 'wcm:ui:setPromptsSamplesCollapsed',
   uiSetGenerationPreviewCollapsed: 'wcm:ui:setGenerationPreviewCollapsed',
   uiSetPromptCoverageWindow: 'wcm:ui:setPromptCoverageWindow',
+  uiSetPromptSubstitutionsWindow: 'wcm:ui:setPromptSubstitutionsWindow',
   uiSetBenchmarkResultsWindow: 'wcm:ui:setBenchmarkResultsWindow',
+  uiSetBenchmarkResultsView: 'wcm:ui:setBenchmarkResultsView',
   uiSetSimulationSettings: 'wcm:ui:setSimulationSettings',
   uiSetGraphLayoutStyle: 'wcm:ui:setGraphLayoutStyle',
   uiSetWorkspaceListFilter: 'wcm:ui:setWorkspaceListFilter',
@@ -65,6 +67,8 @@ export const IPC = {
   uiSetLoraFolder: 'wcm:ui:setLoraFolder',
   uiClearLoraFolder: 'wcm:ui:clearLoraFolder',
   uiOpenLoraFolder: 'wcm:ui:openLoraFolder',
+  uiGetPromptSubstitutions: 'wcm:ui:getPromptSubstitutions',
+  uiSetPromptSubstitutions: 'wcm:ui:setPromptSubstitutions',
   uiIgnoreUnusedLora: 'wcm:ui:ignoreUnusedLora',
   uiCategorizeUnusedLora: 'wcm:ui:categorizeUnusedLora',
   uiExtendUnusedLoraSeries: 'wcm:ui:extendUnusedLoraSeries',
@@ -226,6 +230,7 @@ export const IPC = {
   modelFilesSetCivitaiLink: 'wcm:modelFiles:setCivitaiLink',
   modelFilesClearCivitaiLink: 'wcm:modelFiles:clearCivitaiLink',
   modelFilesSetRating: 'wcm:modelFiles:setRating',
+  modelFilesSetCheckpointEnabled: 'wcm:modelFiles:setCheckpointEnabled',
   modelFilesResolveMasterImages: 'wcm:modelFiles:resolveMasterImages',
   modelFilesReadMasterImage: 'wcm:modelFiles:readMasterImage',
   modelFilesDeleteCheckpoints: 'wcm:modelFiles:deleteCheckpoints',
@@ -541,6 +546,13 @@ export type ModelFileManagerEntryDto = {
    * Currently used for checkpoints; LoRAs default to −1.
    */
   rating: number;
+  /**
+   * Checkpoint files: false when this library lists the path in
+   * `ignoredCheckpoints` (`library.json`). Unticked checkpoints stay on disk
+   * and are left out of this library’s Generation list and Benchmark.
+   * Omitted or true means the file is in use here.
+   */
+  enabled?: boolean;
   /** Wildcard files that reference this LoRA (LoRA manager only). */
   referenceCount?: number;
   unused?: boolean;
@@ -1192,6 +1204,20 @@ export type GenerationFormLoadedDto = GenerationFormStateDto & {
   lastImageUrl?: string;
 };
 
+/**
+ * One library rule: when the checkpoint file name contains `modelContains`,
+ * replace every exact `find` in the selected prompt with `replace` before
+ * wildcards expand.
+ */
+export type PromptSubstitutionDto = {
+  /** Case-insensitive substring of the checkpoint file name (no extension). */
+  modelContains: string;
+  /** Exact, case-sensitive prompt text. */
+  find: string;
+  /** Replacement text. May be empty to remove `find`. */
+  replace: string;
+};
+
 export type GenerationStartRequestDto = {
   mode: GenerationModeDto;
   /** Style profile that owns checkpoints/prompts and the output root. */
@@ -1210,6 +1236,10 @@ export type GenerationStartRequestDto = {
   promptFoldersRecursive?: boolean;
   /** Required when promptSource is `text`. */
   promptText?: string;
+  /**
+   * Checkpoint relative path. Prompt substitutions match its file name
+   * before the line is expanded.
+   */
   checkpoint: string;
   clip?: string;
   vae?: string;
@@ -1246,12 +1276,17 @@ export type CheckpointBenchmarkResultRowDto = {
   runCount: number;
   avgDurationMs: number;
   totalDurationMs: number;
-  /** Fastest single run for this checkpoint. */
+  /** Fastest single run among the five fastest. */
   minDurationMs: number;
-  /** Slowest single run for this checkpoint. */
+  /** Slowest single run among the five fastest. */
   maxDurationMs: number;
-  /** Individual run durations (ms), typically up to 10. */
+  /** Every recorded run duration (ms). The chart draws all of them. */
   runDurationsMs: number[];
+  /**
+   * `field_rating` from the sample folder’s `mfe_meta` ADS, when that stream
+   * exists. Null when the folder has no rating.
+   */
+  rating: number | null;
 };
 
 export type CheckpointBenchmarkResultsDto = {
@@ -1306,7 +1341,31 @@ export type GenerationProgressDto = {
 };
 
 export type ExpandRequestDto = {
-  relativePath: string;
+  /**
+   * `wildcard` (default) expands a library file. `gen-file` expands the
+   * selected Prompts `!gen.txt`. `generation` expands the line Once would queue.
+   */
+  source?: 'wildcard' | 'gen-file' | 'generation';
+  /** Wildcard file. Required for `wildcard`. */
+  relativePath?: string;
+  /** Prompts folder for `gen-file`, and the selected folder for `generation`. */
+  relativeFolder?: string;
+  /** Unsaved `!gen.txt` body. When omitted, `gen-file` reads the file on disk. */
+  content?: string;
+  promptSource?: 'text' | 'folder';
+  promptText?: string;
+  promptFoldersRecursive?: boolean;
+  additionalPositivePrompt?: string;
+  /**
+   * Generation checkpoint relative path. Substitutions for this library
+   * match its file name before the chosen line is expanded.
+   */
+  checkpoint?: string;
+  /**
+   * Generation form seed. ≤0 rolls a new seed the way Once does.
+   * Wildcard expansion of that chosen line uses the resolved seed.
+   */
+  generationSeed?: number;
   mode: ExpandMode;
   limit?: number;
   seed?: number;
@@ -1322,6 +1381,8 @@ export type ExpandResultDto = {
   truncated: boolean;
   seed: number | null;
   issues: IssueDto[];
+  /** Short label for where the samples came from. */
+  detail?: string;
 };
 
 export type SimulateRequestDto = {
@@ -1661,6 +1722,32 @@ export type FloatingWindowStateDto = {
   maximized: boolean;
 };
 
+export const BENCHMARK_RESULTS_SORTS = [
+  'speed-asc',
+  'speed-desc',
+  'name-asc',
+  'name-desc',
+  'rating-desc',
+  'rating-asc',
+  'weight-desc',
+  'weight-asc',
+] as const;
+
+/** Benchmark results chart order. */
+export type BenchmarkResultsSort = (typeof BENCHMARK_RESULTS_SORTS)[number];
+
+/** Remembered name filter and sort for the Benchmark results chart. */
+export type BenchmarkResultsViewDto = {
+  sort: BenchmarkResultsSort;
+  /** Case-insensitive “name contains” filter. Empty shows every name. */
+  nameFilter: string;
+};
+
+export const DEFAULT_BENCHMARK_RESULTS_VIEW: BenchmarkResultsViewDto = {
+  sort: 'speed-asc',
+  nameFilter: '',
+};
+
 export type UiSettingsDto = {
   /** @deprecated Prefer panelWidthsByTab; kept as wildcards-tab widths. */
   detailsPanelWidth: number;
@@ -1680,8 +1767,12 @@ export type UiSettingsDto = {
   generationPreviewCollapsed: boolean | null;
   /** Prompt Coverage dialog position/size (null = never saved). */
   promptCoverageWindow: FloatingWindowStateDto | null;
+  /** Generation prompt-substitutions dialog position/size (null = never saved). */
+  promptSubstitutionsWindow: FloatingWindowStateDto | null;
   /** Checkpoint Benchmark results chart position/size (null = never saved). */
   benchmarkResultsWindow: FloatingWindowStateDto | null;
+  /** Name filter and sort for the Benchmark results chart. */
+  benchmarkResultsView: BenchmarkResultsViewDto;
   simulationIterations: number;
   simulationSeed: number;
   graphLayoutStyle: GraphLayoutStyle;
@@ -2907,7 +2998,10 @@ export type WcmDesktopApi = {
     delete(relativePath: string): Promise<DeleteResultDto>;
   };
   expand: {
-    /** Generate expansion previews for a wildcard file. */
+    /**
+     * Expansion preview. Wildcard files, the selected Prompts `!gen.txt`,
+     * or the Generation Once pick.
+     */
     preview(request: ExpandRequestDto): Promise<ExpandResultDto>;
   };
   simulate: {
@@ -2969,9 +3063,15 @@ export type WcmDesktopApi = {
     setPromptCoverageWindow(
       state: FloatingWindowStateDto,
     ): Promise<FloatingWindowStateDto>;
+    setPromptSubstitutionsWindow(
+      state: FloatingWindowStateDto,
+    ): Promise<FloatingWindowStateDto>;
     setBenchmarkResultsWindow(
       state: FloatingWindowStateDto,
     ): Promise<FloatingWindowStateDto>;
+    setBenchmarkResultsView(
+      view: BenchmarkResultsViewDto,
+    ): Promise<BenchmarkResultsViewDto>;
     setSimulationSettings(iterations: number, seed: number): Promise<void>;
     setGraphLayoutStyle(style: GraphLayoutStyle): Promise<void>;
     setWorkspaceListFilter(
@@ -3066,6 +3166,15 @@ export type WcmDesktopApi = {
     extendUnusedLoraSeries(
       relativePaths: string[],
     ): Promise<ExtendUnusedLoraSeriesResultDto>;
+    /**
+     * This library’s generation prompt substitutions (`library.json`).
+     * Applied to Use this prompt and the selected prompt folder before
+     * wildcards expand.
+     */
+    getPromptSubstitutions(): Promise<PromptSubstitutionDto[]>;
+    setPromptSubstitutions(
+      rules: PromptSubstitutionDto[],
+    ): Promise<PromptSubstitutionDto[]>;
     /** Search the configured LoRA folder by name (cached index; no disk walk). */
     searchLoras(query: string): Promise<LoraSearchResultDto>;
     /** Named main-process work for the status bar. */
@@ -3152,6 +3261,14 @@ export type WcmDesktopApi = {
       autoV2?: string | null;
       rating: number;
     }): Promise<number>;
+    /**
+     * Tick = use this checkpoint in the active library’s Generation list and Benchmark.
+     * Untick keeps the file and adds it to this library’s `ignoredCheckpoints`.
+     */
+    setCheckpointEnabled(opts: {
+      absolutePath: string;
+      enabled: boolean;
+    }): Promise<boolean>;
     /** Resolve/cache masters-folder collage JPGs for a checkpoint. */
     resolveMasterImages(opts: {
       absolutePath: string;

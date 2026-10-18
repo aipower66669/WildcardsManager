@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { WCM_DIR } from '../domain/librarySidecarPaths.js';
 import {
   LIBRARY_LOCAL_VERSION,
   protectLibraryListsFromEmptyClobber,
+  readLibraryLocalPayload,
   type LibraryLocalPayload,
 } from './libraryLocalState.js';
 
@@ -138,5 +143,51 @@ describe('protectLibraryListsFromEmptyClobber', () => {
     });
     const next = protectLibraryListsFromEmptyClobber(incoming, existing);
     expect(next.loraDownloadCategories).toEqual(existing.loraDownloadCategories);
+  });
+});
+
+describe('readLibraryLocalPayload', () => {
+  const temps: string[] = [];
+
+  afterEach(() => {
+    for (const dir of temps.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps sibling-only fields when the legacy file has more membership rows', () => {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'wcm-lib-'));
+    temps.push(parent);
+    const root = path.join(parent, 'wildcards');
+    fs.mkdirSync(root, { recursive: true });
+    const rules = [
+      { modelContains: 'Kroma', find: '__loraname__', replace: '__loraname-KromaVersion__' },
+    ];
+    fs.mkdirSync(path.join(parent, 'wildcards.wcm'), { recursive: true });
+    fs.writeFileSync(
+      path.join(parent, 'wildcards.wcm', 'library.json'),
+      `${JSON.stringify({
+        version: 1,
+        promptSubstitutions: rules,
+        archivedCivitaiModels: [],
+      })}\n`,
+    );
+    fs.mkdirSync(path.join(root, WCM_DIR), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, WCM_DIR, 'library.json'),
+      `${JSON.stringify({
+        version: 1,
+        archivedCivitaiModels: [
+          { origin: 'https://civitai.com', modelId: 1 },
+          { origin: 'https://civitai.com', modelId: 2 },
+        ],
+        ignoredCheckpoints: ['old.safetensors'],
+      })}\n`,
+    );
+
+    const payload = readLibraryLocalPayload(root);
+    expect(payload?.promptSubstitutions).toEqual(rules);
+    expect(payload?.archivedCivitaiModels).toHaveLength(2);
+    expect(payload?.ignoredCheckpoints).toEqual(['old.safetensors']);
   });
 });

@@ -5,6 +5,7 @@ import {
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
+  type MutableRefObject,
 } from 'react';
 import {
   ClipboardCopy,
@@ -93,6 +94,11 @@ type Props = {
   onRenameLora?: (name: string) => void;
   onOpenLora?: (name: string) => void;
   onOpenLoraInCivitaiCatalog?: (model: ParsedCivitaiModelPageUrl) => void;
+  /** Live editor text so Expand uses unsaved !gen.txt lines. */
+  genTextRef?: MutableRefObject<{
+    relativeFolder: string | null;
+    content: string;
+  } | null>;
 };
 
 const SAMPLES_COLLAPSED_KEY = 'wcm.prompts.samplesCollapsed';
@@ -130,12 +136,19 @@ export function PromptsWorkspace({
   onRenameLora,
   onOpenLora,
   onOpenLoraInCivitaiCatalog,
+  genTextRef,
 }: Props) {
   const [tree, setTree] = useState<PromptTreeDto>({ root: null, folders: [] });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [genExists, setGenExists] = useState(false);
   const [editorText, setEditorText] = useState('');
+  if (genTextRef) {
+    genTextRef.current = {
+      relativeFolder: selectedFolder,
+      content: editorText,
+    };
+  }
   const [dirty, setDirty] = useState(false);
   const [samples, setSamples] = useState<
     Array<{ fileName: string; url: string }>
@@ -568,7 +581,7 @@ export function PromptsWorkspace({
               title={
                 coverageRunning
                   ? `Coverage running — ${Math.round(coveragePercent)}% (click for details)`
-                  : 'Coverage — simulate all !gen.txt prompts and measure wildcard usage'
+                  : 'Coverage — opens Generation and measures wildcard usage from every !gen.txt'
               }
               aria-label="Coverage"
               onClick={() => onOpenCoverage?.()}

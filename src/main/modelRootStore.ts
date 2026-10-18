@@ -8,6 +8,7 @@ import {
   modelsJsonPath,
   rootRelativePosixKey,
 } from '../domain/librarySidecarPaths.js';
+import { normalizeCheckpointIgnored } from '../domain/checkpointEnabled.js';
 import { normalizeAutoV2 } from '../domain/modelHash.js';
 import { atomicWriteFile, readJsonFile } from './librarySidecarIo.js';
 import { getActiveLibrary } from './settingsStore.js';
@@ -39,6 +40,11 @@ export type ModelsStoreFile = {
     byAutoV2: Record<string, ManualLinkEntry>;
     byPath: Record<string, ManualLinkEntry>;
   };
+  /**
+   * Root-relative paths the user does not want to use. For checkpoints this
+   * hides the file from Generation and from Benchmark. Missing means none.
+   */
+  ignored: string[];
 };
 
 const STORE_VERSION = 1 as const;
@@ -49,6 +55,7 @@ function emptyStore(): ModelsStoreFile {
     hashes: {},
     ratings: { byAutoV2: {}, byPath: {} },
     links: { byAutoV2: {}, byPath: {} },
+    ignored: [],
   };
 }
 
@@ -98,6 +105,7 @@ export function loadModelsStore(modelRoot: string): ModelsStoreFile {
                 ? raw.links.byPath
                 : {},
           },
+          ignored: normalizeCheckpointIgnored(raw.ignored),
         }
       : emptyStore();
   memoryByRoot.set(key, { root: path.resolve(modelRoot), store });

@@ -189,6 +189,7 @@ function migrateModelsJson(lib: LibraryConfig): void {
           ...part.linkPaths,
         },
       },
+      ignored: Array.isArray(existing?.ignored) ? existing.ignored : [],
     };
     saveModelsStore(root, store);
   };

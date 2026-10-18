@@ -40,6 +40,11 @@ import {
 } from './modelManualCivitaiLink.js';
 import { getModelRating, setModelRating, clearModelRating } from './modelRatings.js';
 import {
+  checkpointEnabledForRelativePath,
+  clearCheckpointIgnored,
+  setCheckpointEnabled,
+} from './checkpointEnabled.js';
+import {
   clearCheckpointMasterCache,
   MASTERS_DELETED_FOLDER,
   resolveCheckpointMasterImages,
@@ -283,6 +288,7 @@ function toDetailEntry(
 }
 
 export { setManualCivitaiLink, clearManualCivitaiLink, setModelRating };
+export { setCheckpointEnabled };
 export { resolveCheckpointMasterImages, readMastersImageDataUrl };
 
 function readLibraryFiles() {
@@ -513,7 +519,10 @@ export async function listManagedCheckpoints(opts?: {
   }
   const catalog = getAutoV2CatalogIndex();
   const files = hashed.files
-    .map((file) => toListEntry(file, hashed.root, catalog))
+    .map((file) => ({
+      ...toListEntry(file, hashed.root, catalog),
+      enabled: checkpointEnabledForRelativePath(file.relativePath),
+    }))
     .sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 
   // Background: hash checkpoints missing AutoV2 (sibling `.txt` sidecars first,
@@ -625,7 +634,10 @@ export async function getCheckpointManagerDetail(
       f.relativePath.replace(/\\/g, '/') === relativePath.replace(/\\/g, '/'),
   );
   if (!file) throw new Error(`Checkpoint not found: ${relativePath}`);
-  const entry = toDetailEntry(file, index.root, { resolveMasters: true });
+  const entry = {
+    ...toDetailEntry(file, index.root, { resolveMasters: true }),
+    enabled: checkpointEnabledForRelativePath(file.relativePath),
+  };
   if (entry.previewUrl && !entry.previewLocalUrl) {
     void requestCachedPreview(
       entry.previewUrl,
@@ -796,6 +808,7 @@ export async function deleteCheckpoints(
         absolutePath: file.absolutePath,
         autoV2: file.autoV2,
       });
+      clearCheckpointIgnored(file.absolutePath);
 
       if (typeof modelId === 'number' && Number.isFinite(modelId)) {
         unmarkCivitaiModelInstalled(modelId);

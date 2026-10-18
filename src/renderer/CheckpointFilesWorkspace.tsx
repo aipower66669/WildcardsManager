@@ -84,6 +84,33 @@ export function CheckpointFilesWorkspace({
     [list, selectedPath],
   );
 
+  const setCheckpointInUse = useCallback(
+    async (entry: ModelFileManagerEntryDto, enabled: boolean) => {
+      setError(null);
+      try {
+        const next = await window.wcm.modelFiles.setCheckpointEnabled({
+          absolutePath: entry.absolutePath,
+          enabled,
+        });
+        setList((prev) =>
+          prev.map((row) =>
+            row.relativePath === entry.relativePath
+              ? { ...row, enabled: next }
+              : row,
+          ),
+        );
+        setFile((prev) =>
+          prev && prev.relativePath === entry.relativePath
+            ? { ...prev, enabled: next }
+            : prev,
+        );
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [],
+  );
+
   const refresh = useCallback(async (opts?: { force?: boolean; quiet?: boolean }) => {
     if (!opts?.quiet) {
       setBusy(true);
@@ -399,11 +426,29 @@ export function CheckpointFilesWorkspace({
             </label>
             <ul className="file-list">
               {visible.map((f) => (
-                <li key={f.relativePath}>
+                <li key={f.relativePath} className="file-list-row">
+                  <label
+                    className="file-list-use"
+                    title="Use this checkpoint in the current library. Untick to keep the file but hide it from this library’s Generation list and Benchmark. Other libraries are unchanged."
+                  >
+                    <input
+                      type="checkbox"
+                      checked={f.enabled !== false}
+                      aria-label={`Use ${f.stem} in this library`}
+                      onChange={(event) =>
+                        void setCheckpointInUse(f, event.target.checked)
+                      }
+                    />
+                  </label>
                   <button
                     type="button"
                     className={
-                      f.relativePath === selectedPath ? 'selected' : undefined
+                      [
+                        f.relativePath === selectedPath ? 'selected' : '',
+                        f.enabled === false ? 'file-list-unused' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ') || undefined
                     }
                     onClick={() => setSelectedPath(f.relativePath)}
                     onContextMenu={(event: ReactMouseEvent) => {
@@ -441,6 +486,19 @@ export function CheckpointFilesWorkspace({
             <div className="sidebar-head">
               <strong>Checkpoint details</strong>
             </div>
+            <label
+              className="checkpoint-use-toggle"
+              title="Untick to keep this file on disk but leave it out of this library’s Generation list and Benchmark."
+            >
+              <input
+                type="checkbox"
+                checked={file.enabled !== false}
+                onChange={(event) =>
+                  void setCheckpointInUse(file, event.target.checked)
+                }
+              />
+              Use in this library
+            </label>
             <div className="pad">
               <ModelIdentityPanel
                 file={file}

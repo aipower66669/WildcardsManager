@@ -29,7 +29,10 @@ import {
   setPromptsSamplesCollapsed,
   setGenerationPreviewCollapsed,
   setPromptCoverageWindow,
+  setPromptSubstitutionsWindow,
   setBenchmarkResultsWindow,
+  getBenchmarkResultsView,
+  setBenchmarkResultsView,
   resolvePanelWidthsByTab,
   setGraphLayoutStyle,
   getWorkspaceListFilters,
@@ -270,6 +273,7 @@ import {
   setManualCivitaiLink,
   clearManualCivitaiLink,
   setModelRating,
+  setCheckpointEnabled,
   resolveCheckpointMasterImages,
   readMastersImageDataUrl,
   deleteCheckpoints,
@@ -366,6 +370,10 @@ import {
   saveFile,
 } from './refactorService.js';
 import { expandPreview } from './expandService.js';
+import {
+  getPromptSubstitutions,
+  setPromptSubstitutions,
+} from './promptSubstitutions.js';
 import { exportSimulatedLines, runSimulation } from './simulateService.js';
 import {
   historyState,
@@ -905,7 +913,9 @@ export function registerIpc(): void {
           ? settings.generationPreviewCollapsed
           : null,
       promptCoverageWindow: settings.promptCoverageWindow ?? null,
+      promptSubstitutionsWindow: settings.promptSubstitutionsWindow ?? null,
       benchmarkResultsWindow: settings.benchmarkResultsWindow ?? null,
+      benchmarkResultsView: getBenchmarkResultsView(),
       simulationIterations: settings.simulationIterations ?? 10_000,
       simulationSeed: settings.simulationSeed ?? 1,
       graphLayoutStyle: settings.graphLayoutStyle ?? 'optimized',
@@ -1003,6 +1013,28 @@ export function registerIpc(): void {
   );
 
   ipcMain.handle(
+    IPC.uiSetPromptSubstitutionsWindow,
+    async (_e, state: unknown) => {
+      if (!state || typeof state !== 'object') {
+        throw new Error('Invalid prompt substitutions window state');
+      }
+      const rec = state as Record<string, unknown>;
+      for (const key of ['x', 'y', 'width', 'height'] as const) {
+        if (typeof rec[key] !== 'number' || !Number.isFinite(rec[key])) {
+          throw new Error('Invalid prompt substitutions window state');
+        }
+      }
+      return setPromptSubstitutionsWindow({
+        x: rec.x as number,
+        y: rec.y as number,
+        width: rec.width as number,
+        height: rec.height as number,
+        maximized: rec.maximized === true,
+      });
+    },
+  );
+
+  ipcMain.handle(
     IPC.uiSetBenchmarkResultsWindow,
     async (_e, state: unknown) => {
       if (!state || typeof state !== 'object') {
@@ -1022,6 +1054,10 @@ export function registerIpc(): void {
         maximized: rec.maximized === true,
       });
     },
+  );
+
+  ipcMain.handle(IPC.uiSetBenchmarkResultsView, async (_e, view: unknown) =>
+    setBenchmarkResultsView(view),
   );
 
   ipcMain.handle(
@@ -1103,6 +1139,17 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.uiCheckForAppUpdate, async () => checkForAppUpdate());
 
   ipcMain.handle(IPC.uiInstallAppUpdate, async () => installAppUpdate());
+
+  ipcMain.handle(IPC.uiGetPromptSubstitutions, async () =>
+    getPromptSubstitutions(),
+  );
+
+  ipcMain.handle(IPC.uiSetPromptSubstitutions, async (_e, rules: unknown) => {
+    if (!Array.isArray(rules)) {
+      throw new Error('Invalid prompt substitutions');
+    }
+    return setPromptSubstitutions(rules);
+  });
 
   ipcMain.handle(IPC.uiGetLoraFolder, async () => loadSettings().loraFolder ?? null);
 
@@ -1379,6 +1426,23 @@ export function registerIpc(): void {
       absolutePath: o.absolutePath.trim(),
       autoV2: typeof o.autoV2 === 'string' ? o.autoV2 : null,
       rating: o.rating,
+    });
+  });
+
+  ipcMain.handle(IPC.modelFilesSetCheckpointEnabled, async (_e, opts: unknown) => {
+    const o =
+      opts && typeof opts === 'object'
+        ? (opts as { absolutePath?: unknown; enabled?: unknown })
+        : {};
+    if (typeof o.absolutePath !== 'string' || !o.absolutePath.trim()) {
+      throw new Error('Invalid model path');
+    }
+    if (typeof o.enabled !== 'boolean') {
+      throw new Error('Invalid checkpoint enabled flag');
+    }
+    return setCheckpointEnabled({
+      absolutePath: o.absolutePath.trim(),
+      enabled: o.enabled,
     });
   });
 
@@ -3393,17 +3457,48 @@ export function registerIpc(): void {
       throw new Error('Invalid expand request');
     }
     const req = request as {
+      source?: unknown;
       relativePath?: unknown;
+      relativeFolder?: unknown;
+      content?: unknown;
+      promptSource?: unknown;
+      promptText?: unknown;
+      promptFoldersRecursive?: unknown;
+      additionalPositivePrompt?: unknown;
+      checkpoint?: unknown;
+      generationSeed?: unknown;
       mode?: unknown;
       limit?: unknown;
       seed?: unknown;
     };
-    if (typeof req.relativePath !== 'string') throw new Error('Invalid path');
+    const source =
+      req.source === 'gen-file' || req.source === 'generation'
+        ? req.source
+        : 'wildcard';
+    if (source === 'wildcard' && typeof req.relativePath !== 'string') {
+      throw new Error('Invalid path');
+    }
     if (req.mode !== 'exhaustive' && req.mode !== 'random') {
       throw new Error('Invalid expand mode');
     }
     return expandPreview({
-      relativePath: req.relativePath,
+      source,
+      relativePath:
+        typeof req.relativePath === 'string' ? req.relativePath : undefined,
+      relativeFolder:
+        typeof req.relativeFolder === 'string' ? req.relativeFolder : undefined,
+      content: typeof req.content === 'string' ? req.content : undefined,
+      promptSource: req.promptSource === 'text' ? 'text' : 'folder',
+      promptText: typeof req.promptText === 'string' ? req.promptText : undefined,
+      promptFoldersRecursive: req.promptFoldersRecursive === true,
+      additionalPositivePrompt:
+        typeof req.additionalPositivePrompt === 'string'
+          ? req.additionalPositivePrompt
+          : undefined,
+      checkpoint:
+        typeof req.checkpoint === 'string' ? req.checkpoint : undefined,
+      generationSeed:
+        typeof req.generationSeed === 'number' ? req.generationSeed : undefined,
       mode: req.mode,
       limit: typeof req.limit === 'number' ? req.limit : undefined,
       seed: typeof req.seed === 'number' ? req.seed : undefined,

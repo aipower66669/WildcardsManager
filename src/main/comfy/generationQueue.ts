@@ -10,6 +10,13 @@ import type {
 import { IPC } from '../../shared/contracts.js';
 import { GENERATION_OUTPUT_FILENAME } from '../../shared/comfy.js';
 import { applyBindings } from './applyBindings.js';
+import {
+  emptySampleClock,
+  noteSampleProgress,
+  sampleClockDurationMs,
+  samplerNodeIds,
+  type SampleClock,
+} from './benchmarkTiming.js';
 import { ComfyAdapter } from './adapter.js';
 import {
   getComfyConnection,
@@ -27,9 +34,11 @@ import {
   type GenerationImagePrompts,
 } from '../../domain/generationImagePrompt.js';
 import {
-  chooseGenPrompt,
-  createMulberry32,
-  pickGenPrompt,
+  pickGenerationPrompt,
+  reseedGenerationFolderDeck,
+  resolveGenerationSeed,
+} from '../../domain/generationPromptPick.js';
+import {
   stripTestingGenTag,
 } from '../../domain/genPrompts.js';
 import { GenFolderDeck } from '../../domain/genFolderDeck.js';
@@ -58,6 +67,7 @@ import {
   generationPreviewUrlForFile,
 } from './generationPreview.js';
 import { BENCHMARK_IMAGES_PER_CHECKPOINT } from '../../domain/checkpointBenchmark.js';
+import { applyLibraryPromptSubstitutions } from '../promptSubstitutions.js';
 
 let cancelled = false;
 let running = false;
@@ -84,20 +94,6 @@ function emit(): void {
 function setProgress(patch: Partial<GenerationProgressDto>): void {
   progress = { ...progress, ...patch };
   emit();
-}
-
-function randomSeed(): number {
-  return Math.floor(Math.random() * 0xffffffff) >>> 0;
-}
-
-/**
- * UI seed → job seed. ≤0 (and non-finite) means random per job — same contract
- * as LT · Seed’s docs. Always a uint32 suitable for the node’s `value` input.
- */
-function resolveJobSeed(uiSeed: unknown): number {
-  const n = typeof uiSeed === 'number' ? uiSeed : Number(uiSeed);
-  if (!Number.isFinite(n) || n <= 0) return randomSeed();
-  return Math.floor(n) >>> 0;
 }
 
 /** Write the job seed into every LT · Seed node (`value` input — not `seed`). */
@@ -166,59 +162,94 @@ async function findNewestOutputFile(
   return best?.abs ?? null;
 }
 
-/** Wait until Comfy finishes the prompt (success or error). */
-async function waitForExecutionComplete(
+const UNTIMED_BENCHMARK =
+  'Benchmark did not record a time because ComfyUI never reported the sampler steps from the first step to the last.';
+
+type ExecutionWatch = {
+  /** Resolves once the socket is open — queue only after this. */
+  opened: Promise<void>;
+  /**
+   * Sampler step span in ms, or null when the first-to-last step range was
+   * never seen. Rejects on cancel, error, or timeout.
+   */
+  done: Promise<number | null>;
+  setPromptId: (id: string) => void;
+  dispose: () => void;
+};
+
+/**
+ * Listen before the prompt is queued. Duration is the sampler step counter
+ * from the opening step through the last, not wall time until the file appears.
+ */
+function watchExecution(
   adapter: ComfyAdapter,
   clientId: string,
-  promptId: string,
-): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const finish = (err?: Error) => {
-      if (settled) return;
-      settled = true;
-      dispose();
-      if (err) reject(err);
-      else resolve();
-    };
-    const timer = setTimeout(
-      () => finish(new Error('ComfyUI execution timed out')),
-      10 * 60 * 1000,
-    );
-    const dispose = adapter.monitor(clientId, (event) => {
+  samplerIds: ReadonlySet<string>,
+): ExecutionWatch {
+  let promptId = '';
+  let clock: SampleClock = emptySampleClock();
+  let settled = false;
+  let resolveDone: (durationMs: number | null) => void = () => {};
+  let rejectDone: (error: Error) => void = () => {};
+  const done = new Promise<number | null>((resolve, reject) => {
+    resolveDone = resolve;
+    rejectDone = reject;
+  });
+  const finish = (err?: Error) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    disposeSocket();
+    if (err) rejectDone(err);
+    else resolveDone(sampleClockDurationMs(clock));
+  };
+  const timer = setTimeout(
+    () => finish(new Error('ComfyUI execution timed out')),
+    10 * 60 * 1000,
+  );
+  const { dispose: disposeSocket, opened } = adapter.monitor(clientId, (event) => {
+    const eventPromptId = 'promptId' in event ? event.promptId : undefined;
+    if (promptId && eventPromptId && eventPromptId !== promptId) return;
+    if (
+      event.type === 'progress' &&
+      (event.promptId == null || !promptId || event.promptId === promptId)
+    ) {
+      clock = noteSampleProgress(clock, event, samplerIds, Date.now());
+    }
+    if (cancelled) {
+      finish(new Error('cancelled'));
+      return;
+    }
+    if (
+      event.type === 'execution_error' &&
+      (!promptId || event.promptId === promptId)
+    ) {
+      finish(new Error(event.message || 'ComfyUI execution error'));
+      return;
+    }
+    if (
+      (event.type === 'execution_success' &&
+        (!promptId || event.promptId === promptId)) ||
+      (event.type === 'executing' &&
+        event.node === null &&
+        (!promptId || event.promptId === promptId))
+    ) {
+      clearTimeout(timer);
+      // Let a last progress frame land, and give save nodes time to flush.
+      setTimeout(() => finish(), 300);
+    }
+  });
+  const poll = async () => {
+    while (!settled) {
       if (cancelled) {
-        clearTimeout(timer);
         finish(new Error('cancelled'));
         return;
       }
-      if (event.type === 'execution_error' && event.promptId === promptId) {
-        clearTimeout(timer);
-        finish(new Error(event.message || 'ComfyUI execution error'));
-        return;
-      }
-      if (
-        (event.type === 'execution_success' && event.promptId === promptId) ||
-        (event.type === 'executing' &&
-          event.promptId === promptId &&
-          event.node === null)
-      ) {
-        clearTimeout(timer);
-        // Small delay so save nodes can flush to disk / history.
-        setTimeout(() => finish(), 300);
-      }
-    });
-    const poll = async () => {
-      while (!settled) {
-        if (cancelled) {
-          clearTimeout(timer);
-          finish(new Error('cancelled'));
-          return;
-        }
+      if (promptId) {
         try {
           const hist = await adapter.getHistoryBrief(promptId);
           if (hist.completed) {
             if (hist.statusStr === 'error') {
-              clearTimeout(timer);
               finish(new Error('ComfyUI execution failed'));
               return;
             }
@@ -231,11 +262,23 @@ async function waitForExecutionComplete(
         } catch {
           // retry
         }
-        await new Promise((r) => setTimeout(r, 400));
       }
-    };
-    void poll();
-  });
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  };
+  void poll();
+  // Cleanup can reject `done` after the caller has already moved on.
+  void done.catch(() => {});
+  return {
+    opened,
+    done,
+    setPromptId: (id: string) => {
+      promptId = id;
+    },
+    dispose: () => {
+      if (!settled) finish(new Error('cancelled'));
+    },
+  };
 }
 
 /**
@@ -320,6 +363,8 @@ function resolveStyleProfile(
   return loadGenerationForm().activeProfile;
 }
 
+type JobOutcome = 'normal' | 'timed' | 'untimed';
+
 async function runJob(
   adapter: ComfyAdapter,
   request: GenerationStartRequestDto,
@@ -331,7 +376,7 @@ async function runJob(
     totalCheckpoints: number;
     remainingImages: number;
   } | null,
-): Promise<void> {
+): Promise<JobOutcome> {
   const profile = loadWorkflowProfile();
   if (!profile) throw new Error('Save a Comfy workflow profile first (Edit Workflow → Save Workflow)');
   if (!isWorkflowGraph(profile.workflow)) {
@@ -341,53 +386,37 @@ async function runJob(
   const promptSource = request.promptSource === 'text' ? 'text' : 'folder';
   const styleProfile = resolveStyleProfile(request);
   const outputRoot = resolveGenerationOutputRoot(styleProfile);
-  let line: string;
+  // Resolve seed before picking/expanding so folder-mode selection is reproducible.
+  const seed = resolveGenerationSeed(request.seed);
+  const picked = pickGenerationPrompt({
+    promptSource,
+    promptText: request.promptText ?? '',
+    relativeFolder: request.relativeFolder?.trim() ?? '',
+    recursive: request.promptFoldersRecursive === true,
+    seed,
+    deck: genFolderDeck,
+    listAllFolders: listGenPromptFolders,
+    listFoldersUnder: listGenPromptFoldersUnder,
+    loadLines: (folder) => {
+      loadGenPrompts(folder);
+      return getLoadedGenPrompts(folder);
+    },
+  });
+  let line = picked.line;
   /** Relative prompts path used for in-app sample copy (folder mode / _manual). */
-  let reviewRelativeFolder: string;
+  const reviewRelativeFolder = picked.relativeFolder;
   /** Absolute path injected into LT · Output Folder. */
   let ltOutputFolder: string;
-
-  // Resolve seed before picking/expanding so folder-mode selection is reproducible.
-  const seed = resolveJobSeed(request.seed);
-
   if (promptSource === 'text') {
-    try {
-      line = chooseGenPrompt(request.promptText ?? '', seed);
-    } catch {
-      throw new Error('Enter a prompt');
-    }
     // Typed prompt → style output root (replaces the old single Generation folder).
     ltOutputFolder = outputRoot;
-    reviewRelativeFolder =
-      request.relativeFolder?.trim() || MANUAL_OUTPUT_FOLDER;
   } else {
-    let folder = request.relativeFolder?.trim() ?? '';
-    const recursive = request.promptFoldersRecursive === true;
-    if (!folder) {
-      const choices = listGenPromptFolders();
-      if (choices.length === 0) {
-        throw new Error('No prompt folders with !gen.txt to randomize');
-      }
-      folder = genFolderDeck.next(() => choices);
-    } else if (recursive) {
-      const choices = listGenPromptFoldersUnder(folder);
-      if (choices.length === 0) {
-        throw new Error(
-          `No !gen.txt under “${folder}” (enable Recursive only when this folder or a sub-folder has prompts)`,
-        );
-      }
-      folder = genFolderDeck.next(() => choices);
-    }
     const promptsRoot = loadSettings().promptsFolder?.trim();
     if (!promptsRoot) {
       throw new Error('No prompts folder configured for this library');
     }
-    loadGenPrompts(folder);
-    const prompts = getLoadedGenPrompts(folder);
-    line = pickGenPrompt(prompts, seed);
-    reviewRelativeFolder = folder;
     // Selected prompt folder → `{styleOutputRoot}/{selected}/New`
-    ltOutputFolder = path.resolve(outputRoot, folder, 'New');
+    ltOutputFolder = path.resolve(outputRoot, picked.relativeFolder, 'New');
   }
 
   if (benchmarkSlot) {
@@ -429,6 +458,11 @@ async function runJob(
   if (!line) {
     throw new Error('Expanded prompt was empty');
   }
+  // Swap generic wildcard calls for this checkpoint before expansion.
+  line = applyLibraryPromptSubstitutions(line, request.checkpoint);
+  if (!line.trim()) {
+    throw new Error('Expanded prompt was empty');
+  }
 
   const expanded = expandGenLine(line, seed);
   if (!expanded.text.trim()) {
@@ -463,15 +497,25 @@ async function runJob(
 
   const clientId = randomUUID();
   const jobStartedMs = Date.now();
-  const queued = await adapter.queuePrompt(graph, clientId, {
-    uiWorkflow: profile.uiWorkflow,
-  });
-  await waitForExecutionComplete(adapter, clientId, queued.promptId);
+  const watch = watchExecution(adapter, clientId, samplerNodeIds(graph));
+  let sampleDurationMs: number | null = null;
+  let promptId = '';
+  try {
+    await watch.opened;
+    const queued = await adapter.queuePrompt(graph, clientId, {
+      uiWorkflow: profile.uiWorkflow,
+    });
+    promptId = queued.promptId;
+    watch.setPromptId(promptId);
+    sampleDurationMs = await watch.done;
+  } finally {
+    watch.dispose();
+  }
 
   setProgress({ status: 'saving' });
   const output = await loadGeneratedPreviewUrl(
     adapter,
-    queued.promptId,
+    promptId,
     ltOutputFolder,
     jobStartedMs,
   );
@@ -491,14 +535,20 @@ async function runJob(
     request.negativePrompt,
   );
 
-  if (benchmarkSlot) {
+  if (benchmarkSlot && (sampleDurationMs == null || sampleDurationMs <= 0)) {
+    // The file would count as one of the 10 images and block a real timing.
+    if (output.absolutePath) fs.unlinkSync(output.absolutePath);
+    return 'untimed';
+  }
+
+  if (benchmarkSlot && sampleDurationMs != null) {
     try {
       const root = resolveBenchmarkOutputRoot();
       recordBenchmarkRun({
         root,
         stem: benchmarkSlot.stem,
         relativePath: request.checkpoint,
-        durationMs: Date.now() - jobStartedMs,
+        durationMs: sampleDurationMs,
         seed,
         outputFile: output.absolutePath
           ? path.basename(output.absolutePath)
@@ -537,6 +587,7 @@ async function runJob(
   } catch {
     // Preview restore is best-effort.
   }
+  return benchmarkSlot ? 'timed' : 'normal';
 }
 
 async function readPromptsFromOutputImage(
@@ -592,13 +643,7 @@ export async function startGeneration(
   running = true;
   // Fixed seed → deterministic folder shuffle for Randomize / Recursive.
   // Seed ≤ 0 (Random) keeps Math.random so infinite runs still vary.
-  const uiSeed =
-    typeof request.seed === 'number' ? request.seed : Number(request.seed);
-  if (Number.isFinite(uiSeed) && uiSeed > 0) {
-    genFolderDeck.reseed(createMulberry32(Math.floor(uiSeed) >>> 0));
-  } else {
-    genFolderDeck.reseed(Math.random);
-  }
+  reseedGenerationFolderDeck(genFolderDeck, request.seed);
   const promptSource = request.promptSource === 'text' ? 'text' : 'folder';
   // Keep lastImageUrl / lastPrompt until this job finishes — do not blank the
   // Last output preview while the next generation is still running.
@@ -643,6 +688,7 @@ export async function startGeneration(
       }
     }
 
+    let untimedStreak = 0;
     do {
       if (cancelled) break;
       let jobRequest =
@@ -683,8 +729,9 @@ export async function startGeneration(
           remainingImages: slot.remainingImages,
         };
       }
+      let outcome: JobOutcome = 'normal';
       try {
-        await runJob(adapter, jobRequest, benchmarkSlot);
+        outcome = await runJob(adapter, jobRequest, benchmarkSlot);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         if (message === 'cancelled' || cancelled) {
@@ -704,7 +751,16 @@ export async function startGeneration(
           // The failed job may already have finished.
         }
         await new Promise((r) => setTimeout(r, 400));
+        continue;
       }
+      if (outcome === 'untimed') {
+        untimedStreak += 1;
+        if (request.mode !== 'infinite' || untimedStreak >= 3) {
+          throw new Error(UNTIMED_BENCHMARK);
+        }
+        continue;
+      }
+      untimedStreak = 0;
       if (request.mode === 'once') break;
     } while (!cancelled);
 

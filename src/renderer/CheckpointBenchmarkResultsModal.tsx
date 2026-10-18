@@ -10,20 +10,22 @@ import {
   Maximize2,
   Minimize2,
   RefreshCw,
+  Search,
   X,
 } from 'lucide-react';
 import type {
+  BenchmarkResultsSort,
+  BenchmarkResultsViewDto,
   CheckpointBenchmarkResultRowDto,
   CheckpointBenchmarkResultsDto,
 } from '../shared/contracts';
+import { benchmarkWeightByKey } from '../domain/benchmarkWeight';
+import {
+  BENCHMARK_RESULTS_FILTER_MAX,
+  parseBenchmarkResultsView,
+} from '../shared/benchmarkResultsView';
 import { modalOverlayDismiss } from './modalOverlayDismiss';
 import { usePersistedFloatingModal } from './usePersistedFloatingModal';
-
-export type BenchmarkResultsSort =
-  | 'speed-asc'
-  | 'speed-desc'
-  | 'name-asc'
-  | 'name-desc';
 
 type Props = {
   onClose: () => void;
@@ -40,30 +42,82 @@ function formatAvgMs(ms: number): string {
   return `${min}m ${rem}s`;
 }
 
+function byName(
+  a: CheckpointBenchmarkResultRowDto,
+  b: CheckpointBenchmarkResultRowDto,
+): number {
+  return a.stem.localeCompare(b.stem, undefined, { sensitivity: 'base' });
+}
+
+function isRatingSort(sort: BenchmarkResultsSort): boolean {
+  return sort === 'rating-desc' || sort === 'rating-asc';
+}
+
+function isWeightSort(sort: BenchmarkResultsSort): boolean {
+  return sort === 'weight-desc' || sort === 'weight-asc';
+}
+
+/** Rating and weight both need a field_rating. */
+function hidesUnrated(sort: BenchmarkResultsSort): boolean {
+  return isRatingSort(sort) || isWeightSort(sort);
+}
+
+/** Rated folders only. Callers drop rows with no `field_rating` first. */
+function byRating(
+  a: CheckpointBenchmarkResultRowDto,
+  b: CheckpointBenchmarkResultRowDto,
+  direction: 1 | -1,
+): number {
+  const aMissing = a.rating == null;
+  const bMissing = b.rating == null;
+  if (aMissing && bMissing) return byName(a, b);
+  if (aMissing) return 1;
+  if (bMissing) return -1;
+  return (a.rating! - b.rating!) * direction || byName(a, b);
+}
+
 function sortRows(
   rows: CheckpointBenchmarkResultRowDto[],
   sort: BenchmarkResultsSort,
+  weights: ReadonlyMap<string, number>,
 ): CheckpointBenchmarkResultRowDto[] {
   const copy = [...rows];
   copy.sort((a, b) => {
-    if (sort === 'name-asc') {
-      return a.stem.localeCompare(b.stem, undefined, { sensitivity: 'base' });
-    }
-    if (sort === 'name-desc') {
-      return b.stem.localeCompare(a.stem, undefined, { sensitivity: 'base' });
-    }
-    if (sort === 'speed-asc') {
+    if (sort === 'name-asc') return byName(a, b);
+    if (sort === 'name-desc') return byName(b, a);
+    if (sort === 'rating-desc') return byRating(a, b, -1);
+    if (sort === 'rating-asc') return byRating(a, b, 1);
+    if (sort === 'weight-desc' || sort === 'weight-asc') {
+      const aw = weights.get(a.stem);
+      const bw = weights.get(b.stem);
+      const aMissing = aw == null;
+      const bMissing = bw == null;
+      if (aMissing && bMissing) return byName(a, b);
+      if (aMissing) return 1;
+      if (bMissing) return -1;
+      const rank = sort === 'weight-desc' ? -1 : 1;
       return (
-        a.avgDurationMs - b.avgDurationMs ||
-        a.stem.localeCompare(b.stem, undefined, { sensitivity: 'base' })
+        (aw! - bw!) * rank ||
+        byRating(a, b, rank) ||
+        (a.avgDurationMs - b.avgDurationMs) * -rank ||
+        byName(a, b)
       );
     }
-    return (
-      b.avgDurationMs - a.avgDurationMs ||
-      a.stem.localeCompare(b.stem, undefined, { sensitivity: 'base' })
-    );
+    if (sort === 'speed-asc') {
+      return a.avgDurationMs - b.avgDurationMs || byName(a, b);
+    }
+    return b.avgDurationMs - a.avgDurationMs || byName(a, b);
   });
   return copy;
+}
+
+function rowMatchesName(
+  row: CheckpointBenchmarkResultRowDto,
+  query: string,
+): boolean {
+  const key = query.trim().toLowerCase();
+  if (!key) return true;
+  return row.stem.toLowerCase().includes(key);
 }
 
 type PlotPoint = {
@@ -83,6 +137,9 @@ const RANGE_CAP = 5;
 /** Radius of individual-run markers (avg dots stay larger). */
 const RUN_DOT_R = 2;
 
+/** Last filter/sort this session, so a reopen does not flash the defaults. */
+let sessionBenchmarkResultsView: BenchmarkResultsViewDto | null = null;
+
 /**
  * Line/scatter chart of Checkpoint Benchmark avg timings.
  * Floating window: drag title, resize corner, maximize — geometry persisted.
@@ -94,7 +151,15 @@ export function CheckpointBenchmarkResultsModal({
   const [data, setData] = useState<CheckpointBenchmarkResultsDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sort, setSort] = useState<BenchmarkResultsSort>('speed-asc');
+  const [sort, setSort] = useState<BenchmarkResultsSort>(
+    () => sessionBenchmarkResultsView?.sort ?? 'speed-asc',
+  );
+  const [nameFilter, setNameFilter] = useState(
+    () => sessionBenchmarkResultsView?.nameFilter ?? '',
+  );
+  const viewSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** True once the saved filter/sort is applied, or the user edits either one. */
+  const viewHydrated = useRef(sessionBenchmarkResultsView != null);
   const [hover, setHover] = useState<{
     row: CheckpointBenchmarkResultRowDto;
     clientX: number;
@@ -119,6 +184,13 @@ export function CheckpointBenchmarkResultsModal({
     minHeight: 320,
     load: async () => {
       const settings = await window.wcm.ui.getSettings();
+      if (!viewHydrated.current) {
+        const view = parseBenchmarkResultsView(settings.benchmarkResultsView);
+        sessionBenchmarkResultsView = view;
+        setSort(view.sort);
+        setNameFilter(view.nameFilter);
+        viewHydrated.current = true;
+      }
       return settings.benchmarkResultsWindow;
     },
     save: (state) => {
@@ -174,6 +246,31 @@ export function CheckpointBenchmarkResultsModal({
     void reload();
   }, []);
 
+  const rememberView = (next: BenchmarkResultsViewDto) => {
+    viewHydrated.current = true;
+    sessionBenchmarkResultsView = next;
+    if (viewSaveTimer.current) clearTimeout(viewSaveTimer.current);
+    viewSaveTimer.current = setTimeout(() => {
+      viewSaveTimer.current = null;
+      void window.wcm.ui.setBenchmarkResultsView(next).catch(() => {
+        // ignore persistence failures
+      });
+    }, 200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (!viewSaveTimer.current || !sessionBenchmarkResultsView) return;
+      clearTimeout(viewSaveTimer.current);
+      viewSaveTimer.current = null;
+      void window.wcm.ui
+        .setBenchmarkResultsView(sessionBenchmarkResultsView)
+        .catch(() => {
+          // ignore persistence failures
+        });
+    };
+  }, []);
+
   // Floating window geometry changed (drag resize / maximize) — remasure plot.
   useEffect(() => {
     if (!ready) return;
@@ -182,10 +279,29 @@ export function CheckpointBenchmarkResultsModal({
     return () => window.cancelAnimationFrame(id);
   }, [ready, modalStyle, maximized, dragging, measurePlot]);
 
-  const sorted = useMemo(
-    () => sortRows(data?.rows ?? [], sort),
-    [data?.rows, sort],
+  const nameQuery = nameFilter.trim();
+  const weightSort = isWeightSort(sort);
+  const weights = useMemo(
+    () =>
+      benchmarkWeightByKey(
+        (data?.rows ?? []).map((row) => ({
+          key: row.stem,
+          avgDurationMs: row.avgDurationMs,
+          rating: row.rating,
+        })),
+      ),
+    [data?.rows],
   );
+  const namedRows = useMemo(
+    () => (data?.rows ?? []).filter((row) => rowMatchesName(row, nameQuery)),
+    [data?.rows, nameQuery],
+  );
+  const sorted = useMemo(() => {
+    const rows = hidesUnrated(sort)
+      ? namedRows.filter((row) => row.rating != null)
+      : namedRows;
+    return sortRows(rows, sort, weights);
+  }, [namedRows, sort, weights]);
 
   const { points, linePath, yTicks, maxScale } = useMemo(() => {
     const w = plotSize.width;
@@ -196,6 +312,9 @@ export function CheckpointBenchmarkResultsModal({
     for (const row of sorted) {
       if (row.maxDurationMs > max) max = row.maxDurationMs;
       if (row.avgDurationMs > max) max = row.avgDurationMs;
+      for (const ms of row.runDurationsMs ?? []) {
+        if (ms > max) max = ms;
+      }
     }
     if (max <= 0) max = 1;
     const yAt = (ms: number) =>
@@ -281,19 +400,43 @@ export function CheckpointBenchmarkResultsModal({
             <LineChart size={18} /> Benchmark results
           </h2>
           <div className="benchmark-results-head-actions">
+            <label className="benchmark-results-filter">
+              <Search size={14} />
+              <input
+                type="search"
+                className="text-input"
+                placeholder="Filter name"
+                value={nameFilter}
+                aria-label="Filter checkpoints by name"
+                onChange={(e) => {
+                  const nextFilter = e.target.value.slice(
+                    0,
+                    BENCHMARK_RESULTS_FILTER_MAX,
+                  );
+                  setNameFilter(nextFilter);
+                  rememberView({ sort, nameFilter: nextFilter });
+                }}
+              />
+            </label>
             <label className="benchmark-results-sort">
               <span className="hint">Sort</span>
               <select
                 className="text-input"
                 value={sort}
-                onChange={(e) =>
-                  setSort(e.target.value as BenchmarkResultsSort)
-                }
+                onChange={(e) => {
+                  const nextSort = e.target.value as BenchmarkResultsSort;
+                  setSort(nextSort);
+                  rememberView({ sort: nextSort, nameFilter });
+                }}
               >
                 <option value="speed-asc">Speed · fastest first</option>
                 <option value="speed-desc">Speed · slowest first</option>
                 <option value="name-asc">Name · A–Z</option>
                 <option value="name-desc">Name · Z–A</option>
+                <option value="rating-desc">Rating · highest first</option>
+                <option value="rating-asc">Rating · lowest first</option>
+                <option value="weight-desc">Weight · best first</option>
+                <option value="weight-asc">Weight · worst first</option>
               </select>
             </label>
             <button
@@ -334,17 +477,42 @@ export function CheckpointBenchmarkResultsModal({
               Set Checkpoint Benchmark folder in Library Manager first.
             </p>
           ) : null}
-          {!error && data?.root && sorted.length === 0 ? (
+          {!error && data?.root && (data.rows.length === 0) ? (
             <p className="hint">
               No timings yet. Run Generation with Benchmark enabled — the graph
               fills as jobs finish.
             </p>
           ) : null}
+          {!error && data?.root && data.rows.length > 0 && sorted.length === 0 ? (
+            namedRows.length === 0 ? (
+              <p className="hint">
+                No checkpoint names contain “{nameQuery}”.
+              </p>
+            ) : (
+              <p className="hint">
+                {nameQuery
+                  ? `No rated checkpoints match “${nameQuery}”.`
+                  : 'No rated checkpoints.'}{' '}
+                Rating is field_rating on each sample folder’s mfe_meta stream.
+              </p>
+            )
+          ) : null}
           {sorted.length > 0 ? (
             <>
               <p className="hint benchmark-results-legend">
-                Avg (blue) · individual runs (amber) · min–max range ·{' '}
-                {sorted.length} checkpoints · hover a point for the name · click
+                Avg of 5 fastest (blue) · all runs (amber) · min–max of 5 fastest ·{' '}
+                {sorted.length}
+                {data?.rows && sorted.length !== data.rows.length
+                  ? ` of ${data.rows.length}`
+                  : ''}{' '}
+                checkpoints
+                {hidesUnrated(sort) ? ' · unrated hidden' : ''}
+                {weightSort
+                  ? ' · weight under each point (100 = fastest and top rated)'
+                  : sorted.some((row) => row.rating != null)
+                    ? ' · rating under each point'
+                    : ''}{' '}
+                · hover a point for the name · click
                 to load it in the Checkpoint dropdown
                 {data?.updatedAt
                   ? ` · updated ${new Date(data.updatedAt).toLocaleString()}`
@@ -416,14 +584,53 @@ export function CheckpointBenchmarkResultsModal({
                     x2={plotSize.width - PAD.right}
                     y2={plotSize.height - PAD.bottom}
                   />
-                  <text
-                    className="benchmark-results-axis-label"
-                    x={(PAD.left + plotSize.width - PAD.right) / 2}
-                    y={plotSize.height - 10}
-                    textAnchor="middle"
-                  >
-                    Checkpoints (sorted)
-                  </text>
+                  {points.some((p) =>
+                    weightSort
+                      ? weights.get(p.row.stem) != null
+                      : p.row.rating != null,
+                  ) ? (
+                    points.map((p) => {
+                      const axisValue = weightSort
+                        ? weights.get(p.row.stem)
+                        : p.row.rating;
+                      if (axisValue == null) return null;
+                      const gap =
+                        points.length > 1
+                          ? Math.abs(points[1]!.x - points[0]!.x)
+                          : 99;
+                      const crowded = gap < 16;
+                      const axisY = plotSize.height - PAD.bottom;
+                      return (
+                        <text
+                          key={`${p.row.stem}-rating`}
+                          className={
+                            hover?.row.stem === p.row.stem
+                              ? 'benchmark-results-rating-label is-active'
+                              : 'benchmark-results-rating-label'
+                          }
+                          textAnchor={crowded ? 'start' : 'middle'}
+                          x={crowded ? undefined : p.x}
+                          y={crowded ? undefined : plotSize.height - 12}
+                          transform={
+                            crowded
+                              ? `translate(${p.x} ${axisY + 8}) rotate(90)`
+                              : undefined
+                          }
+                        >
+                          {String(axisValue)}
+                        </text>
+                      );
+                    })
+                  ) : (
+                    <text
+                      className="benchmark-results-axis-label"
+                      x={(PAD.left + plotSize.width - PAD.right) / 2}
+                      y={plotSize.height - 10}
+                      textAnchor="middle"
+                    >
+                      Checkpoints (sorted)
+                    </text>
+                  )}
                   {points.map((p) => {
                     const active = hover?.row.stem === p.row.stem;
                     const stem = p.row.stem;
@@ -515,10 +722,14 @@ export function CheckpointBenchmarkResultsModal({
             <span>
               {formatAvgMs(hover.row.avgDurationMs)} avg ·{' '}
               {formatAvgMs(hover.row.minDurationMs)}–
-              {formatAvgMs(hover.row.maxDurationMs)} · {hover.row.runCount}{' '}
-              run{hover.row.runCount === 1 ? '' : 's'} ·{' '}
+              {formatAvgMs(hover.row.maxDurationMs)} of 5 fastest ·{' '}
+              {hover.row.runCount} run{hover.row.runCount === 1 ? '' : 's'} ·{' '}
               {hover.row.imageCount} img
               {hover.row.imageCount === 1 ? '' : 's'}
+              {weights.get(hover.row.stem) != null
+                ? ` · weight ${weights.get(hover.row.stem)}`
+                : ''}
+              {hover.row.rating != null ? ` · rating ${hover.row.rating}` : ''}
             </span>
             <span className="hint mono">{hover.row.relativePath}</span>
           </div>
