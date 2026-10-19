@@ -59,6 +59,8 @@ type Props = {
   active?: boolean;
   selectedFolder: string | null;
   onSelectedFolderChange: (relativePath: string | null) => void;
+  /** Prompts → Generate this folder. Applies once per nonce. */
+  folderPick?: { folder: string; nonce: number } | null;
   wildcardKeys?: string[];
   onOpenWildcard?: (name: string) => void;
   onCreateWildcard?: (name: string) => void;
@@ -158,6 +160,42 @@ function formatBenchmarkAvgMs(ms: number): string {
 }
 
 /** Prompt folder breadcrumb (`portraits/boys` → `portraits › boys`). */
+function applyPromptBoxHeight(
+  el: HTMLTextAreaElement | null,
+  height: number | null,
+): void {
+  if (!el || height == null || !Number.isFinite(height)) return;
+  el.style.height = `${Math.round(height)}px`;
+}
+
+/** Persist vertical resizes. The first observation is the layout size, not a drag. */
+function watchPromptBoxHeight(
+  el: HTMLTextAreaElement | null,
+  onHeight: (height: number) => void,
+): () => void {
+  if (!el || typeof ResizeObserver === 'undefined') return () => {};
+  let skip = true;
+  let last = Math.round(el.getBoundingClientRect().height);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const obs = new ResizeObserver(() => {
+    const next = Math.round(el.getBoundingClientRect().height);
+    if (skip) {
+      skip = false;
+      last = next;
+      return;
+    }
+    if (next === last) return;
+    last = next;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => onHeight(next), 300);
+  });
+  obs.observe(el);
+  return () => {
+    obs.disconnect();
+    if (timer) clearTimeout(timer);
+  };
+}
+
 function promptCategoryBreadcrumb(relativeFolder: string | null | undefined): string {
   const cleaned = (relativeFolder ?? '')
     .trim()
@@ -175,6 +213,7 @@ export function GenerationWorkspace({
   active = true,
   selectedFolder,
   onSelectedFolderChange,
+  folderPick = null,
   wildcardKeys = [],
   onOpenWildcard,
   onCreateWildcard,
@@ -254,12 +293,15 @@ export function GenerationWorkspace({
   const [previewCollapsed, setPreviewCollapsed] = useState(
     readLegacyPreviewCollapsed,
   );
+  const additionalPositiveRef = useRef<HTMLTextAreaElement>(null);
+  const negativePromptRef = useRef<HTMLTextAreaElement>(null);
   const [deletingLast, setDeletingLast] = useState(false);
   const [webviewSrc, setWebviewSrc] = useState('');
   const [formHydrated, setFormHydrated] = useState(false);
   const formHydratedRef = useRef(false);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextPersist = useRef(true);
+  const appliedFolderPick = useRef(0);
   const catalogNeedsFillRef = useRef(true);
   const formSnapshotRef = useRef({
     activeProfile: 'realistic' as GenerationStyleProfileIdDto,
@@ -603,6 +645,44 @@ export function GenerationWorkspace({
     benchmark,
   ]);
 
+  // Prompts context menu: point the dropdown at a folder without starting a run.
+  // Infinite re-reads this form before each image.
+  useEffect(() => {
+    if (!folderPick || folderPick.nonce === appliedFolderPick.current) return;
+    appliedFolderPick.current = folderPick.nonce;
+    setPromptSource('folder');
+    if (selectedFolder !== folderPick.folder) {
+      onSelectedFolderChange(folderPick.folder);
+    }
+    const snapshot = {
+      ...formSnapshotRef.current,
+      relativeFolder: folderPick.folder,
+      promptSource: 'folder' as const,
+    };
+    formSnapshotRef.current = snapshot;
+    const activeId = snapshot.activeProfile;
+    profilesRef.current = {
+      ...profilesRef.current,
+      [activeId]: {
+        ...profilesRef.current[activeId],
+        relativeFolder: folderPick.folder,
+        promptSource: 'folder',
+      },
+    };
+    if (persistTimer.current) {
+      clearTimeout(persistTimer.current);
+      persistTimer.current = null;
+    }
+    if (formHydratedRef.current) {
+      void window.wcm.comfy.setGenerationForm(snapshot);
+    } else {
+      void window.wcm.comfy.setGenerationForm({
+        relativeFolder: folderPick.folder,
+        promptSource: 'folder',
+      });
+    }
+  }, [folderPick, selectedFolder, onSelectedFolderChange]);
+
   // Flush latest form on unmount so a quick quit doesn't drop the last edit.
   useEffect(() => {
     return () => {
@@ -939,7 +1019,22 @@ export function GenerationWorkspace({
       : null;
 
   const applySeedToForm = (value: number) => {
-    setSeed(value >>> 0);
+    const seedValue = value >>> 0;
+    setSeed(seedValue);
+    formSnapshotRef.current = { ...formSnapshotRef.current, seed: seedValue };
+    const activeId = formSnapshotRef.current.activeProfile;
+    profilesRef.current = {
+      ...profilesRef.current,
+      [activeId]: {
+        ...profilesRef.current[activeId],
+        seed: seedValue,
+      },
+    };
+    if (persistTimer.current) {
+      clearTimeout(persistTimer.current);
+      persistTimer.current = null;
+    }
+    void window.wcm.comfy.setGenerationForm({ seed: seedValue });
   };
 
   useEffect(() => {
@@ -953,11 +1048,33 @@ export function GenerationWorkspace({
         setPreviewCollapsed(legacy);
         void window.wcm.ui.setGenerationPreviewCollapsed(legacy);
       }
+      applyPromptBoxHeight(
+        additionalPositiveRef.current,
+        settings.generationAdditionalPositiveHeight,
+      );
+      applyPromptBoxHeight(
+        negativePromptRef.current,
+        settings.generationNegativePromptHeight,
+      );
       clearLegacyPreviewCollapsed();
     });
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    return watchPromptBoxHeight(additionalPositiveRef.current, (height) => {
+      void window.wcm.ui.setGenerationPromptBoxHeights({
+        additionalPositive: height,
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    return watchPromptBoxHeight(negativePromptRef.current, (height) => {
+      void window.wcm.ui.setGenerationPromptBoxHeights({ negative: height });
+    });
   }, []);
 
   const setPreviewCollapsedPersist = (collapsed: boolean) => {
@@ -1002,6 +1119,7 @@ export function GenerationWorkspace({
               role="tab"
               aria-selected={profile === 'realistic'}
               className={profile === 'realistic' ? 'active' : undefined}
+              title="Photo-style settings. This tab keeps its own model, prompts, seed, and size."
               onClick={() => selectProfile('realistic')}
             >
               Realistic
@@ -1011,6 +1129,7 @@ export function GenerationWorkspace({
               role="tab"
               aria-selected={profile === 'hentai'}
               className={profile === 'hentai' ? 'active' : undefined}
+              title="Anime-style settings. This tab keeps its own model, prompts, seed, and size."
               onClick={() => selectProfile('hentai')}
             >
               Anime
@@ -1020,31 +1139,37 @@ export function GenerationWorkspace({
               role="tab"
               aria-selected={profile === '3d'}
               className={profile === '3d' ? 'active' : undefined}
+              title="3D-style settings. This tab keeps its own model, prompts, seed, and size."
               onClick={() => selectProfile('3d')}
             >
               3D
             </button>
           </div>
-          {contract ? (
-            <p className={`hint${contract.ok ? '' : ' error-text'}`}>
-              {contract.ok ? (
-                <>
-                  <CheckCircle2 size={12} /> Workflow ready
-                  {contract.usesContractNodes ? ' (pack nodes)' : ''}
-                </>
-              ) : (
-                <>Missing: {contract.requiredMissing.join(', ')}</>
-              )}
-            </p>
-          ) : (
-            <p className="hint">
-              {hasWorkflow
-                ? 'Workflow saved — Edit Workflow to change it.'
-                : 'No workflow saved yet — use Edit Workflow.'}
-            </p>
-          )}
 
-          <label className="field-label">Prompt folder</label>
+          <div className="generation-label-row">
+            <label
+              className="field-label"
+              title="Which !gen.txt to draw a prompt from. Select… [Randomize] lets the seed pick a folder on each image."
+            >
+              Prompt folder
+            </label>
+            <label
+              className={`generation-recursive${selectedFolder ? '' : ' is-disabled'}`}
+              title={
+                selectedFolder
+                  ? 'Off: only this folder’s !gen.txt. On: each image picks this folder or a sub-folder from the seed. A fixed seed repeats that folder.'
+                  : 'Each image picks a folder from the seed. A fixed seed repeats that folder.'
+              }
+            >
+              <input
+                type="checkbox"
+                checked={promptFoldersRecursive}
+                disabled={!selectedFolder}
+                onChange={(e) => setPromptFoldersRecursive(e.target.checked)}
+              />
+              Recursive
+            </label>
+          </div>
           <select
             className="text-input"
             value={selectedFolder ?? ''}
@@ -1062,36 +1187,14 @@ export function GenerationWorkspace({
               </option>
             ))}
           </select>
-          <label
-            className={`generation-recursive${selectedFolder ? '' : ' is-disabled'}`}
-            title={
-              selectedFolder
-                ? 'Off: only this folder’s !gen.txt. On: also sub-folders that have !gen.txt.'
-                : 'Select a prompt folder to limit Randomize to that folder or its sub-folders.'
-            }
-          >
-            <input
-              type="checkbox"
-              checked={promptFoldersRecursive}
-              disabled={!selectedFolder}
-              onChange={(e) => setPromptFoldersRecursive(e.target.checked)}
-            />
-            Recursive
-          </label>
-          {selectedFolder ? (
-            <p className="hint">
-              {promptFoldersRecursive
-                ? 'Picks among this folder and sub-folders with !gen.txt.'
-                : 'Uses only this folder’s !gen.txt (sub-folders ignored).'}
-            </p>
-          ) : (
-            <p className="hint">
-              Empty selection randomizes across every folder with !gen.txt.
-            </p>
-          )}
 
-          <div className="generation-checkpoint-label-row">
-            <label className="field-label">Checkpoint</label>
+          <div className="generation-label-row">
+            <label
+              className="field-label"
+              title="The model that paints the image. Saved separately for Realistic, Anime, and 3D."
+            >
+              Checkpoint
+            </label>
             <div className="generation-benchmark-controls">
               <label
                 className="generation-recursive"
@@ -1169,7 +1272,12 @@ export function GenerationWorkspace({
             </p>
           ) : null}
 
-          <label className="field-label">CLIP (optional)</label>
+          <label
+            className="field-label"
+            title="Optional text encoder. Leave blank to keep the CLIP already in the workflow."
+          >
+            CLIP (optional)
+          </label>
           <select
             className="text-input"
             value={clip}
@@ -1183,7 +1291,12 @@ export function GenerationWorkspace({
             ))}
           </select>
 
-          <label className="field-label">VAE (optional)</label>
+          <label
+            className="field-label"
+            title="Optional decoder that turns the result into an image. Leave blank to keep the VAE already in the workflow."
+          >
+            VAE (optional)
+          </label>
           <select
             className="text-input"
             value={vae}
@@ -1197,7 +1310,12 @@ export function GenerationWorkspace({
             ))}
           </select>
 
-          <label className="field-label">Seed (≤0 = random)</label>
+          <label
+            className="field-label"
+            title="Drives the folder, the prompt line, and wildcard picks. 1 or higher repeats that image. 0 or below rolls a new seed every run."
+          >
+            Seed (≤0 = random)
+          </label>
           <div className="generation-seed-row">
             <input
               className="text-input mono"
@@ -1215,7 +1333,7 @@ export function GenerationWorkspace({
             />
             <button
               type="button"
-              className="icon-btn"
+              className="generation-action-btn"
               title="Random seed (−1) — a new seed on every run"
               aria-label="Random seed"
               onClick={() => setSeed(-1)}
@@ -1229,12 +1347,15 @@ export function GenerationWorkspace({
               aria-label="Randomize seed"
               onClick={() => setSeed(randomFixedGenerationSeed())}
             >
-              <Shuffle size={14} /> Randomize
+              <Shuffle size={14} />
             </button>
           </div>
 
           <div className="generation-size-row">
-            <label className="generation-size-field">
+            <label
+              className="generation-size-field"
+              title="Image width in pixels."
+            >
               <span className="field-label">Width</span>
               <input
                 className="text-input"
@@ -1243,7 +1364,10 @@ export function GenerationWorkspace({
                 onChange={(e) => setWidth(Number(e.target.value) || 1024)}
               />
             </label>
-            <label className="generation-size-field">
+            <label
+              className="generation-size-field"
+              title="Image height in pixels."
+            >
               <span className="field-label">Height</span>
               <input
                 className="text-input"
@@ -1254,11 +1378,15 @@ export function GenerationWorkspace({
             </label>
           </div>
 
-          <label className="field-label">
-            Additional Positive Prompt (optional)
+          <label
+            className="field-label"
+            title="Extra text added after the !gen.txt line. __wildcards__ expand with the same seed. Leave empty to use only the folder prompt."
+          >
+            Additional Positive Prompt
           </label>
           <textarea
-            className="text-input"
+            ref={additionalPositiveRef}
+            className="text-input generation-prompt-textarea"
             rows={2}
             value={additionalPositive}
             placeholder={
@@ -1271,38 +1399,61 @@ export function GenerationWorkspace({
             onChange={(e) => setAdditionalPositive(e.target.value)}
           />
 
-          <label className="field-label">Negative (optional)</label>
+          <label
+            className="field-label"
+            title="Things to avoid, such as blur or watermarks. Leave empty to keep the negative prompt already in the workflow."
+          >
+            Negative Prompt
+          </label>
           <textarea
-            className="text-input"
+            ref={negativePromptRef}
+            className="text-input generation-prompt-textarea"
             rows={3}
             value={negative}
             onChange={(e) => setNegative(e.target.value)}
           />
 
-          <div className="row-actions generation-actions">
-            <button
-              type="button"
-              className="primary"
-              disabled={running || busy}
-              onClick={() => void start('once')}
+          <div className="generation-actions">
+            <div className="generation-actions-start">
+              <span
+                className="generation-action-tip"
+                title="Generate one image with these settings. A fixed seed repeats that image."
+              >
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={running || busy}
+                  onClick={() => void start('once')}
+                >
+                  <Zap size={14} /> Once
+                </button>
+              </span>
+              <span
+                className="generation-action-tip"
+                title="Keep generating images until Cancel. A fixed seed repeats the same image. 0 or below rolls a new seed each image."
+              >
+                <button
+                  type="button"
+                  disabled={running || busy}
+                  onClick={() => void start('infinite')}
+                >
+                  Infinite
+                </button>
+              </span>
+            </div>
+            <span
+              className="generation-action-tip"
+              title="Stop this run and interrupt the image in progress."
             >
-              <Zap size={14} /> Once
-            </button>
-            <button
-              type="button"
-              disabled={running || busy}
-              onClick={() => void start('infinite')}
-            >
-              Infinite
-            </button>
-            <button
-              type="button"
-              className="danger"
-              disabled={!running}
-              onClick={() => void window.wcm.comfy.cancelGeneration()}
-            >
-              <Square size={14} /> Cancel
-            </button>
+              <button
+                type="button"
+                className="danger"
+                disabled={!running}
+                onClick={() => void window.wcm.comfy.cancelGeneration()}
+              >
+                <Square size={14} /> Cancel
+              </button>
+            </span>
           </div>
           {progress ? (
             <p className="hint generation-progress-hint">
@@ -1410,14 +1561,43 @@ export function GenerationWorkspace({
           <>
             <div className="panel-toolbar">
               <strong>Prompt</strong>
-              <button
-                type="button"
-                className="generation-action-btn"
-                title="Open ComfyUI to edit the generation workflow"
-                onClick={() => setMiddleMode('workflow')}
-              >
-                <Workflow size={14} /> Edit Workflow
-              </button>
+              <div className="row-actions">
+                {contract ? (
+                  <span
+                    className={`hint generation-workflow-status${
+                      contract.ok ? '' : ' error-text'
+                    }`}
+                    title={
+                      contract.ok
+                        ? 'Saved workflow matches the Generation contract'
+                        : `Missing: ${contract.requiredMissing.join(', ')}`
+                    }
+                  >
+                    {contract.ok ? (
+                      <>
+                        <CheckCircle2 size={12} /> Workflow ready
+                        {contract.usesContractNodes ? ' (pack nodes)' : ''}
+                      </>
+                    ) : (
+                      <>Missing: {contract.requiredMissing.join(', ')}</>
+                    )}
+                  </span>
+                ) : (
+                  <span className="hint generation-workflow-status">
+                    {hasWorkflow
+                      ? 'Workflow saved'
+                      : 'No workflow saved yet'}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="generation-action-btn"
+                  title="Open ComfyUI to edit the generation workflow"
+                  onClick={() => setMiddleMode('workflow')}
+                >
+                  <Workflow size={14} /> Edit Workflow
+                </button>
+              </div>
             </div>
             <div className="generation-prompt-pane">
               <div className="generation-prompt-source-row">

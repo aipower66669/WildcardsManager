@@ -152,6 +152,8 @@ const api: WcmDesktopApi = {
       ipcRenderer.invoke(IPC.uiSetPromptsSamplesCollapsed, collapsed),
     setGenerationPreviewCollapsed: (collapsed) =>
       ipcRenderer.invoke(IPC.uiSetGenerationPreviewCollapsed, collapsed),
+    setGenerationPromptBoxHeights: (patch) =>
+      ipcRenderer.invoke(IPC.uiSetGenerationPromptBoxHeights, patch),
     setPromptCoverageWindow: (state) =>
       ipcRenderer.invoke(IPC.uiSetPromptCoverageWindow, state),
     setPromptSubstitutionsWindow: (state) =>
@@ -244,6 +246,8 @@ const api: WcmDesktopApi = {
       ipcRenderer.invoke(IPC.uiSetCivitaiCatalogAutoSyncInterval, minutes),
     setDisableHardwareAcceleration: (disable) =>
       ipcRenderer.invoke(IPC.uiSetDisableHardwareAcceleration, disable),
+    setGenerationSaveInNewSubfolder: (enabled) =>
+      ipcRenderer.invoke(IPC.uiSetGenerationSaveInNewSubfolder, enabled),
     setCivitaiBrowseFilters: (filters) =>
       ipcRenderer.invoke(IPC.uiSetCivitaiBrowseFilters, filters),
     getCivitaiImageBrowseFilters: () =>

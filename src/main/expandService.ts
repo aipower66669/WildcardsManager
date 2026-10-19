@@ -1,9 +1,7 @@
 import { expandPrompts, type ExpandResult } from '../domain/expand.js';
-import { GenFolderDeck } from '../domain/genFolderDeck.js';
 import {
   pickGenerationPrompt,
   promptsForFileExpand,
-  reseedGenerationFolderDeck,
   resolveGenerationSeed,
 } from '../domain/generationPromptPick.js';
 import type { ExpandRequestDto, ExpandResultDto } from '../shared/contracts.js';
@@ -76,8 +74,6 @@ function expandGenFilePreview(request: ExpandRequestDto): ExpandResultDto {
 
 function expandGenerationPreview(request: ExpandRequestDto): ExpandResultDto {
   const promptSource = request.promptSource === 'text' ? 'text' : 'folder';
-  const deck = new GenFolderDeck();
-  reseedGenerationFolderDeck(deck, request.generationSeed);
   const seed = resolveGenerationSeed(request.generationSeed);
   const picked = pickGenerationPrompt({
     promptSource,
@@ -85,7 +81,6 @@ function expandGenerationPreview(request: ExpandRequestDto): ExpandResultDto {
     relativeFolder: request.relativeFolder?.trim() ?? '',
     recursive: request.promptFoldersRecursive === true,
     seed,
-    deck,
     listAllFolders: listGenPromptFolders,
     listFoldersUnder: listGenPromptFoldersUnder,
     loadLines: (folder) => {

@@ -15,7 +15,7 @@ export interface ComfyConnectionSettings {
   apiKeyHeader?: string;
   /**
    * Absolute folder for Generation “Use this prompt” outputs (LT · Output Folder).
-   * Folder-mode Generation uses `{promptsFolder}/{selected}/New` instead.
+   * Folder mode uses `{styleOutput}/{prompt folder}`, or `…/New` when that option is on.
    */
   generationFolder: string | null;
   /**

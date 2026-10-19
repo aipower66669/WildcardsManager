@@ -86,6 +86,8 @@ type Props = {
   wildcardKeys: string[];
   selectedFolder: string | null;
   onSelectedFolderChange: (relativePath: string | null) => void;
+  /** Point Generation at this folder. Does not start a run. */
+  onUseFolderForGeneration?: (relativeFolder: string) => void;
   onOpenCoverage?: () => void;
   coverageRunning?: boolean;
   coveragePercent?: number;
@@ -128,6 +130,7 @@ export function PromptsWorkspace({
   wildcardKeys,
   selectedFolder,
   onSelectedFolderChange,
+  onUseFolderForGeneration,
   onOpenCoverage,
   coverageRunning = false,
   coveragePercent = 0,
@@ -638,6 +641,9 @@ export function PromptsWorkspace({
           <PromptFolderContextMenu
             menu={folderMenu}
             onClose={() => setFolderMenu(null)}
+            onUseForGeneration={() => {
+              onUseFolderForGeneration?.(folderMenu.relativePath);
+            }}
             onRename={() => {
               onSelectedFolderChange(folderMenu.relativePath);
               setRenamingPath(folderMenu.relativePath);

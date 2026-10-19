@@ -24,10 +24,16 @@ import {
 } from './comfySettings.js';
 import { ensureComfyRunning } from './ensureComfyRunning.js';
 import { forceFixedSeeds, patchUiWorkflowSeed } from './forceSeeds.js';
-import { resolveGenerationOutputRoot } from './generationOutputRoots.js';
+import {
+  generationImageOutputFolder,
+  resolveGenerationOutputRoot,
+} from './generationOutputRoots.js';
 import { loadWorkflowProfile } from './workflowStore.js';
 import { isWorkflowGraph } from './workflowGraph.js';
-import { loadSettings } from '../settingsStore.js';
+import {
+  getGenerationSaveInNewSubfolder,
+  loadSettings,
+} from '../settingsStore.js';
 import {
   extractGenerationPromptsFromImage,
   selectLastOutputPrompts,
@@ -35,13 +41,11 @@ import {
 } from '../../domain/generationImagePrompt.js';
 import {
   pickGenerationPrompt,
-  reseedGenerationFolderDeck,
   resolveGenerationSeed,
 } from '../../domain/generationPromptPick.js';
 import {
   stripTestingGenTag,
 } from '../../domain/genPrompts.js';
-import { GenFolderDeck } from '../../domain/genFolderDeck.js';
 import {
   expandGenLine,
   getLoadedGenPrompts,
@@ -71,8 +75,6 @@ import { applyLibraryPromptSubstitutions } from '../promptSubstitutions.js';
 
 let cancelled = false;
 let running = false;
-/** Shuffled !gen.txt folders for the current Once / Infinite run. */
-const genFolderDeck = new GenFolderDeck();
 let progress: GenerationProgressDto = {
   status: 'idle',
   mode: null,
@@ -386,15 +388,17 @@ async function runJob(
   const promptSource = request.promptSource === 'text' ? 'text' : 'folder';
   const styleProfile = resolveStyleProfile(request);
   const outputRoot = resolveGenerationOutputRoot(styleProfile);
-  // Resolve seed before picking/expanding so folder-mode selection is reproducible.
   const seed = resolveGenerationSeed(request.seed);
+  // Publish the roll before the folder pick. A bad !gen.txt throws before
+  // the later progress update, and the next Infinite click must not look
+  // like it reused this seed.
+  setProgress({ status: 'running', seed, error: undefined });
   const picked = pickGenerationPrompt({
     promptSource,
     promptText: request.promptText ?? '',
     relativeFolder: request.relativeFolder?.trim() ?? '',
     recursive: request.promptFoldersRecursive === true,
     seed,
-    deck: genFolderDeck,
     listAllFolders: listGenPromptFolders,
     listFoldersUnder: listGenPromptFoldersUnder,
     loadLines: (folder) => {
@@ -415,15 +419,17 @@ async function runJob(
     if (!promptsRoot) {
       throw new Error('No prompts folder configured for this library');
     }
-    // Selected prompt folder → `{styleOutputRoot}/{selected}/New`
-    ltOutputFolder = path.resolve(outputRoot, picked.relativeFolder, 'New');
+    // ComfyUI's save node creates this directory when it writes the image.
+    ltOutputFolder = generationImageOutputFolder(
+      outputRoot,
+      picked.relativeFolder,
+      getGenerationSaveInNewSubfolder(),
+    );
   }
 
   if (benchmarkSlot) {
     ltOutputFolder = benchmarkSlot.outputFolder;
   }
-
-  fs.mkdirSync(ltOutputFolder, { recursive: true });
 
   setProgress({
     status: 'running',
@@ -641,9 +647,6 @@ export async function startGeneration(
   assertGenerationRequest(request);
   cancelled = false;
   running = true;
-  // Fixed seed → deterministic folder shuffle for Randomize / Recursive.
-  // Seed ≤ 0 (Random) keeps Math.random so infinite runs still vary.
-  reseedGenerationFolderDeck(genFolderDeck, request.seed);
   const promptSource = request.promptSource === 'text' ? 'text' : 'folder';
   // Keep lastImageUrl / lastPrompt until this job finishes — do not blank the
   // Last output preview while the next generation is still running.
@@ -740,9 +743,13 @@ export async function startGeneration(
         }
         if (request.mode !== 'infinite') throw e;
         // One bad prompt or Comfy error should not end the run.
+        const rolled =
+          typeof progress.seed === 'number' && Number.isFinite(progress.seed)
+            ? ` (seed ${progress.seed >>> 0})`
+            : '';
         setProgress({
           status: 'running',
-          error: message,
+          error: message.includes('(seed ') ? message : `${message}${rolled}`,
           detail: 'Skipped — next job',
         });
         try {

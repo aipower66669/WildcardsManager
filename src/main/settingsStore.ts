@@ -245,6 +245,10 @@ type Settings = {
   promptsSamplesCollapsed?: boolean;
   /** Generation tab Last output side panel collapsed (UI preference). */
   generationPreviewCollapsed?: boolean;
+  /** Additional Positive Prompt textarea height in px. */
+  generationAdditionalPositiveHeight?: number;
+  /** Negative Prompt textarea height in px. */
+  generationNegativePromptHeight?: number;
   /** Prompt Coverage floating window geometry. */
   promptCoverageWindow?: {
     x: number;
@@ -345,6 +349,11 @@ type Settings = {
    * less with Comfy/A1111 for the GPU. Requires app restart to apply.
    */
   disableHardwareAcceleration?: boolean;
+  /**
+   * When true, folder-mode Generation output goes in `{prompt folder}/New`.
+   * Default off. ComfyUI creates the folder when it saves.
+   */
+  generationSaveInNewSubfolder?: boolean;
   /**
    * Folder of electron-builder installers (`release/`) used by in-app Update.
    * App-global (not per library).
@@ -1334,6 +1343,12 @@ function readSettingsFromDisk(): Settings {
         typeof raw.generationPreviewCollapsed === 'boolean'
           ? raw.generationPreviewCollapsed
           : undefined,
+      generationAdditionalPositiveHeight: parsePromptBoxHeight(
+        raw.generationAdditionalPositiveHeight,
+      ),
+      generationNegativePromptHeight: parsePromptBoxHeight(
+        raw.generationNegativePromptHeight,
+      ),
       promptCoverageWindow: parseFloatingWindow(raw.promptCoverageWindow),
       promptSubstitutionsWindow: parseFloatingWindow(
         raw.promptSubstitutionsWindow,
@@ -1442,6 +1457,7 @@ function readSettingsFromDisk(): Settings {
         typeof raw.disableHardwareAcceleration === 'boolean'
           ? raw.disableHardwareAcceleration
           : true,
+      generationSaveInNewSubfolder: raw.generationSaveInNewSubfolder === true,
       updateReleaseFolder:
         typeof raw.updateReleaseFolder === 'string' &&
         raw.updateReleaseFolder.trim()
@@ -2313,6 +2329,33 @@ export function setGenerationPreviewCollapsed(collapsed: boolean): void {
   saveSettings({ generationPreviewCollapsed: collapsed === true });
 }
 
+const PROMPT_BOX_MIN_HEIGHT = 48;
+const PROMPT_BOX_MAX_HEIGHT = 720;
+
+function parsePromptBoxHeight(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return Math.max(
+    PROMPT_BOX_MIN_HEIGHT,
+    Math.min(PROMPT_BOX_MAX_HEIGHT, Math.round(value)),
+  );
+}
+
+export function setGenerationPromptBoxHeights(patch: {
+  additionalPositive?: number;
+  negative?: number;
+}): void {
+  const next: Partial<Settings> = {};
+  if (patch.additionalPositive !== undefined) {
+    const height = parsePromptBoxHeight(patch.additionalPositive);
+    if (height !== undefined) next.generationAdditionalPositiveHeight = height;
+  }
+  if (patch.negative !== undefined) {
+    const height = parsePromptBoxHeight(patch.negative);
+    if (height !== undefined) next.generationNegativePromptHeight = height;
+  }
+  if (Object.keys(next).length > 0) saveSettings(next);
+}
+
 export function getPromptCoverageWindow(): Settings['promptCoverageWindow'] {
   return loadSettings().promptCoverageWindow;
 }
@@ -2654,6 +2697,17 @@ export function getDisableHardwareAcceleration(): boolean {
 export function setDisableHardwareAcceleration(disable: boolean): boolean {
   const next = disable === true;
   saveSettings({ disableHardwareAcceleration: next });
+  return next;
+}
+
+/** Default off. Folder-mode images use a `New` subfolder only when this is on. */
+export function getGenerationSaveInNewSubfolder(): boolean {
+  return loadSettings().generationSaveInNewSubfolder === true;
+}
+
+export function setGenerationSaveInNewSubfolder(enabled: boolean): boolean {
+  const next = enabled === true;
+  saveSettings({ generationSaveInNewSubfolder: next });
   return next;
 }
 

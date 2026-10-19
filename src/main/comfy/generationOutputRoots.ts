@@ -22,8 +22,22 @@ export function generationOutputFieldForProfile(
 }
 
 /**
+ * Folder-mode image directory. ComfyUI creates it when the save node runs.
+ * `saveInNewSubfolder` adds a `New` child.
+ */
+export function generationImageOutputFolder(
+  outputRoot: string,
+  relativeFolder: string,
+  saveInNewSubfolder: boolean,
+): string {
+  const folder = path.resolve(outputRoot, relativeFolder);
+  return saveInNewSubfolder ? path.join(folder, 'New') : folder;
+}
+
+/**
  * Absolute output root for a style.
- * Folder mode → `{root}/{promptRelative}/New`; typed prompt → `{root}`.
+ * Folder mode → `{root}/{promptRelative}` plus `/New` when that option is on.
+ * Typed prompt → `{root}`.
  * Realistic falls back to prompts folder, then legacy Comfy generation folder.
  */
 export function resolveGenerationOutputRoot(

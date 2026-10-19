@@ -10,6 +10,7 @@ import {
 import {
   ChevronDown,
   ChevronRight,
+  FolderInput,
   FolderOpen,
   FolderPlus,
   Pencil,
@@ -77,7 +78,7 @@ export function openPromptFolderContextMenu(
   return {
     relativePath,
     name,
-    ...menuPosition(event.clientX, event.clientY, 220, 140),
+    ...menuPosition(event.clientX, event.clientY, 240, 188),
   };
 }
 
@@ -121,12 +122,14 @@ function useDismissibleMenu(
 export function PromptFolderContextMenu({
   menu,
   onClose,
+  onUseForGeneration,
   onRename,
   onAddSubfolder,
   onDelete,
 }: {
   menu: PromptFolderContextMenuState;
   onClose: () => void;
+  onUseForGeneration: () => void;
   onRename: () => void;
   onAddSubfolder: () => void;
   onDelete: () => void;
@@ -145,6 +148,18 @@ export function PromptFolderContextMenu({
       <div className="file-context-menu-title" title={menu.relativePath}>
         {menu.name}
       </div>
+      <button
+        type="button"
+        role="menuitem"
+        title="Set this folder in Generation. Does not start a run. The next Infinite image uses it."
+        onClick={() => {
+          onClose();
+          onUseForGeneration();
+        }}
+      >
+        <FolderInput size={14} /> Generate this folder
+      </button>
+      <div className="file-context-menu-separator" />
       <button
         type="button"
         role="menuitem"

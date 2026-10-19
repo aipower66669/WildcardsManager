@@ -766,7 +766,7 @@ export function LoraFilesWorkspace({
                 <option value="unmatched">Unmatched</option>
               </select>
             </label>
-            <ul className="file-list">
+            <ul className="file-list file-list-dense">
               {visibleRows.map((row) => {
                 if (row.kind === 'single') {
                   const f = row.file;

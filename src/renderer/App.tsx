@@ -731,6 +731,10 @@ export function App() {
   const [generationSelectedFolder, setGenerationSelectedFolder] = useState<
     string | null
   >(null);
+  const [generationFolderPick, setGenerationFolderPick] = useState<{
+    folder: string;
+    nonce: number;
+  } | null>(null);
   const [loraTabSelectPath, setLoraTabSelectPath] = useState<string | null>(
     null,
   );
@@ -740,6 +744,21 @@ export function App() {
   /** Keep workspaces mounted after first visit so tab switches don’t wipe UI. */
   const [promptsTabMounted, setPromptsTabMounted] = useState(false);
   const [generationTabMounted, setGenerationTabMounted] = useState(false);
+  const useFolderForGeneration = useCallback(
+    (folder: string) => {
+      const relativeFolder = folder.trim().replaceAll('\\', '/');
+      if (!relativeFolder) return;
+      setGenerationSelectedFolder(relativeFolder);
+      setGenerationFolderPick({ folder: relativeFolder, nonce: Date.now() });
+      if (!generationTabMounted) {
+        void window.wcm.comfy.setGenerationForm({
+          relativeFolder,
+          promptSource: 'folder',
+        });
+      }
+    },
+    [generationTabMounted],
+  );
   const [searchTabMounted, setSearchTabMounted] = useState(false);
   const [lorasTabMounted, setLorasTabMounted] = useState(false);
   const [checkpointsTabMounted, setCheckpointsTabMounted] = useState(false);
@@ -1371,6 +1390,8 @@ export function App() {
               panelWidthsByTab: clonePanelWidthsByTab(DEFAULT_TAB_PANEL_WIDTHS),
               promptsSamplesCollapsed: null,
               generationPreviewCollapsed: null,
+              generationAdditionalPositiveHeight: null,
+              generationNegativePromptHeight: null,
               simulationIterations: 10_000,
               simulationSeed: 1,
               graphLayoutStyle: 'optimized' as const,
@@ -4287,6 +4308,7 @@ export function App() {
               wildcardKeys={wildcardKeys}
               selectedFolder={promptsSelectedFolder}
               onSelectedFolderChange={setPromptsSelectedFolder}
+              onUseFolderForGeneration={useFolderForGeneration}
               genTextRef={promptsGenRef}
               onOpenCoverage={() => {
                 setWorkspaceTab('generation');
@@ -4337,6 +4359,7 @@ export function App() {
               detailsWidth={detailsWidth}
               selectedFolder={generationSelectedFolder}
               onSelectedFolderChange={setGenerationSelectedFolder}
+              folderPick={generationFolderPick}
               expandSnapshotRef={generationExpandRef}
               wildcardKeys={wildcardKeys}
               onOpenWildcard={(name) => {
@@ -4542,7 +4565,7 @@ export function App() {
             {filterMode === 'errors' && validationBusy ? (
               <p className="hint validation-progress">Scanning wildcards…</p>
             ) : null}
-            <div className="file-list">
+            <div className="file-list file-list-dense">
               {visibleFiles.map((file) => {
                 const issueRow = validationIssueByKey.get(file.key);
                 return (

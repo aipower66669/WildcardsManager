@@ -104,7 +104,7 @@ const FOLDER_FIELDS: Array<{
   {
     field: 'generationOutputRealistic',
     label: 'Generation output (Realistic)',
-    help: 'Where Realistic images are written. Folder mode uses {this}/{prompt folder}/New; “Use this prompt” writes here. Leave empty to use the Prompts folder (previous default).',
+    help: 'Where Realistic images are written. Folder mode uses {this}/{prompt folder}, or {this}/{prompt folder}/New when Settings → AI → “Save folder-mode images in a New subfolder” is on. “Use this prompt” writes here. Leave empty to use the Prompts folder (previous default).',
     placeholder: 'Defaults to Prompts folder when empty…',
   },
   {

@@ -424,7 +424,7 @@ export function CheckpointFilesWorkspace({
                 <option value="missing-hash">Missing AutoV2 hash</option>
               </select>
             </label>
-            <ul className="file-list">
+            <ul className="file-list file-list-dense">
               {visible.map((f) => (
                 <li key={f.relativePath} className="file-list-row">
                   <label

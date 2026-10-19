@@ -79,6 +79,9 @@ npm run check       # typecheck + vitest (same as GitHub Tests / Build gates)
 npm run dist        # platform installer (win / mac / linux via CI tags)
 ```
 
+If you need any additional help, I invite you to download and feed an AI (ChatGPT/Grok/Qwen/Etc.) this file which should contain all relevant information gathered across the whole repo: https://github.com/aipower66669/WildcardsManager/blob/main/docs/all-in-one.md
+
+
 ## Sample library
 
 The repo ships a demo at [`sample_wildcards/`](sample_wildcards/) (~69 files).

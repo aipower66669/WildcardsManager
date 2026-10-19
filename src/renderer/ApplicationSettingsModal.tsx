@@ -188,6 +188,8 @@ export function ApplicationSettingsModal({
   const [blockedCreators, setBlockedCreators] = useState<
     BlockedCivitaiCreatorDto[]
   >([]);
+  const [generationSaveInNewSubfolder, setGenerationSaveInNewSubfolder] =
+    useState(false);
   const [disableHardwareAcceleration, setDisableHardwareAcceleration] =
     useState(true);
   const [hwAccelRestartHint, setHwAccelRestartHint] = useState(false);
@@ -282,6 +284,9 @@ export function ApplicationSettingsModal({
           setDisableHardwareAcceleration(
             ui.disableHardwareAcceleration !== false,
           );
+          setGenerationSaveInNewSubfolder(
+            ui.generationSaveInNewSubfolder === true,
+          );
           setUpdateReleaseFolder(ui.updateReleaseFolder ?? null);
           setAppVersion(ui.appVersion ?? '');
           setBlockedCreators(blocked);
@@ -314,6 +319,9 @@ export function ApplicationSettingsModal({
       );
       await window.wcm.ui.setDisableHardwareAcceleration(
         disableHardwareAcceleration,
+      );
+      await window.wcm.ui.setGenerationSaveInNewSubfolder(
+        generationSaveInNewSubfolder,
       );
       setHwAccelRestartHint(true);
       if (civitaiApiKey.trim()) {
@@ -1241,14 +1249,25 @@ export function ApplicationSettingsModal({
                       ) : null}
                     </div>
                   </div>
+                  <label className="library-manager-check">
+                    <input
+                      type="checkbox"
+                      checked={generationSaveInNewSubfolder}
+                      onChange={(e) =>
+                        setGenerationSaveInNewSubfolder(e.target.checked)
+                      }
+                    />
+                    <span>Save folder-mode images in a New subfolder</span>
+                  </label>
                   <p className="hint">
-                    Generation image output folders (Realistic / Hentai / 3D) are
-                    set per library in{' '}
-                    <strong>Library Manager</strong>. Folder mode writes{' '}
-                    <code>{'{styleOutput}/{prompt folder}/New'}</code>; “Use this
-                    prompt” writes to the style output root. Filename stem is
-                    always <code>WCG</code>. Realistic defaults to the Prompts
-                    folder when unset.
+                    Folder mode writes{' '}
+                    <code>{'{styleOutput}/{prompt folder}'}</code>, and adds{' '}
+                    <code>/New</code> when the checkbox above is on. ComfyUI
+                    creates that folder when it saves the image. “Use this
+                    prompt” writes to the style output root. Those roots are
+                    set per library in <strong>Library Manager</strong>.
+                    Filename stem is always <code>WCG</code>. Realistic
+                    defaults to the Prompts folder when unset.
                   </p>
                   <div className="settings-folder-row">
                     <div className="settings-actions">

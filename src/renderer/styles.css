@@ -656,6 +656,11 @@ button.status-bar-queue-btn:hover {
   overflow: auto;
 }
 
+.generation-form > .field-label {
+  margin-top: 6px;
+  margin-bottom: -4px;
+}
+
 .generation-profile-tabs {
   display: flex;
   width: 100%;
@@ -665,8 +670,30 @@ button.status-bar-queue-btn:hover {
   flex: 1;
 }
 
+.generation-profile-tabs + .generation-label-row {
+  margin-top: 14px;
+}
+
 .generation-actions {
-  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.generation-actions-start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.generation-action-tip {
+  display: inline-flex;
+}
+
+.generation-actions button:disabled {
+  pointer-events: none;
 }
 
 .generation-seed-row {
@@ -678,6 +705,23 @@ button.status-bar-queue-btn:hover {
 .generation-seed-row .text-input {
   min-width: 0;
   flex: 1;
+}
+
+.generation-prompt-textarea {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  resize: vertical;
+  min-height: 52px;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.generation-seed-row .generation-action-btn {
+  justify-content: center;
+  width: 26px;
+  padding: 0;
+  flex: 0 0 auto;
 }
 
 .generation-progress-hint,
@@ -730,15 +774,16 @@ button.status-bar-queue-btn:hover {
   flex: 1;
 }
 
-.generation-checkpoint-label-row {
+.generation-label-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 6px;
+  margin-bottom: -4px;
 }
 
-.generation-checkpoint-label-row .field-label {
+.generation-label-row .field-label {
   margin: 0;
 }
 
@@ -991,6 +1036,14 @@ button.status-bar-queue-btn:hover {
   gap: 6px;
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.generation-workflow-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  white-space: nowrap;
 }
 
 .panel-toolbar .icon-btn {
@@ -2413,6 +2466,36 @@ body.resizing-panels * {
   border-color: transparent;
   background: transparent;
   text-align: left;
+}
+
+.files-sidebar .file-list {
+  gap: 0;
+  padding-top: 0;
+}
+
+.files-sidebar .file-list > button,
+.files-sidebar .file-list > li {
+  flex-shrink: 0;
+}
+
+.files-sidebar .file-list button {
+  min-height: 22px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.25;
+  gap: 6px;
+}
+
+.files-sidebar .file-list button small,
+.files-sidebar .file-list .file-list-rating,
+.files-sidebar .file-list .file-list-meta {
+  font-size: 10px;
+}
+
+.files-sidebar .file-list button.selected {
+  box-shadow: inset 0 0 0 1px #4f63bd;
 }
 
 .file-list button span {

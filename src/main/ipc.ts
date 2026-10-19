@@ -28,6 +28,7 @@ import {
   setFilesPanelWidth,
   setPromptsSamplesCollapsed,
   setGenerationPreviewCollapsed,
+  setGenerationPromptBoxHeights,
   setPromptCoverageWindow,
   setPromptSubstitutionsWindow,
   setBenchmarkResultsWindow,
@@ -60,6 +61,8 @@ import {
   setCivitaiCatalogAutoSyncIntervalMinutes,
   getDisableHardwareAcceleration,
   setDisableHardwareAcceleration,
+  getGenerationSaveInNewSubfolder,
+  setGenerationSaveInNewSubfolder,
   getUpdateReleaseFolder,
   setUpdateReleaseFolder,
   getCivitaiBrowseFilters,
@@ -912,6 +915,10 @@ export function registerIpc(): void {
         typeof settings.generationPreviewCollapsed === 'boolean'
           ? settings.generationPreviewCollapsed
           : null,
+      generationAdditionalPositiveHeight:
+        settings.generationAdditionalPositiveHeight ?? null,
+      generationNegativePromptHeight:
+        settings.generationNegativePromptHeight ?? null,
       promptCoverageWindow: settings.promptCoverageWindow ?? null,
       promptSubstitutionsWindow: settings.promptSubstitutionsWindow ?? null,
       benchmarkResultsWindow: settings.benchmarkResultsWindow ?? null,
@@ -933,6 +940,7 @@ export function registerIpc(): void {
       activeLibraryId: getActiveLibraryId(),
       libraries: libraries.map((lib) => ({ id: lib.id, name: lib.name })),
       disableHardwareAcceleration: getDisableHardwareAcceleration(),
+      generationSaveInNewSubfolder: getGenerationSaveInNewSubfolder(),
       updateReleaseFolder: getUpdateReleaseFolder(),
       appVersion: app.getVersion(),
     };
@@ -987,6 +995,23 @@ export function registerIpc(): void {
         throw new Error('Invalid generation preview collapsed flag');
       }
       setGenerationPreviewCollapsed(collapsed);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.uiSetGenerationPromptBoxHeights,
+    async (_e, patch: unknown) => {
+      if (!patch || typeof patch !== 'object') {
+        throw new Error('Invalid prompt box height');
+      }
+      const rec = patch as Record<string, unknown>;
+      const additionalPositive =
+        typeof rec.additionalPositive === 'number' ? rec.additionalPositive : undefined;
+      const negative = typeof rec.negative === 'number' ? rec.negative : undefined;
+      if (additionalPositive === undefined && negative === undefined) {
+        throw new Error('Invalid prompt box height');
+      }
+      setGenerationPromptBoxHeights({ additionalPositive, negative });
     },
   );
 
@@ -2028,6 +2053,16 @@ export function registerIpc(): void {
         throw new Error('Invalid hardware acceleration setting');
       }
       return setDisableHardwareAcceleration(disable);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.uiSetGenerationSaveInNewSubfolder,
+    async (_e, enabled: unknown) => {
+      if (typeof enabled !== 'boolean') {
+        throw new Error('Invalid New subfolder setting');
+      }
+      return setGenerationSaveInNewSubfolder(enabled);
     },
   );
 

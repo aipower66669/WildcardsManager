@@ -46,6 +46,7 @@ export const IPC = {
   uiSetFilesPanelWidth: 'wcm:ui:setFilesPanelWidth',
   uiSetPromptsSamplesCollapsed: 'wcm:ui:setPromptsSamplesCollapsed',
   uiSetGenerationPreviewCollapsed: 'wcm:ui:setGenerationPreviewCollapsed',
+  uiSetGenerationPromptBoxHeights: 'wcm:ui:setGenerationPromptBoxHeights',
   uiSetPromptCoverageWindow: 'wcm:ui:setPromptCoverageWindow',
   uiSetPromptSubstitutionsWindow: 'wcm:ui:setPromptSubstitutionsWindow',
   uiSetBenchmarkResultsWindow: 'wcm:ui:setBenchmarkResultsWindow',
@@ -177,6 +178,8 @@ export const IPC = {
   uiSetCivitaiCatalogAutoSyncInterval:
     'wcm:ui:setCivitaiCatalogAutoSyncInterval',
   uiSetDisableHardwareAcceleration: 'wcm:ui:setDisableHardwareAcceleration',
+  uiSetGenerationSaveInNewSubfolder:
+    'wcm:ui:setGenerationSaveInNewSubfolder',
   uiSetCivitaiBrowseFilters: 'wcm:ui:setCivitaiBrowseFilters',
   uiGetCivitaiImageBrowseFilters: 'wcm:ui:getCivitaiImageBrowseFilters',
   uiSetCivitaiImageBrowseFilters: 'wcm:ui:setCivitaiImageBrowseFilters',
@@ -1460,7 +1463,8 @@ export type LibraryConfigDto = {
   promptsFolder: string | null;
   /**
    * Generation image output roots per style. Folder mode →
-   * `{root}/{promptRelative}/New`; typed prompt → `{root}`.
+   * `{root}/{promptRelative}`, or `{root}/{promptRelative}/New` when
+   * Save in New subfolder is on. Typed prompt → `{root}`.
    * Realistic falls back to `promptsFolder` when unset.
    */
   generationOutputRealistic: string | null;
@@ -1765,6 +1769,10 @@ export type UiSettingsDto = {
    * `null` when never saved yet (renderer may migrate a legacy localStorage value).
    */
   generationPreviewCollapsed: boolean | null;
+  /** Additional Positive Prompt box height in px, or null when never resized. */
+  generationAdditionalPositiveHeight: number | null;
+  /** Negative Prompt box height in px, or null when never resized. */
+  generationNegativePromptHeight: number | null;
   /** Prompt Coverage dialog position/size (null = never saved). */
   promptCoverageWindow: FloatingWindowStateDto | null;
   /** Generation prompt-substitutions dialog position/size (null = never saved). */
@@ -1804,6 +1812,12 @@ export type UiSettingsDto = {
    * Requires app restart to apply.
    */
   disableHardwareAcceleration: boolean;
+  /**
+   * Folder-mode Generation writes `{prompt folder}/New` when true.
+   * Off writes into the prompt folder itself. ComfyUI creates the directory
+   * when it saves the image.
+   */
+  generationSaveInNewSubfolder: boolean;
   /**
    * Folder of electron-builder installers (e.g. this repo’s `release/`).
    * Used by Check for update / Install.
@@ -3060,6 +3074,10 @@ export type WcmDesktopApi = {
     setFilesPanelWidth(tab: WorkspaceTabId, width: number): Promise<void>;
     setPromptsSamplesCollapsed(collapsed: boolean): Promise<void>;
     setGenerationPreviewCollapsed(collapsed: boolean): Promise<void>;
+    setGenerationPromptBoxHeights(patch: {
+      additionalPositive?: number;
+      negative?: number;
+    }): Promise<void>;
     setPromptCoverageWindow(
       state: FloatingWindowStateDto,
     ): Promise<FloatingWindowStateDto>;
@@ -3129,6 +3147,7 @@ export type WcmDesktopApi = {
     getHuggingFaceTokenStatus(): Promise<{ hasToken: boolean }>;
     setCivitaiCatalogAutoSyncInterval(minutes: number): Promise<number>;
     setDisableHardwareAcceleration(disable: boolean): Promise<boolean>;
+    setGenerationSaveInNewSubfolder(enabled: boolean): Promise<boolean>;
     setCivitaiBrowseFilters(
       filters: CivitaiBrowseFiltersDto,
     ): Promise<CivitaiBrowseFiltersDto>;

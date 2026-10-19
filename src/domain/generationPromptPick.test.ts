@@ -1,11 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { GenFolderDeck } from './genFolderDeck.js';
-import { createMulberry32 } from './genPrompts.js';
 import {
+  pickFolderBySeed,
   pickGenerationPrompt,
   promptsForFileExpand,
   randomFixedGenerationSeed,
-  reseedGenerationFolderDeck,
   resolveGenerationSeed,
 } from './generationPromptPick.js';
 
@@ -25,10 +23,13 @@ describe('randomFixedGenerationSeed', () => {
 });
 
 describe('resolveGenerationSeed', () => {
-  it('keeps a positive seed and rolls when the UI seed is random', () => {
+  it('keeps a positive seed and rolls a new clock seed when the UI seed is random', () => {
     expect(resolveGenerationSeed(42)).toBe(42);
-    expect(resolveGenerationSeed(0)).toBeGreaterThanOrEqual(0);
-    expect(resolveGenerationSeed(-1)).not.toBe(-1);
+    const first = resolveGenerationSeed(-1);
+    const second = resolveGenerationSeed(0);
+    expect(first).not.toBe(-1);
+    expect(second).not.toBe(first);
+    expect(second).toBeGreaterThan(0);
   });
 });
 
@@ -42,15 +43,12 @@ describe('pickGenerationPrompt', () => {
   function pick(
     overrides: Partial<Parameters<typeof pickGenerationPrompt>[0]> = {},
   ) {
-    const deck = new GenFolderDeck();
-    reseedGenerationFolderDeck(deck, 7);
     return pickGenerationPrompt({
       promptSource: 'folder',
       promptText: '',
       relativeFolder: 'portraits',
       recursive: false,
       seed: 7,
-      deck,
       listAllFolders: () => Object.keys(lines),
       listFoldersUnder: (folder) =>
         Object.keys(lines).filter(
@@ -76,6 +74,12 @@ describe('pickGenerationPrompt', () => {
     expect(pick().relativeFolder).toBe('portraits');
   });
 
+  it('names the folder when !gen.txt has no usable prompts', () => {
+    expect(() => pick({ relativeFolder: 'portraits/empty' })).toThrow(
+      'portraits/empty/!gen.txt has no usable prompts',
+    );
+  });
+
   it('picks a folder under the selection when Recursive is on', () => {
     const first = pick({ recursive: true });
     const again = pick({ recursive: true });
@@ -85,23 +89,23 @@ describe('pickGenerationPrompt', () => {
     expect(again).toEqual(first);
   });
 
-  it('shuffles every prompt folder when none is selected', () => {
-    const deck = new GenFolderDeck(createMulberry32(7));
-    const picked = pickGenerationPrompt({
-      promptSource: 'folder',
+  it('picks the folder from the seed alone, including after other seeds', () => {
+    const folders = ['d', 'b', 'a', 'c'];
+    const input = {
+      promptSource: 'folder' as const,
       promptText: '',
       relativeFolder: '',
       recursive: false,
-      seed: 7,
-      deck,
-      listAllFolders: () => ['a', 'b', 'c'],
+      listAllFolders: () => folders,
       listFoldersUnder: () => [],
-      loadLines: () => ['only'],
-    });
-    const deck2 = new GenFolderDeck(createMulberry32(7));
-    const again = deck2.next(() => ['a', 'b', 'c']);
-    expect(picked.relativeFolder).toBe(again);
-    expect(picked.line).toBe('only');
+      loadLines: (folder: string) => [`line ${folder}`],
+    };
+    const first = pickGenerationPrompt({ ...input, seed: 7 });
+    pickGenerationPrompt({ ...input, seed: 99 });
+    pickGenerationPrompt({ ...input, seed: 3 });
+    expect(pickGenerationPrompt({ ...input, seed: 7 })).toEqual(first);
+    expect(first.relativeFolder).toBe(pickFolderBySeed(folders, 7));
+    expect(first.line).toBe(`line ${first.relativeFolder}`);
   });
 });
 
