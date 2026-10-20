@@ -92,31 +92,40 @@ configured **images folder** (Settings) and an AppData download registry.
 
 ### Generation
 
-The app queues ComfyUI. It does not ship a ComfyUI install. Nodes and a sample
-graph are in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/). The
-[user guide](user-guide.md#install-the-nodes-and-the-sample-graph) has the full
-list of extra packs the sample graph needs.
+The app queues ComfyUI. It does not ship a ComfyUI install. The sample graph
+is a **Krea 2** example. The app itself is not limited to Krea 2: another
+architecture needs a graph you adapt in ComfyUI before you save it. Nodes and
+that graph are in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/). The
+[user guide](user-guide.md#install-the-nodes-and-the-sample-graph) names every
+extra pack, with links.
 
 1. Unzip `ComfyUI-Workflow/comfyui-lora-training.zip` into ComfyUI
-   `custom_nodes/` so you get `custom_nodes/comfyui-lora-training/`. 
+   `custom_nodes/` so you get `custom_nodes/comfyui-lora-training/`.
 2. Unzip `ComfyUI-Workflow/comfyui-custom-save-node.zip` into ComfyUI
-   `custom_nodes/` so you get `custom_nodes/comfyui-custom-save-node/`. Restart
-   ComfyUI. 
+   `custom_nodes/` so you get `custom_nodes/comfyui-custom-save-node/`. That
+   zip is the sample’s `SaveImageToFolder` node. Restart ComfyUI.
 3. Install the other custom nodes that graph uses (Dynamic Prompts, LoRA tag
-   loader, Corza LoRA loader and Krea 2 enhancer), then
-   restart ComfyUI again. See the user guide for the pack names.
+   loader, Corza LoRA loader, and the Krea 2 enhancer), then restart ComfyUI
+   again. The user guide has the repository links. A red node on the canvas
+   means one of those packs is still missing.
 4. In ComfyUI, open
    `ComfyUI-Workflow/WildcardManager-ComfyUI-Generation-Workflow.json`. The
    sample expects Krea 2 UNET / CLIP / VAE filenames — change those loader
-   widgets if your models differ.
-5. In the app: **Settings → AI** host, port, **Test**, **Check install**.
-   Library Manager: prompts folder and a Generation output folder per style.
-6. **Generation → Save Workflow** (this stores the graph the app will queue),
-   then generate from **Use this prompt** or a prompt folder with `!gen.txt`.
-   Each style tab has **Generation** and **Options**. Options holds CLIP, VAE,
-   and KSampler steps, CFG, sampler, scheduler, and denoise. A fixed seed
-   repeats the same image on Once and Infinite. Folder-mode `/New` is optional
-   under **Settings → AI** and is off until you turn it on.
+   widgets if your Krea 2 files differ. For a different architecture, replace
+   the loaders, not only the filenames.
+5. In the app: **Settings → AI** host, port, and **Test**. **Test** only checks
+   that ComfyUI answers. Library Manager: prompts folder and a Generation
+   output folder per style.
+6. **Generation → Save Workflow** (this stores the graph the app will queue).
+   Then **Settings → AI → Check install**. That reads the saved graph and
+   reports missing prompt, seed, or save nodes. It does not scan ComfyUI for
+   missing custom nodes, and it cannot run before the save.
+7. Generate from **Use this prompt** or a prompt folder with `!gen.txt`. A
+   short typed prompt and **Once** should put an image in the style output
+   folder. Each style tab has **Generation** and **Options**. Options holds
+   CLIP, VAE, and KSampler steps, CFG, sampler, scheduler, and denoise. A
+   fixed seed repeats the same image on Once and Infinite. Folder-mode `/New`
+   is optional under **Settings → AI** and is off until you turn it on.
 
 ### Wildcard files (three columns)
 

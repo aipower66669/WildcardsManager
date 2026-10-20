@@ -105,14 +105,20 @@ Generation talks to a ComfyUI you already run. Settings → AI holds the host,
 a launch shortcut, and Test / Check install. The node pack and a ready graph
 are in [`ComfyUI-Workflow/`](ComfyUI-Workflow/):
 
-1. Unzip `comfyui-lora-training.zip` into ComfyUI `custom_nodes/` and restart.
-2. Install the other packs that sample graph uses (Dynamic Prompts, LoRA tag
-   loader, Corza LoRA loader, Krea 2 enhancer, `SaveImageToFolder`).
-3. Open `WildcardManager-ComfyUI-Generation-Workflow.json` in ComfyUI. It is a
-   Krea 2 graph — change the UNET, CLIP, and VAE filenames if you use other
-   models.
-4. In the app, **Generation → Save Workflow**, then queue a typed prompt or a
-   prompt folder.
+The sample graph is a Krea 2 example. Another architecture needs the graph
+adapted in ComfyUI before you save it.
+
+1. Unzip `comfyui-lora-training.zip` and `comfyui-custom-save-node.zip`
+   (`SaveImageToFolder`) into ComfyUI `custom_nodes/` and restart.
+2. Install the other packs that sample graph uses (Dynamic Prompts,
+   [LoRA tag loader](https://github.com/badjeff/comfyui_lora_tag_loader),
+   [Corza LoRA loader](https://github.com/CoreyCorza/comfyui-lora-loader),
+   [Krea 2 enhancer](https://github.com/capitan01R/ComfyUI-Krea2T-Enhancer)).
+3. Open `WildcardManager-ComfyUI-Generation-Workflow.json` in ComfyUI. Change
+   the UNET, CLIP, and VAE filenames if your Krea 2 files differ.
+4. In the app, **Test** (server only), **Generation → Save Workflow**, then
+   **Check install** (saved graph only). Queue a typed prompt or a prompt
+   folder.
 
 Step-by-step: [user guide](docs/user-guide.md#install-the-nodes-and-the-sample-graph).
 
@@ -120,8 +126,8 @@ Step-by-step: [user guide](docs/user-guide.md#install-the-nodes-and-the-sample-g
   A fixed seed repeats the folder and the line.
 - Style profiles (Realistic, Anime, 3D), each with Generation and Options.
 - **Benchmark** walks checkpoint files and records timings.
-- **Edit Workflow** / **Save Workflow**. The toolbar shows when the graph is
-  ready.
+- **Edit Workflow** / **Save Workflow**. The toolbar stays quiet when the
+  graph is ready and names missing nodes when it is not.
 - **Categorize** appends a prompt into a folder’s `!gen.txt`.
 - **Substitutions** replace prompt text for a checkpoint name before wildcards
   expand. Rules stay in that library’s `library.json`.

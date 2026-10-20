@@ -237,7 +237,8 @@ Generation itself lives on the separate **Generation** tab.
 ### Generation workspace
 
 The **Generation** tab queues jobs against a running ComfyUI instance
-(configure host / Test / Check install under **Settings → AI**):
+(**Settings → AI**: host, **Test** for the server, **Check install** after
+**Save Workflow**):
 
 - **Use this prompt** (typed, with the same `!gen.txt` multi-line rules) or a
   selected prompt folder. **Recursive** sits on the Prompt folder line. With a
@@ -319,43 +320,56 @@ nodes.
 
 #### Install the nodes and the sample graph
 
-The repo ships both pieces in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/):
+The supplied graph is a **Krea 2** example. Wildcards Manager is not limited
+to Krea 2. SDXL, Flux, and other architectures need a graph you adapt in
+ComfyUI (different loaders and model files) before **Save Workflow**. Swapping
+only the filenames on this sample is not enough for a different architecture.
+
+The repo ships the two node packs and that graph in
+[`ComfyUI-Workflow/`](../ComfyUI-Workflow/):
 
 | File | What it is |
 | --- | --- |
 | `comfyui-lora-training.zip` | The LT custom-node pack (same files as [`comfyui-lora-training/`](../comfyui-lora-training/) in a clone) |
-| `WildcardManager-ComfyUI-Generation-Workflow.json` | A ComfyUI graph already wired to those nodes |
+| `comfyui-custom-save-node.zip` | The sample’s save node, class `SaveImageToFolder` (display name **Save Image To Folder**) |
+| `WildcardManager-ComfyUI-Generation-Workflow.json` | A Krea 2 ComfyUI graph already wired to those nodes |
 
-1. **Install the LT pack.** Unzip `comfyui-lora-training.zip` into ComfyUI’s
-   `custom_nodes` folder so the result is
+1. **Install the two packs from this repo.** Unzip both zips into ComfyUI’s
+   `custom_nodes` folder so you get
    `custom_nodes/comfyui-lora-training/` (that folder must contain
-   `__init__.py` and `nodes.py`). From a git clone you can copy or symlink
-   `comfyui-lora-training/` the same way. Restart ComfyUI.
+   `__init__.py` and `nodes.py`) and
+   `custom_nodes/comfyui-custom-save-node/` (that folder must contain
+   `__init__.py`). From a git clone you can copy or symlink
+   `comfyui-lora-training/` the same way. Do not search ComfyUI Manager for
+   another `SaveImageToFolder`: this zip is the one the sample graph uses.
+   Restart ComfyUI. If ComfyUI says that pack failed to import, its Python is
+   missing `piexif` (`pip install piexif` in that environment) and the node
+   will stay missing until you install it and restart.
 2. **Install the other packs the sample graph uses**, then restart ComfyUI
-   again. ComfyUI Manager can install these by repo name:
+   again. ComfyUI Manager can install these by repository:
    - [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts)
      (`DPRandomGenerator`) — also what expands your wildcard files inside ComfyUI
-   - `comfyui_lora_tag_loader` (`LoraTagLoader`) — turns `<lora:name:weight>`
-     tags in the prompt into loaded LoRAs
+   - [badjeff/comfyui_lora_tag_loader](https://github.com/badjeff/comfyui_lora_tag_loader)
+     (`LoraTagLoader`) — turns `<lora:name:weight>` tags in the prompt into
+     loaded LoRAs
    - [CoreyCorza/comfyui-lora-loader](https://github.com/CoreyCorza/comfyui-lora-loader)
      (`CorzaCleanAppliedLoRAs`)
-   - `comfyui-krea2t-enhancer` (`ComfyUI-Krea2T-Enhancer`)
-   - a pack that provides **`SaveImageToFolder`** (inputs: image, output
-     folder, filename, positive text, negative text, seed). That class is the
-     sample’s save node and is not inside the zip. If the canvas shows it in
-     red, ComfyUI does not have it yet.
+   - [capitan01R/ComfyUI-Krea2T-Enhancer](https://github.com/capitan01R/ComfyUI-Krea2T-Enhancer)
+     (`ComfyUI-Krea2T-Enhancer`) — Krea 2 only; skip it if you replace this
+     graph with another architecture
 3. **Load the graph in ComfyUI.** Drag
    `WildcardManager-ComfyUI-Generation-Workflow.json` onto the canvas, or use
-   the workflow menu to open it. The LT nodes are already connected: Prompt →
-   Dynamic Prompts → LoRA tag loader, Negative, Seed → sampler, Model → UNET
-   loader, CLIP and VAE → their loaders, Width and Height → Empty Latent,
-   Output Folder and Output Filename → Save Image to Folder. Steps, CFG,
-   Sampler, Scheduler, and Denoise are optional: convert those KSampler
-   widgets to inputs and connect **LT · Steps**, **LT · CFG**, **LT · Sampler**,
-   **LT · Scheduler**, and **LT · Denoise** if you want the Options tab to
-   drive them.
-4. **Point the loaders at models you have.** The sample is a Krea 2 graph and
-   ships with these filenames:
+   the workflow menu to open it. A red node means that pack is still missing;
+   install it and restart before you continue. The LT nodes are already
+   connected: Prompt → Dynamic Prompts → LoRA tag loader, Negative, Seed →
+   sampler, Model → UNET loader, CLIP and VAE → their loaders, Width and
+   Height → Empty Latent, Output Folder and Output Filename → Save Image to
+   Folder. Steps, CFG, Sampler, Scheduler, and Denoise are optional: convert
+   those KSampler widgets to inputs and connect **LT · Steps**, **LT · CFG**,
+   **LT · Sampler**, **LT · Scheduler**, and **LT · Denoise** if you want the
+   Options tab to drive them.
+4. **Point the loaders at models you have.** The sample ships with these Krea 2
+   filenames:
    - UNET `krea2_turbo_fp8_scaled.safetensors`
    - CLIP `qwen3vl_4b_fp8_scaled.safetensors` (CLIP type `krea2`)
    - VAE `Wan2_1_VAE_fp32.safetensors`
@@ -363,19 +377,36 @@ The repo ships both pieces in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/):
    If those files are not in your ComfyUI model folders, change the loader
    widgets (or let the app’s checkpoint / CLIP / VAE fields supply names you
    do have). Leave the LT nodes connected to the loader inputs.
-5. **In Wildcards Manager:**
+5. **In Wildcards Manager, connect and save, in this order:**
    - **Settings → AI:** ComfyUI host and port, optional launch shortcut, then
-     **Test** and **Check install**.
+     **Test**. **Test** only checks that the server answers (latency and how
+     many node classes it reported). It does not look at your graph.
    - **Library Manager:** prompts folder, and a Generation output root for each
      style you use (Realistic, Hentai, 3D). Realistic defaults to the prompts
      folder.
    - **Generation → Save Workflow.** That copies the open ComfyUI graph into
      the app. Use **Edit Workflow** later when you change the graph in ComfyUI,
      then save again.
-6. **Generate.** **Use this prompt**, or select a prompt folder that has
-   `!gen.txt`. Folder mode writes `{style output}/{prompt folder}`, plus
-   `/New` only when that Settings → AI option is on. Typed prompts write to
-   the style root.
+   - **Settings → AI → Check install**, after that save. **Check install**
+     reads the saved graph only. It asks whether **LT · Prompt**, **LT · Seed**,
+     and a save node are present. It does not scan ComfyUI for missing custom
+     nodes, and it has nothing to check until **Save Workflow** has succeeded.
+     Before a save it says there is no saved workflow yet.
+6. **Generate once to confirm.** Type a short prompt such as
+   `a red apple on a wooden table`, choose **Use this prompt**, and click
+   **Once**. The image should show under **Last output** and land in that
+   style’s output folder. A missing-node error on the ComfyUI canvas is still
+   an install problem. An error that names a wildcard or a LoRA is a library
+   problem, not a missing node.
+
+Required nodes on any graph you save yourself: **LT · Prompt**, **LT · Seed**,
+and a save node the app can find (**LT · Save Output**, or a node whose class
+name contains `SaveImage`, which is what `SaveImageToFolder` in
+`comfyui-custom-save-node.zip` is). Optional LT nodes the app fills in when
+they are present: Negative, Model, CLIP, VAE, Width, Height, Steps, CFG,
+Sampler, Scheduler, Denoise, Output Folder, Output Filename. A blank Sampler
+or Scheduler leaves the name already on that node. Wiring notes are in
+[`comfyui-lora-training/README.md`](../comfyui-lora-training/README.md).
 
 Required nodes on any graph you save yourself: **LT · Prompt**, **LT · Seed**,
 and a save node the app can find (**LT · Save Output**, or a node whose class
