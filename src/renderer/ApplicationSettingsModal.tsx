@@ -685,9 +685,6 @@ export function ApplicationSettingsModal({
     try {
       const result = await window.wcm.ui.checkForAppUpdate();
       setUpdateCheck(result);
-      if (result.available && result.latestVersion) {
-        setNotesVersion(result.latestVersion);
-      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -920,7 +917,7 @@ export function ApplicationSettingsModal({
 
                 <SettingsSection
                   title="App updates"
-                  help="Leave the folder empty to check GitHub Releases and download the installer from there. A folder overrides that and uses the installers already in it (latest.yml or WildcardsManager-*-win-x64.exe). What's new shows that version's release notes. Install closes the app and runs the installer — leave “Run” ticked at the end to relaunch."
+                  help="Leave the folder empty to check GitHub Releases and download the installer from there. A folder overrides that and uses the installers already in it (latest.yml or WildcardsManager-*-win-x64.exe). What's new then reads RELEASE_NOTES.md from that folder and does not contact GitHub. Install closes the app and runs the installer — leave “Run” ticked at the end to relaunch."
                 >
                   <p className="hint">
                     Running version{appVersion ? `: ${appVersion}` : ''}

@@ -16,7 +16,7 @@ No. Generation sends a job to ComfyUI. The Windows installer does not install Co
 
 Tagged releases build a Windows x64 NSIS `.exe`, macOS `.dmg` files for Intel and Apple silicon, and a Linux x64 `.AppImage`. Release builds are unsigned, so Windows SmartScreen or macOS Gatekeeper may warn on first launch.
 
-With no folder under **Settings → General → App updates**, **Check for update** uses the public [GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases). When a newer installer is there, **What's new** opens that version's release notes, and **Install** downloads it, closes the app, and runs the installer. A folder you set yourself overrides GitHub and uses the installers in that folder.
+With no folder under **Settings → General → App updates**, **Check for update** uses the public [GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases) and only reports whether a newer installer exists. It does not open a window. **What's new** is a separate button for that version's release notes. **Install** downloads the installer, closes the app, and runs it. A folder you set yourself overrides GitHub: the check, the installer, and **What's new** stay in that folder and do not contact GitHub. **What's new** reads `RELEASE_NOTES.md` there, or in the folder above it.
 
 ### 4. How do I run it from source?
 
@@ -274,7 +274,7 @@ ComfyUI is running (or a launch shortcut is set under **Settings → AI**). **Te
 
 ### 65. What do Once and Infinite do?
 
-**Once** queues a single image, then stops. **Infinite** keeps queuing until you cancel. They use the same pick: a fixed seed repeats the same image, and seed 0 or below rolls a new seed each image. An empty prompt file does not stop Infinite. On a Benchmark run, Infinite continues until every included checkpoint has 10 images, or you cancel. Benchmark **Once** writes one image for the next checkpoint that still needs one. **Cancel** stops the run and interrupts the image in progress.
+**Once** queues a single image, then stops. **Infinite** keeps queuing until you cancel. They use the same pick: a fixed seed repeats the same image, and seed 0 or below rolls a new seed each image. An empty prompt file does not stop Infinite. On a Benchmark run, Infinite continues until every included checkpoint has 10 images, or you cancel. Benchmark **Once** writes one image for the next checkpoint that still needs one. **Cancel** stops the run and interrupts the image in progress. The Prompts `!gen.txt` title bar has the same three actions as square icons (lightning, infinity, stop). They queue that open folder and use the current Generation style, checkpoint, seed, and Recursive setting.
 
 ### 66. What is the difference between the dice and Randomize?
 

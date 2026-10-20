@@ -195,8 +195,10 @@ the end of the Civitai feed.
    Releases page. A folder you set overrides that and must contain `latest.yml`
    and/or `WildcardsManager-<version>-win-x64.exe`.
 2. The installer version must be **newer** than the running app (Settings shows
-   the running version). **What's new** opens that version's release notes
-   before you install.
+   the running version). **Check for update** does not open notes. **What's new**
+   is the button that opens that version's release notes. With a folder set, those notes come from
+   `RELEASE_NOTES.md` in that folder or the folder above it, and the app does
+   not ask GitHub.
 3. **Install update** downloads the GitHub installer when no folder is set,
    then closes the app and launches the NSIS UI — leave **Run Wildcards
    Manager** checked at the end. Unsigned SmartScreen prompts are expected.

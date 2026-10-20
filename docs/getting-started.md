@@ -87,8 +87,11 @@ configured **images folder** (Settings) and an AppData download registry.
 - **Hugging Face** button for Hub search/downloads (token under Settings → AI
   when a repo is gated).
 - **Settings → General → App updates** checks GitHub Releases when the folder
-  is empty, shows **What's new** for that version, and downloads the installer.
-  A folder you set overrides GitHub and uses the installers in that folder.
+  is empty. **Check for update** only reports a newer installer. **What's new**
+  is a separate button for that version's notes. **Install** downloads it.
+  A folder you set overrides GitHub. Check, install, and **What's new** stay
+  in that folder and do not contact GitHub. **What's new** reads
+  `RELEASE_NOTES.md` there, or in the folder above it.
 
 ### Generation
 
@@ -122,7 +125,9 @@ extra pack, with links.
    missing custom nodes, and it cannot run before the save.
 7. Generate from **Use this prompt** or a prompt folder with `!gen.txt`. A
    short typed prompt and **Once** should put an image in the style output
-   folder. Each style tab has **Generation** and **Options**. Options holds
+   folder. The Prompts tab has the same **Once**, **Infinite**, and **Cancel**
+   actions as square icons on the `!gen.txt` title bar; they queue the folder
+   you are editing. Each style tab has **Generation** and **Options**. Options holds
    CLIP, VAE, and KSampler steps, CFG, sampler, scheduler, and denoise. A
    fixed seed repeats the same image on Once and Infinite. Folder-mode `/New`
    is optional under **Settings → AI** and is off until you turn it on.

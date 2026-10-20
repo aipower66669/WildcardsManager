@@ -159,7 +159,8 @@ npm run dev
 Pushing a version tag (`v0.8.0`) runs the checks, builds
 `WildcardsManager-<version>-win-x64.exe`, and attaches it to that GitHub
 Release. Settings → App updates checks that release when the update folder
-is empty, opens **What's new** with these notes, then downloads and installs.
+is empty. **Check for update** only reports a newer installer. **What's new**
+is a separate button for these notes. **Install** downloads and installs.
 `npm run dist` still bumps the patch and builds a local installer into
 `release/`. A folder set under App updates uses that folder instead of GitHub.
 

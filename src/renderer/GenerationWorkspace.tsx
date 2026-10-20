@@ -47,6 +47,10 @@ import { WildcardEditor, type WildcardEditorHandle } from './WildcardEditor';
 import { CategorizePromptModal } from './CategorizePromptModal';
 import { PromptSubstitutionsModal } from './PromptSubstitutionsModal';
 import { CheckpointBenchmarkResultsModal } from './CheckpointBenchmarkResultsModal';
+import {
+  noteGenerationStatus,
+  type GenerationRunHandle,
+} from './generationRun';
 import type { ParsedCivitaiModelPageUrl } from '../domain/civitaiSnippet.js';
 
 type Props = {
@@ -66,6 +70,11 @@ type Props = {
   onRenameLora?: (name: string) => void;
   onOpenLora?: (name: string) => void;
   onOpenLoraInCivitaiCatalog?: (model: ParsedCivitaiModelPageUrl) => void;
+  /**
+   * Prompts title-bar Once / Infinite. Same start path as this tab, with an
+   * optional folder override for the !gen.txt that is open.
+   */
+  runRef?: MutableRefObject<GenerationRunHandle | null>;
   /** Live Once inputs so Expand previews the prompt that would be queued. */
   expandSnapshotRef?: MutableRefObject<{
     kind: 'generation';
@@ -225,6 +234,7 @@ export function GenerationWorkspace({
   onOpenLora,
   onOpenLoraInCivitaiCatalog,
   expandSnapshotRef,
+  runRef,
 }: Props) {
   const webviewRef = useRef<HTMLElement | null>(null);
   const workflowLoadGen = useRef(0);
@@ -541,6 +551,7 @@ export function GenerationWorkspace({
 
   useEffect(() => {
     return window.wcm.comfy.onGenerationProgress((p) => {
+      noteGenerationStatus(p.status);
       setProgress(p);
       if (p.lastImageUrl) {
         setHeldPreview({
@@ -849,56 +860,6 @@ export function GenerationWorkspace({
     }
   };
 
-  const persistFormNow = useCallback(async () => {
-    if (persistTimer.current) {
-      clearTimeout(persistTimer.current);
-      persistTimer.current = null;
-    }
-    const snapshot = {
-      activeProfile: profile,
-      relativeFolder: selectedFolder,
-      promptFoldersRecursive,
-      checkpoint,
-      clip,
-      vae,
-      seed,
-      width,
-      height,
-      steps,
-      cfg,
-      samplerName,
-      scheduler,
-      denoise,
-      additionalPositivePrompt: additionalPositive,
-      negativePrompt: negative,
-      promptText,
-      promptSource,
-      benchmark,
-    };
-    formSnapshotRef.current = snapshot;
-    await window.wcm.comfy.setGenerationForm(snapshot);
-  }, [
-    selectedFolder,
-    promptFoldersRecursive,
-    checkpoint,
-    clip,
-    vae,
-    steps,
-    cfg,
-    samplerName,
-    scheduler,
-    denoise,
-    seed,
-    width,
-    height,
-    additionalPositive,
-    negative,
-    promptText,
-    promptSource,
-    profile,
-    benchmark,
-  ]);
-
   const selectProfile = (next: GenerationStyleProfileIdDto) => {
     if (next === profile) return;
     const leaving: GenerationStyleProfileDto = {
@@ -975,56 +936,138 @@ export function GenerationWorkspace({
     void window.wcm.comfy.setGenerationForm(snapshot);
   };
 
-  const start = async (mode: 'once' | 'infinite') => {
-    if (promptSource === 'text' && !promptText.trim()) {
-      setError('Enter a prompt, or switch to the selected prompt folder.');
-      return;
-    }
-    if (!benchmark && !checkpoint) {
-      setError('Select a checkpoint');
-      return;
-    }
-    if (benchmark && !benchmarkStatus?.root) {
-      setError('Set Checkpoint Benchmark folder in Library Manager');
-      return;
-    }
-    if (!hasWorkflow) {
-      setError('Save a workflow first (Edit Workflow → Save Workflow).');
-      return;
-    }
-    setError(null);
-    setPromptSaveNote(null);
-    try {
-      await persistFormNow();
-      await window.wcm.comfy.startGeneration({
-        mode,
-        styleProfile: profile,
-        promptSource,
-        relativeFolder: selectedFolder ?? undefined,
-        promptFoldersRecursive:
-          promptSource === 'folder' && selectedFolder
-            ? promptFoldersRecursive
-            : undefined,
-        promptText: promptSource === 'text' ? promptText : undefined,
-        checkpoint: benchmark ? checkpoint || '' : checkpoint,
-        clip: clip || undefined,
-        vae: vae || undefined,
-        steps,
-        cfg,
-        samplerName: samplerName.trim() || undefined,
-        scheduler: scheduler.trim() || undefined,
-        denoise,
-        seed,
-        width,
-        height,
-        additionalPositivePrompt: additionalPositive || undefined,
-        negativePrompt: negative || undefined,
-        benchmark: benchmark || undefined,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  const start = useCallback(
+    async (
+      mode: 'once' | 'infinite',
+      folderOverride?: string,
+    ): Promise<string | null> => {
+      const nextSource = folderOverride ? 'folder' : promptSource;
+      const nextFolder = folderOverride ?? selectedFolder;
+      const fail = (message: string) => {
+        setError(message);
+        return message;
+      };
+      if (nextSource === 'text' && !promptText.trim()) {
+        return fail(
+          'Enter a prompt, or switch to the selected prompt folder.',
+        );
+      }
+      if (!benchmark && !checkpoint) return fail('Select a checkpoint');
+      if (benchmark && !benchmarkStatus?.root) {
+        return fail('Set Checkpoint Benchmark folder in Library Manager');
+      }
+      if (!hasWorkflow) {
+        return fail('Save a workflow first (Edit Workflow → Save Workflow).');
+      }
+      setError(null);
+      setPromptSaveNote(null);
+      try {
+        if (persistTimer.current) {
+          clearTimeout(persistTimer.current);
+          persistTimer.current = null;
+        }
+        const snapshot = {
+          activeProfile: profile,
+          relativeFolder: nextFolder,
+          promptFoldersRecursive,
+          checkpoint,
+          clip,
+          vae,
+          seed,
+          width,
+          height,
+          steps,
+          cfg,
+          samplerName,
+          scheduler,
+          denoise,
+          additionalPositivePrompt: additionalPositive,
+          negativePrompt: negative,
+          promptText,
+          promptSource: nextSource,
+          benchmark,
+        };
+        formSnapshotRef.current = snapshot;
+        if (folderOverride) {
+          profilesRef.current = {
+            ...profilesRef.current,
+            [profile]: {
+              ...profilesRef.current[profile],
+              relativeFolder: folderOverride,
+              promptSource: 'folder',
+            },
+          };
+        }
+        await window.wcm.comfy.setGenerationForm(snapshot);
+        if (folderOverride) {
+          setPromptSource('folder');
+          if (selectedFolder !== folderOverride) {
+            onSelectedFolderChange(folderOverride);
+          }
+        }
+        await window.wcm.comfy.startGeneration({
+          mode,
+          styleProfile: profile,
+          promptSource: nextSource,
+          relativeFolder: nextFolder ?? undefined,
+          promptFoldersRecursive:
+            nextSource === 'folder' && nextFolder
+              ? promptFoldersRecursive
+              : undefined,
+          promptText: nextSource === 'text' ? promptText : undefined,
+          checkpoint: benchmark ? checkpoint || '' : checkpoint,
+          clip: clip || undefined,
+          vae: vae || undefined,
+          steps,
+          cfg,
+          samplerName: samplerName.trim() || undefined,
+          scheduler: scheduler.trim() || undefined,
+          denoise,
+          seed,
+          width,
+          height,
+          additionalPositivePrompt: additionalPositive || undefined,
+          negativePrompt: negative || undefined,
+          benchmark: benchmark || undefined,
+        });
+        return null;
+      } catch (e) {
+        return fail(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [
+      promptSource,
+      selectedFolder,
+      promptText,
+      benchmark,
+      checkpoint,
+      benchmarkStatus?.root,
+      hasWorkflow,
+      profile,
+      promptFoldersRecursive,
+      clip,
+      vae,
+      seed,
+      width,
+      height,
+      steps,
+      cfg,
+      samplerName,
+      scheduler,
+      denoise,
+      additionalPositive,
+      negative,
+      onSelectedFolderChange,
+    ],
+  );
+
+  useEffect(() => {
+    if (!runRef) return;
+    runRef.current = { start };
+    return () => {
+      runRef.current = null;
+    };
+  }, [runRef, start]);
 
   const deleteLastOutput = async () => {
     if (!heldPreview || deletingLast) return;

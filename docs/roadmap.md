@@ -56,7 +56,9 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - **Hugging Face Hub** browser and download queue (v0.5).
 - **In-app updates** from GitHub Releases by default, with **What's new**
   release notes before install. A local electron-builder `release/` folder
-  still overrides that (folder support shipped in v0.5; GitHub in v0.8).
+  still overrides that, including **What's new**, which then reads
+  `RELEASE_NOTES.md` and does not contact GitHub (folder support shipped in
+  v0.5; GitHub in v0.8).
 
 ### Validation and diagnostics
 

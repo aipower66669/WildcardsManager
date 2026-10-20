@@ -128,13 +128,14 @@ required for Civitai community Images downloads.
 
 **Settings → General → App updates** checks the public
 [GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases)
-when the folder is empty. **Check for update** looks for a newer installer.
-**What's new** opens that version's release notes so you can read them before
-installing. If the version is not on GitHub yet, the window uses
-`RELEASE_NOTES.md` from the update folder or the folder above it. **Install** downloads the installer, closes the app, and runs it
-(leave **Run** checked to relaunch). A folder you choose overrides GitHub and
-uses the installers already in that folder (`latest.yml` or
-`WildcardsManager-<version>-win-x64.exe`).
+when the folder is empty. **Check for update** only looks for a newer installer
+and does not open a window. **What's new** is a separate button that opens that
+version's release notes. **Install** downloads the installer, closes the app, and runs it
+(leave **Run** checked to relaunch). A folder you choose overrides GitHub:
+check, download, and **What's new** stay on that folder and do not contact
+GitHub. **What's new** reads `RELEASE_NOTES.md` in the folder or in the folder
+above it. Installers are `latest.yml` or
+`WildcardsManager-<version>-win-x64.exe`.
 
 ### LoRA and Checkpoint file managers
 
@@ -231,8 +232,14 @@ The **Prompts** tab manages prompt folders under the configured prompts root
   prompts). Use Last output while editing prompts during a run without leaving
   this tab. Collapse the panel (toolbar icon) for more editor room — while
   collapsed, selecting a folder does **not** scan for samples.
-
-Generation itself lives on the separate **Generation** tab.
+- The `!gen.txt` title bar has three square buttons on the right: **Once**
+  (lightning, blue), **Infinite** (infinity, the same dark button as
+  Generation), and **Cancel** (square, red). Hover each one for the tooltip.
+  **Once** and **Infinite** save the editor, point Generation at this folder,
+  and queue that `!gen.txt` with the current Generation style, checkpoint,
+  seed, and Recursive setting. **Cancel** stops the run and interrupts the
+  image in progress. Style, checkpoint, seed, and Recursive stay on the
+  **Generation** tab.
 
 ### Generation workspace
 
@@ -582,8 +589,12 @@ it and use Left/Right, Home/End, or double-click to reset. Width is persisted.
 ## Diagnostics
 
 The Details panel shows issues on the selected node and all issues reachable
-from the analysis root. Use **Refresh** next to All/Other issues to re-scan
-without changing the selected node or graph focus.
+from the analysis root. The wildcard editor fills the height under the file
+actions. When the node and the graph are clear, **No issues on this node**,
+**All issues (0)**, **Graph is valid**, and **Refresh** share one line. When
+either list has issues, that list grows under the editor and scrolls once it
+reaches about half the panel, so the editor stays at least that tall. Use
+**Refresh** to re-scan without changing the selected node or graph focus.
 
 | Code | Meaning |
 | --- | --- |

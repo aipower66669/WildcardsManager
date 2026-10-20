@@ -11,13 +11,16 @@ import {
   ClipboardCopy,
   FilePlus2,
   FolderOpen,
+  Infinity,
   ListChecks,
   Loader2,
   PanelRightClose,
   PanelRightOpen,
   PieChart,
   RefreshCw,
+  Square,
   Trash2,
+  Zap,
 } from 'lucide-react';
 import { remapPromptFolderPath } from '../domain/promptFolderNames';
 import type { ParsedCivitaiModelPageUrl } from '../domain/civitaiSnippet.js';
@@ -33,6 +36,14 @@ import {
   type PromptFolderContextMenuState,
   type PromptRootContextMenuState,
 } from './PromptFolderTree';
+import {
+  isGenerationRunning,
+  noteGenerationStatus,
+  startPromptFolderGeneration,
+  subscribeGenerationRunning,
+  type GenerationRunHandle,
+  type GenerationRunMode,
+} from './generationRun';
 
 type SidePanelMode = 'samples' | 'lastOutput';
 
@@ -88,6 +99,8 @@ type Props = {
   onSelectedFolderChange: (relativePath: string | null) => void;
   /** Point Generation at this folder. Does not start a run. */
   onUseFolderForGeneration?: (relativeFolder: string) => void;
+  /** Once / Infinite from the Generation tab, when that tab has been opened. */
+  generationRunRef?: MutableRefObject<GenerationRunHandle | null>;
   onOpenCoverage?: () => void;
   coverageRunning?: boolean;
   coveragePercent?: number;
@@ -131,6 +144,7 @@ export function PromptsWorkspace({
   selectedFolder,
   onSelectedFolderChange,
   onUseFolderForGeneration,
+  generationRunRef,
   onOpenCoverage,
   coverageRunning = false,
   coveragePercent = 0,
@@ -144,6 +158,9 @@ export function PromptsWorkspace({
   const [tree, setTree] = useState<PromptTreeDto>({ root: null, folders: [] });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generationNote, setGenerationNote] = useState<string | null>(null);
+  const [generationRunning, setGenerationRunning] = useState(isGenerationRunning);
+  const [generationStarting, setGenerationStarting] = useState(false);
   const [genExists, setGenExists] = useState(false);
   const [editorText, setEditorText] = useState('');
   if (genTextRef) {
@@ -348,8 +365,12 @@ export function PromptsWorkspace({
     };
   }, []);
 
+  useEffect(() => subscribeGenerationRunning(setGenerationRunning), []);
+
   useEffect(() => {
     return window.wcm.comfy.onGenerationProgress((p) => {
+      noteGenerationStatus(p.status);
+      setGenerationNote(p.error?.trim() ? p.error : null);
       if (!p.lastImageUrl) return;
       setHeldPreview({
         url: p.lastImageUrl,
@@ -360,6 +381,33 @@ export function PromptsWorkspace({
       });
     });
   }, []);
+
+  const startFromPrompts = async (mode: GenerationRunMode) => {
+    if (!selectedFolder || generationRunning || generationStarting) return;
+    setGenerationStarting(true);
+    setGenerationNote(null);
+    try {
+      if (saveTimer.current !== undefined) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = undefined;
+      }
+      if (dirty) {
+        await window.wcm.prompts.writeGen(selectedFolder, editorText);
+        setGenExists(true);
+        setDirty(false);
+      }
+      const handle = generationRunRef?.current;
+      const message = handle
+        ? await handle.start(mode, selectedFolder)
+        : await startPromptFolderGeneration(mode, selectedFolder);
+      if (!handle) onUseFolderForGeneration?.(selectedFolder);
+      if (message) setGenerationNote(message);
+    } catch (e) {
+      setGenerationNote(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGenerationStarting(false);
+    }
+  };
 
   const deleteLastOutput = async () => {
     if (!heldPreview || deletingLast) return;
@@ -671,21 +719,87 @@ export function PromptsWorkspace({
 
       <section className="details-panel prompts-editor-panel">
         <div className="panel-toolbar">
-          <strong>
-            {selectedFolder ? `${selectedFolder}/!gen.txt` : '!gen.txt'}
-          </strong>
-          {selectedFolder && !genExists ? (
-            <button
-              type="button"
-              className="manage-btn"
-              disabled={busy}
-              onClick={() => void createGen()}
+          <div className="prompts-editor-title">
+            <strong>
+              {selectedFolder ? `${selectedFolder}/!gen.txt` : '!gen.txt'}
+            </strong>
+            {selectedFolder && !genExists ? (
+              <button
+                type="button"
+                className="manage-btn"
+                disabled={busy}
+                onClick={() => void createGen()}
+              >
+                <FilePlus2 size={14} /> Create !gen.txt
+              </button>
+            ) : null}
+            {dirty ? <span className="hint">Saving…</span> : null}
+          </div>
+          <div className="prompts-gen-actions" role="group" aria-label="Generate">
+            <span
+              className="generation-action-tip"
+              title={
+                selectedFolder
+                  ? 'Generate one image from this folder’s !gen.txt. Uses the current Generation style, checkpoint, seed, and Recursive setting. A fixed seed repeats that image.'
+                  : 'Select a prompt folder first.'
+              }
             >
-              <FilePlus2 size={14} /> Create !gen.txt
-            </button>
-          ) : null}
-          {dirty ? <span className="hint">Saving…</span> : null}
+              <button
+                type="button"
+                className="primary"
+                aria-label="Once"
+                disabled={
+                  !selectedFolder || generationRunning || generationStarting
+                }
+                onClick={() => void startFromPrompts('once')}
+              >
+                <Zap size={14} />
+              </button>
+            </span>
+            <span
+              className="generation-action-tip"
+              title={
+                selectedFolder
+                  ? 'Keep generating images from this folder’s !gen.txt until Cancel. Uses the current Generation style, checkpoint, seed, and Recursive setting. A fixed seed repeats the same image. 0 or below rolls a new seed each image.'
+                  : 'Select a prompt folder first.'
+              }
+            >
+              <button
+                type="button"
+                aria-label="Infinite"
+                disabled={
+                  !selectedFolder || generationRunning || generationStarting
+                }
+                onClick={() => void startFromPrompts('infinite')}
+              >
+                <Infinity size={14} />
+              </button>
+            </span>
+            <span
+              className="generation-action-tip"
+              title="Stop this run and interrupt the image in progress."
+            >
+              <button
+                type="button"
+                className="danger"
+                aria-label="Cancel"
+                disabled={!generationRunning}
+                onClick={() => {
+                  void window.wcm.comfy.cancelGeneration().catch((e) => {
+                    setGenerationNote(
+                      e instanceof Error ? e.message : String(e),
+                    );
+                  });
+                }}
+              >
+                <Square size={14} />
+              </button>
+            </span>
+          </div>
         </div>
+        {generationNote ? (
+          <p className="error-text prompts-gen-error">{generationNote}</p>
+        ) : null}
         {selectedFolder ? (
           genExists || editorText.length > 0 ? (
             <WildcardEditor

@@ -318,8 +318,11 @@ configured **images folder** (Settings) and an AppData download registry.
 - **Hugging Face** button for Hub search/downloads (token under Settings → AI
   when a repo is gated).
 - **Settings → General → App updates** checks GitHub Releases when the folder
-  is empty, shows **What's new** for that version, and downloads the installer.
-  A folder you set overrides GitHub and uses the installers in that folder.
+  is empty. **Check for update** only reports a newer installer. **What's new**
+  is a separate button for that version's notes. **Install** downloads it.
+  A folder you set overrides GitHub. Check, install, and **What's new** stay
+  in that folder and do not contact GitHub. **What's new** reads
+  `RELEASE_NOTES.md` there, or in the folder above it.
 
 ### Generation
 
@@ -353,7 +356,9 @@ extra pack, with links.
    missing custom nodes, and it cannot run before the save.
 7. Generate from **Use this prompt** or a prompt folder with `!gen.txt`. A
    short typed prompt and **Once** should put an image in the style output
-   folder. Each style tab has **Generation** and **Options**. Options holds
+   folder. The Prompts tab has the same **Once**, **Infinite**, and **Cancel**
+   actions as square icons on the `!gen.txt` title bar; they queue the folder
+   you are editing. Each style tab has **Generation** and **Options**. Options holds
    CLIP, VAE, and KSampler steps, CFG, sampler, scheduler, and denoise. A
    fixed seed repeats the same image on Once and Infinite. Folder-mode `/New`
    is optional under **Settings → AI** and is off until you turn it on.
@@ -634,13 +639,14 @@ required for Civitai community Images downloads.
 
 **Settings → General → App updates** checks the public
 [GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases)
-when the folder is empty. **Check for update** looks for a newer installer.
-**What's new** opens that version's release notes so you can read them before
-installing. If the version is not on GitHub yet, the window uses
-`RELEASE_NOTES.md` from the update folder or the folder above it. **Install** downloads the installer, closes the app, and runs it
-(leave **Run** checked to relaunch). A folder you choose overrides GitHub and
-uses the installers already in that folder (`latest.yml` or
-`WildcardsManager-<version>-win-x64.exe`).
+when the folder is empty. **Check for update** only looks for a newer installer
+and does not open a window. **What's new** is a separate button that opens that
+version's release notes. **Install** downloads the installer, closes the app, and runs it
+(leave **Run** checked to relaunch). A folder you choose overrides GitHub:
+check, download, and **What's new** stay on that folder and do not contact
+GitHub. **What's new** reads `RELEASE_NOTES.md` in the folder or in the folder
+above it. Installers are `latest.yml` or
+`WildcardsManager-<version>-win-x64.exe`.
 
 ### LoRA and Checkpoint file managers
 
@@ -737,8 +743,14 @@ The **Prompts** tab manages prompt folders under the configured prompts root
   prompts). Use Last output while editing prompts during a run without leaving
   this tab. Collapse the panel (toolbar icon) for more editor room — while
   collapsed, selecting a folder does **not** scan for samples.
-
-Generation itself lives on the separate **Generation** tab.
+- The `!gen.txt` title bar has three square buttons on the right: **Once**
+  (lightning, blue), **Infinite** (infinity, the same dark button as
+  Generation), and **Cancel** (square, red). Hover each one for the tooltip.
+  **Once** and **Infinite** save the editor, point Generation at this folder,
+  and queue that `!gen.txt` with the current Generation style, checkpoint,
+  seed, and Recursive setting. **Cancel** stops the run and interrupts the
+  image in progress. Style, checkpoint, seed, and Recursive stay on the
+  **Generation** tab.
 
 ### Generation workspace
 
@@ -1088,8 +1100,12 @@ it and use Left/Right, Home/End, or double-click to reset. Width is persisted.
 ## Diagnostics
 
 The Details panel shows issues on the selected node and all issues reachable
-from the analysis root. Use **Refresh** next to All/Other issues to re-scan
-without changing the selected node or graph focus.
+from the analysis root. The wildcard editor fills the height under the file
+actions. When the node and the graph are clear, **No issues on this node**,
+**All issues (0)**, **Graph is valid**, and **Refresh** share one line. When
+either list has issues, that list grows under the editor and scrolls once it
+reaches about half the panel, so the editor stays at least that tall. Use
+**Refresh** to re-scan without changing the selected node or graph focus.
 
 | Code | Meaning |
 | --- | --- |
@@ -1687,8 +1703,10 @@ the end of the Civitai feed.
    Releases page. A folder you set overrides that and must contain `latest.yml`
    and/or `WildcardsManager-<version>-win-x64.exe`.
 2. The installer version must be **newer** than the running app (Settings shows
-   the running version). **What's new** opens that version's release notes
-   before you install.
+   the running version). **Check for update** does not open notes. **What's new**
+   is the button that opens that version's release notes. With a folder set, those notes come from
+   `RELEASE_NOTES.md` in that folder or the folder above it, and the app does
+   not ask GitHub.
 3. **Install update** downloads the GitHub installer when no folder is set,
    then closes the app and launches the NSIS UI — leave **Run Wildcards
    Manager** checked at the end. Unsigned SmartScreen prompts are expected.
@@ -2458,7 +2476,9 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - **Hugging Face Hub** browser and download queue (v0.5).
 - **In-app updates** from GitHub Releases by default, with **What's new**
   release notes before install. A local electron-builder `release/` folder
-  still overrides that (folder support shipped in v0.5; GitHub in v0.8).
+  still overrides that, including **What's new**, which then reads
+  `RELEASE_NOTES.md` and does not contact GitHub (folder support shipped in
+  v0.5; GitHub in v0.8).
 
 ### Validation and diagnostics
 
@@ -2647,7 +2667,7 @@ No. Generation sends a job to ComfyUI. The Windows installer does not install Co
 
 Tagged releases build a Windows x64 NSIS `.exe`, macOS `.dmg` files for Intel and Apple silicon, and a Linux x64 `.AppImage`. Release builds are unsigned, so Windows SmartScreen or macOS Gatekeeper may warn on first launch.
 
-With no folder under **Settings → General → App updates**, **Check for update** uses the public [GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases). When a newer installer is there, **What's new** opens that version's release notes, and **Install** downloads it, closes the app, and runs the installer. A folder you set yourself overrides GitHub and uses the installers in that folder.
+With no folder under **Settings → General → App updates**, **Check for update** uses the public [GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases) and only reports whether a newer installer exists. It does not open a window. **What's new** is a separate button for that version's release notes. **Install** downloads the installer, closes the app, and runs it. A folder you set yourself overrides GitHub: the check, the installer, and **What's new** stay in that folder and do not contact GitHub. **What's new** reads `RELEASE_NOTES.md` there, or in the folder above it.
 
 ### 4. How do I run it from source?
 
@@ -2905,7 +2925,7 @@ ComfyUI is running (or a launch shortcut is set under **Settings → AI**). **Te
 
 ### 65. What do Once and Infinite do?
 
-**Once** queues a single image, then stops. **Infinite** keeps queuing until you cancel. They use the same pick: a fixed seed repeats the same image, and seed 0 or below rolls a new seed each image. An empty prompt file does not stop Infinite. On a Benchmark run, Infinite continues until every included checkpoint has 10 images, or you cancel. Benchmark **Once** writes one image for the next checkpoint that still needs one. **Cancel** stops the run and interrupts the image in progress.
+**Once** queues a single image, then stops. **Infinite** keeps queuing until you cancel. They use the same pick: a fixed seed repeats the same image, and seed 0 or below rolls a new seed each image. An empty prompt file does not stop Infinite. On a Benchmark run, Infinite continues until every included checkpoint has 10 images, or you cancel. Benchmark **Once** writes one image for the next checkpoint that still needs one. **Cancel** stops the run and interrupts the image in progress. The Prompts `!gen.txt` title bar has the same three actions as square icons (lightning, infinity, stop). They queue that open folder and use the current Generation style, checkpoint, seed, and Recursive setting.
 
 ### 66. What is the difference between the dice and Randomize?
 
@@ -3110,7 +3130,7 @@ Both `userData` and `sessionData` are pinned to that folder, so the few UI toggl
 
 Settings → General → App updates. An empty folder (the default) checks `https://github.com/aipower66669/WildcardsManager/releases` through the GitHub API (`/releases/latest`) and downloads the installer for this computer. A saved folder overrides that and uses `latest.yml` or `WildcardsManager-<version>-*.exe|dmg|AppImage` in the folder. Clearing the folder returns to GitHub. An existing folder is left as it is.
 
-What's new opens a window with that version's GitHub release notes (the release body, otherwise `RELEASE_NOTES.md` on the tag) rendered as markdown. If that version is not published yet, the window uses `RELEASE_NOTES.md` in the update folder or the folder above it. Install confirms, downloads when the source is GitHub, launches the installer, and quits. Leave Run checked. Two-part tags such as `v0.7` compare as `0.7.0`.
+Check for update only reports whether a newer installer exists. It does not open What's new. What's new is a separate button and opens a window with that version's notes rendered as markdown. An empty update folder uses the GitHub release body, otherwise `RELEASE_NOTES.md` on the tag, otherwise a local `RELEASE_NOTES.md`. A saved update folder does not contact GitHub: notes are `RELEASE_NOTES.md` in that folder or the folder above it. Install confirms, downloads when the source is GitHub, launches the installer, and quits. Leave Run checked. Two-part tags such as `v0.7` compare as `0.7.0`.
 
 ## Workspace
 
@@ -3153,6 +3173,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 ## Generation modes and benchmark
 
 - Once: one job, then stop. Infinite: keep queuing until cancel.
+- Prompts `!gen.txt` title bar has square icon buttons for the same actions: Once (lightning, blue), Infinite (infinity, dark), Cancel (stop square, red). They write the editor, set the Generation folder and prompt source to that folder, then start with the saved style, checkpoint, seed, Recursive, and benchmark settings. **Generate this folder** still only points the dropdown and does not start a run.
 - Benchmark is a separate checkbox. It walks `.safetensors` in the checkpoint folder that are not in this library’s `ignoredCheckpoints`. Once = one image each. Infinite = until each included stem has 10 images or the user cancels.
 - Output: `{benchmarkRoot}/{fileStem}/`. Stats: `{benchmarkRoot}/benchmark-stats.json`.
 - A saved timing is sampler steps from the first reported step through the last. Model load and file save are outside that range. If the run never reports the full range, the image is deleted and the slot is retried.

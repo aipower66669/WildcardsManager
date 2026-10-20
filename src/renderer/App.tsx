@@ -148,6 +148,7 @@ import { LibraryManagerModal } from './LibraryManagerModal';
 import { LoraFilesWorkspace } from './LoraFilesWorkspace';
 import { CheckpointFilesWorkspace } from './CheckpointFilesWorkspace';
 import { PromptsWorkspace } from './PromptsWorkspace';
+import type { GenerationRunHandle } from './generationRun';
 import { PromptCoverageModal } from './PromptCoverageModal';
 import { GenerationWorkspace } from './GenerationWorkspace';
 import { LoraDownloadCategoryManagerModal } from './LoraDownloadCategoryManagerModal';
@@ -744,6 +745,7 @@ export function App() {
     folder: string;
     nonce: number;
   } | null>(null);
+  const generationRunRef = useRef<GenerationRunHandle | null>(null);
   const [loraTabSelectPath, setLoraTabSelectPath] = useState<string | null>(
     null,
   );
@@ -4336,6 +4338,7 @@ export function App() {
               selectedFolder={promptsSelectedFolder}
               onSelectedFolderChange={setPromptsSelectedFolder}
               onUseFolderForGeneration={useFolderForGeneration}
+              generationRunRef={generationRunRef}
               genTextRef={promptsGenRef}
               onOpenCoverage={() => {
                 setWorkspaceTab('generation');
@@ -4387,6 +4390,7 @@ export function App() {
               selectedFolder={generationSelectedFolder}
               onSelectedFolderChange={setGenerationSelectedFolder}
               folderPick={generationFolderPick}
+              runRef={generationRunRef}
               expandSnapshotRef={generationExpandRef}
               wildcardKeys={wildcardKeys}
               onOpenWildcard={(name) => {
@@ -5087,38 +5091,180 @@ export function App() {
                     </p>
                   </section>
                 ) : null}
-                {fileContent ? (
-                  <section className="source-section">
-                    <WildcardEditor
-                      key={fileContent.relativePath}
-                      ref={editorRef}
-                      className="wildcard-editor"
-                      value={editText}
-                      onChange={updateEditText}
-                      onBlur={() => {
-                        const text = editTextRef.current;
-                        setEditText(text);
-                        setValidationText(text);
-                        void flushDraft(undefined, { rebuild: true });
-                      }}
-                      readOnly={false}
-                      fileExt={selectedFileEntry?.ext ?? '.txt'}
-                      wildcardKeys={wildcardKeys}
-                      onOpenWildcard={(name) => void openWildcardFromEditor(name)}
-                      onCreateWildcard={openCreateMissing}
-                      onRenameLora={(name) => setRenameLoraTarget(name)}
-                      onOpenLora={(name) => void openLoraInLoraTab(name)}
-                      onOpenLoraInCivitaiCatalog={openLoraInCivitaiCatalog}
-                    />
-                  </section>
-                ) : null}
-                {displayedNodeIssues.length > 0 ? (
-                  <section>
-                    <div className="source-head">
-                      <h3>
-                        Node issues
-                        {liveValidation?.pending ? ' · validating…' : ''}
-                      </h3>
+                <div
+                  className={`details-editor-stack${
+                    displayedNodeIssues.length > 0 ||
+                    graphIssuesSection.issues.length > 0
+                      ? ' has-issues'
+                      : ''
+                  }${fileContent ? ' has-editor' : ''}`}
+                >
+                  {fileContent ? (
+                    <section className="source-section">
+                      <WildcardEditor
+                        key={fileContent.relativePath}
+                        ref={editorRef}
+                        className="wildcard-editor details-wildcard-editor"
+                        value={editText}
+                        onChange={updateEditText}
+                        onBlur={() => {
+                          const text = editTextRef.current;
+                          setEditText(text);
+                          setValidationText(text);
+                          void flushDraft(undefined, { rebuild: true });
+                        }}
+                        readOnly={false}
+                        fileExt={selectedFileEntry?.ext ?? '.txt'}
+                        wildcardKeys={wildcardKeys}
+                        onOpenWildcard={(name) => void openWildcardFromEditor(name)}
+                        onCreateWildcard={openCreateMissing}
+                        onRenameLora={(name) => setRenameLoraTarget(name)}
+                        onOpenLora={(name) => void openLoraInLoraTab(name)}
+                        onOpenLoraInCivitaiCatalog={openLoraInCivitaiCatalog}
+                      />
+                    </section>
+                  ) : null}
+                  {displayedNodeIssues.length > 0 ||
+                  graphIssuesSection.issues.length > 0 ? (
+                    <div className="details-issues">
+                      {displayedNodeIssues.length > 0 ? (
+                        <section>
+                          <div className="source-head">
+                            <h3>
+                              Node issues
+                              {liveValidation?.pending ? ' · validating…' : ''}
+                            </h3>
+                            {fileContent ? (
+                              <span
+                                className={`save-status save-status-${saveStatus}`}
+                                role="status"
+                              >
+                                {saveStatus === 'saving'
+                                  ? 'Saving…'
+                                  : saveStatus === 'dirty'
+                                    ? 'Unsaved'
+                                    : saveStatus === 'error'
+                                      ? 'Save failed'
+                                      : 'Saved'}
+                              </span>
+                            ) : null}
+                          </div>
+                          <IssueList
+                            issues={displayedNodeIssues}
+                            onSelect={handleIssueSelect}
+                            onCreateMissing={openCreateMissing}
+                            onOpenRelatedPath={(relativePath) => {
+                              setLoraTabSelectPath(relativePath.replace(/\\/g, '/'));
+                              setWorkspaceTab('loras');
+                            }}
+                          />
+                        </section>
+                      ) : (
+                        <div className="node-status-row">
+                          <p className="ok-row">
+                            <CheckCircle2 size={15} />{' '}
+                            <span>
+                              {liveValidation?.pending
+                                ? 'Validating changes…'
+                                : 'No issues on this node'}
+                            </span>
+                          </p>
+                          {fileContent ? (
+                            <span
+                              className={`save-status save-status-${saveStatus}`}
+                              role="status"
+                            >
+                              {saveStatus === 'saving'
+                                ? 'Saving…'
+                                : saveStatus === 'dirty'
+                                  ? 'Unsaved'
+                                  : saveStatus === 'error'
+                                    ? 'Save failed'
+                                    : 'Saved'}
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
+                      <section>
+                        <div className="source-head">
+                          <h3>
+                            {graphIssuesSection.title} ({graphIssuesSection.issues.length})
+                            {issuesRefreshing ? ' · refreshing…' : ''}
+                          </h3>
+                          <button
+                            type="button"
+                            className="ghost-btn"
+                            onClick={() => void refreshGraphIssues()}
+                            disabled={!rootFile || issuesRefreshing || busy}
+                            title="Re-check all issues, including a fresh scan of the LoRA folder for unused files"
+                          >
+                            <RefreshCw
+                              size={13}
+                              className={issuesRefreshing ? 'spin' : ''}
+                            />{' '}
+                            Refresh
+                          </button>
+                        </div>
+                        {graphIssuesSection.issues.length > 0 ? (
+                          <IssueList
+                            issues={graphIssuesSection.issues}
+                            showNode
+                            onSelect={handleIssueSelect}
+                            onCreateMissing={openCreateMissing}
+                            onIgnoreUnusedLora={setIgnoreLoraIssue}
+                            onCopyUnusedLoraRef={(issue) =>
+                              void copyUnusedLoraRef(issue)
+                            }
+                            onCategorizeUnusedLora={setCategorizeLoraIssue}
+                            onFixUnusedLoraSeries={(issue) =>
+                              void extendUnusedLoraSeries(issue)
+                            }
+                            onOpenRelatedPath={(relativePath) => {
+                              setLoraTabSelectPath(relativePath.replace(/\\/g, '/'));
+                              setWorkspaceTab('loras');
+                            }}
+                          />
+                        ) : (
+                          <p className="ok-row">
+                            <CheckCircle2 size={15} />{' '}
+                            <span>
+                              {displayedNodeIssues.length > 0
+                                ? 'No other issues in the graph'
+                                : 'Graph is valid'}
+                            </span>
+                          </p>
+                        )}
+                      </section>
+                    </div>
+                  ) : (
+                    <div className="details-status-line">
+                      <p className="ok-row">
+                        <CheckCircle2 size={15} />{' '}
+                        <span>
+                          {liveValidation?.pending
+                            ? 'Validating changes…'
+                            : 'No issues on this node'}
+                        </span>
+                      </p>
+                      <p className="ok-row">
+                        <CheckCircle2 size={15} />{' '}
+                        <span>
+                          {graphIssuesSection.title} (0) · Graph is valid
+                        </span>
+                      </p>
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        onClick={() => void refreshGraphIssues()}
+                        disabled={!rootFile || issuesRefreshing || busy}
+                        title="Re-check all issues, including a fresh scan of the LoRA folder for unused files"
+                      >
+                        <RefreshCw
+                          size={13}
+                          className={issuesRefreshing ? 'spin' : ''}
+                        />{' '}
+                        Refresh
+                      </button>
                       {fileContent ? (
                         <span
                           className={`save-status save-status-${saveStatus}`}
@@ -5134,88 +5280,8 @@ export function App() {
                         </span>
                       ) : null}
                     </div>
-                    <IssueList
-                      issues={displayedNodeIssues}
-                      onSelect={handleIssueSelect}
-                      onCreateMissing={openCreateMissing}
-                      onOpenRelatedPath={(relativePath) => {
-                        setLoraTabSelectPath(relativePath.replace(/\\/g, '/'));
-                        setWorkspaceTab('loras');
-                      }}
-                    />
-                  </section>
-                ) : (
-                  <div className="node-status-row">
-                    <p className="ok-row">
-                      <CheckCircle2 size={15} />{' '}
-                      {liveValidation?.pending
-                        ? 'Validating changes…'
-                        : 'No issues on this node'}
-                    </p>
-                    {fileContent ? (
-                      <span
-                        className={`save-status save-status-${saveStatus}`}
-                        role="status"
-                      >
-                        {saveStatus === 'saving'
-                          ? 'Saving…'
-                          : saveStatus === 'dirty'
-                            ? 'Unsaved'
-                            : saveStatus === 'error'
-                              ? 'Save failed'
-                              : 'Saved'}
-                      </span>
-                    ) : null}
-                  </div>
-                )}
-                <section>
-                  <div className="source-head">
-                    <h3>
-                      {graphIssuesSection.title} ({graphIssuesSection.issues.length})
-                      {issuesRefreshing ? ' · refreshing…' : ''}
-                    </h3>
-                    <button
-                      type="button"
-                      className="ghost-btn"
-                      onClick={() => void refreshGraphIssues()}
-                      disabled={!rootFile || issuesRefreshing || busy}
-                      title="Re-check all issues, including a fresh scan of the LoRA folder for unused files"
-                    >
-                      <RefreshCw
-                        size={13}
-                        className={issuesRefreshing ? 'spin' : ''}
-                      />{' '}
-                      Refresh
-                    </button>
-                  </div>
-                  {graphIssuesSection.issues.length > 0 ? (
-                    <IssueList
-                      issues={graphIssuesSection.issues}
-                      showNode
-                      onSelect={handleIssueSelect}
-                      onCreateMissing={openCreateMissing}
-                      onIgnoreUnusedLora={setIgnoreLoraIssue}
-                      onCopyUnusedLoraRef={(issue) =>
-                        void copyUnusedLoraRef(issue)
-                      }
-                      onCategorizeUnusedLora={setCategorizeLoraIssue}
-                      onFixUnusedLoraSeries={(issue) =>
-                        void extendUnusedLoraSeries(issue)
-                      }
-                      onOpenRelatedPath={(relativePath) => {
-                        setLoraTabSelectPath(relativePath.replace(/\\/g, '/'));
-                        setWorkspaceTab('loras');
-                      }}
-                    />
-                  ) : (
-                    <p className="ok-row">
-                      <CheckCircle2 size={15} />{' '}
-                      {displayedNodeIssues.length > 0
-                        ? 'No other issues in the graph'
-                        : 'Graph is valid'}
-                    </p>
                   )}
-                </section>
+                </div>
               </>
             ) : (
               <div className="empty">Select a graph node.</div>

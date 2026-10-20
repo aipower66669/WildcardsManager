@@ -35,10 +35,10 @@ and uses [Semantic Versioning](https://semver.org/).
   library’s `library.json`.
 - Version tags build the Windows NSIS installer in GitHub Actions and attach
   the `.exe` (plus blockmap and `latest.yml`) to the GitHub Release.
-- **App updates** check GitHub Releases when the update folder is empty,
-  download the installer for this computer, and open **What's new** with that
-  version's release notes before install. A folder you set still overrides
-  GitHub.
+- **App updates** check GitHub Releases when the update folder is empty and
+  download the installer for this computer. **Check for update** does not open
+  notes. **What's new** is a separate button for that version's release notes.
+  A folder you set still overrides GitHub.
 - **Generation install guide.** `ComfyUI-Workflow/` ships the
   `comfyui-lora-training` node zip and a ComfyUI graph
   (`WildcardManager-ComfyUI-Generation-Workflow.json`). The user guide explains

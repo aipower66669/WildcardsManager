@@ -500,12 +500,14 @@ async function fetchReleaseByTag(tag: string): Promise<GithubReleaseJson | null>
   return (await res.json()) as GithubReleaseJson;
 }
 
-function readLocalReleaseNotes(): string | null {
-  const dirs = localReleaseNotesSearchDirs(getUpdateReleaseFolder(), [
-    app.getAppPath(),
-    process.cwd(),
-    process.resourcesPath,
-  ]);
+function readLocalReleaseNotes(folderOnly: boolean): string | null {
+  const updateFolder = getUpdateReleaseFolder();
+  const dirs = localReleaseNotesSearchDirs(
+    updateFolder,
+    folderOnly
+      ? []
+      : [app.getAppPath(), process.cwd(), process.resourcesPath],
+  );
   for (const dir of dirs) {
     const file = path.join(dir, 'RELEASE_NOTES.md');
     try {
@@ -535,10 +537,28 @@ async function fetchRawReleaseNotes(tag: string): Promise<string | null> {
   return text;
 }
 
-/** Release notes for a version, from the GitHub release body or RELEASE_NOTES.md. */
+/**
+ * Release notes for a version. A saved update folder reads `RELEASE_NOTES.md`
+ * there (or in the folder above it) and does not contact GitHub. An empty
+ * folder uses the GitHub release body, then `RELEASE_NOTES.md` on that tag,
+ * then a local file.
+ */
 export async function fetchAppReleaseNotes(
   version: string,
 ): Promise<AppReleaseNotesDto> {
+  const updateFolder = getUpdateReleaseFolder();
+  if (updateFolder) {
+    const local = readLocalReleaseNotes(true);
+    return {
+      version,
+      title: `What's new in ${version}`,
+      markdown:
+        local ??
+        `No \`RELEASE_NOTES.md\` was found in the update folder or the folder above it.\n\n\`${updateFolder}\``,
+      htmlUrl: null,
+    };
+  }
+
   const tags = githubReleaseTagCandidates(version);
   for (const tag of tags) {
     const json = await fetchReleaseByTag(tag);
@@ -555,7 +575,7 @@ export async function fetchAppReleaseNotes(
     };
   }
 
-  const local = readLocalReleaseNotes();
+  const local = readLocalReleaseNotes(false);
   if (local) {
     return {
       version,
