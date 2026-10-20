@@ -849,8 +849,10 @@ The repo ships the two node packs and that graph in
    `comfyui-lora-training/` the same way. Do not search ComfyUI Manager for
    another `SaveImageToFolder`: this zip is the one the sample graph uses.
    Restart ComfyUI. If ComfyUI says that pack failed to import, its Python is
-   missing `piexif` (`pip install piexif` in that environment) and the node
-   will stay missing until you install it and restart.
+   missing `piexif` and the node stays missing until you install it and
+   restart. Use ComfyUI’s own Python: `pip install piexif` in that environment.
+   On the official Windows portable build, from the folder that contains
+   `python_embeded`, run `python_embeded\python.exe -m pip install piexif`.
 2. **Install the other packs the sample graph uses**, then restart ComfyUI
    again. ComfyUI Manager can install these by repository:
    - [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts)
@@ -912,15 +914,6 @@ name contains `SaveImage`, which is what `SaveImageToFolder` in
 they are present: Negative, Model, CLIP, VAE, Width, Height, Steps, CFG,
 Sampler, Scheduler, Denoise, Output Folder, Output Filename. A blank Sampler
 or Scheduler leaves the name already on that node. Wiring notes are in
-[`comfyui-lora-training/README.md`](../comfyui-lora-training/README.md).
-
-Required nodes on any graph you save yourself: **LT · Prompt**, **LT · Seed**,
-and a save node the app can find (**LT · Save Output**, or a node whose class
-name contains `SaveImage`, which is what the sample uses). Optional LT nodes
-the app fills in when they are present: Negative, Model, CLIP, VAE, Width,
-Height, Steps, CFG, Sampler, Scheduler, Denoise, Output Folder, Output
-Filename. A blank Sampler or Scheduler leaves the name already on that node.
-Wiring notes are in
 [`comfyui-lora-training/README.md`](../comfyui-lora-training/README.md).
 
 ### LM Studio prompt assist
@@ -1654,7 +1647,10 @@ the end of the Civitai feed.
    - `comfyui-lora-training.zip` → `custom_nodes/comfyui-lora-training/`
    - `comfyui-custom-save-node.zip` → `custom_nodes/comfyui-custom-save-node/`
      (class `SaveImageToFolder`). If ComfyUI says that pack failed to import,
-     install `piexif` into ComfyUI’s Python and restart.
+     install `piexif` with ComfyUI’s own Python (`pip install piexif`, or on
+     the official Windows portable build
+     `python_embeded\python.exe -m pip install piexif` from the folder that
+     contains `python_embeded`) and restart.
    If Options (Steps, CFG, Sampler, Scheduler, Denoise) does nothing, the
    saved graph does not have those LT nodes yet — add them, **Save Workflow**,
    and restart ComfyUI after replacing the LT pack.
