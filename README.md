@@ -15,6 +15,22 @@ Built for wildcard libraries used by
 [Stable Diffusion WebUI Dynamic Prompts](https://github.com/adieyal/sd-dynamic-prompts)
 and [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts).
 
+## Need help with Wildcards Manager?
+
+Before opening an issue or requesting support, try asking your preferred AI assistant.
+
+We've prepared a comprehensive documentation file specifically designed for AI-assisted support, covering installation, features, configuration, troubleshooting, and technical details.
+
+**[Wildcards Manager — Complete AI Documentation](https://github.com/aipower66669/WildcardsManager/blob/main/docs/all-in-one.md)**
+
+1. [Download the documentation file](https://raw.githubusercontent.com/aipower66669/WildcardsManager/main/docs/all-in-one.md).
+2. Upload it to ChatGPT, Claude, Gemini, or another AI assistant.
+3. Ask your question about Wildcards Manager.
+
+The documentation includes instructions for AI assistants to avoid guessing about unsupported features or undocumented behaviour.
+
+If the assistant cannot resolve your issue, please [open a GitHub issue](https://github.com/aipower66669/WildcardsManager/issues) with the relevant error details.
+
 > **License:** Noncommercial use only. Code is under
 > [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)
 > and the `sample_wildcards/` content is under
@@ -79,9 +95,6 @@ npm run check       # typecheck + vitest (same as GitHub Tests / Build gates)
 npm run dist        # Windows installer (GitHub tags publish this .exe only)
 ```
 
-If you need any additional help, I invite you to download and feed an AI (ChatGPT/Grok/Qwen/Etc.) this file which should contain all relevant information gathered across the whole repo: https://github.com/aipower66669/WildcardsManager/blob/main/docs/all-in-one.md
-
-
 ## Sample library
 
 The repo ships a demo at [`sample_wildcards/`](sample_wildcards/) (~69 files).
@@ -132,10 +145,10 @@ app before. If a step confused you, that is a useful contribution.
 - **Guides.** A short article, a forum post, or a video that walks through
   opening a library, fixing a missing wildcard, or generating from a prompt
   folder. Link it so other people can find it (see below).
-- **Bug reports.** OS, app version, what you expected, and what happened. A
+- **Bug reports.** Ask the [AI documentation](https://github.com/aipower66669/WildcardsManager/blob/main/docs/all-in-one.md) first. If that does not resolve it, open an
+  [issue](https://github.com/aipower66669/WildcardsManager/issues) with the OS, app version, what you expected, what happened, and the error text. A
   minimal wildcard folder or one of the
-  [`fixtures/wildcards`](fixtures/wildcards) cases is ideal. Open an
-  [issue](https://github.com/aipower66669/WildcardsManager/issues).
+  [`fixtures/wildcards`](fixtures/wildcards) cases is ideal.
 - **Code.** Bug fixes, clearer diagnostics, sample-library improvements, tests,
   and packaging polish. Check [`docs/roadmap.md`](docs/roadmap.md) before a
   large feature so the work does not duplicate something already planned.
