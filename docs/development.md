@@ -247,10 +247,12 @@ would otherwise be wrong. A behavior or docs change is incomplete until this
 file matches.
 
 When a change adds a menu command, a persisted settings key, a diagnostic code,
-or an error string a user can see, name it in the user guide or in
-troubleshooting in that same change. There is no coverage test that fails the
-build when a new code is missing from the docs; that check is part of the docs
-update.
+or an error string a user can see, name it in the docs in that same change.
+`npm test` runs `src/domain/docsCoverage.test.ts`, which fails when an
+`IssueCode`, a custom application-menu label, or a library/settings field
+outside that file’s UI-chrome list is missing from `docs/`. Add a new geometry
+or one-time flag to the chrome list. Add a new behavior key to the key tables
+in [architecture.md](architecture.md#settings-library-sidecars-and-filesystem-watching).
 
 The README image is `docs/screenshot.png`; replacing that file preserves the
 link.

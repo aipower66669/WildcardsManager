@@ -269,15 +269,36 @@ Work down this list:
    A missing UNET, CLIP, VAE, or custom node is ComfyUI’s install, not a
    wildcard-graph failure. Install steps are in the section above.
 
+This app can tell you whether the server answers, whether the saved graph has
+**LT · Prompt**, **LT · Seed**, and a save node, and whether an image landed in
+the folder it sent. A red node, a missing model file, a pack that failed to
+import, or a link you changed on the canvas is repaired in ComfyUI. After that
+repair, **Save Workflow** again. The app does not rewrite a custom graph.
+
 ## Last output stays empty after a successful ComfyUI image
 
-**Last output** is the preview the app loaded from the folder it sent as
-**LT · Output Folder** after the job. If the save node did not receive
-**LT · Output Folder** and **LT · Output Filename**, ComfyUI can still write an
-image somewhere else and this pane stays empty. The sample graph wires those
-into `SaveImageToFolder`.
+**Last output** is the image the app found in the folder it wrote into
+**LT · Output Folder**, under the filename stem `WCG`. ComfyUI can still write
+a picture somewhere else. This pane stays empty until a file shows up in that
+folder.
 
-Deleting that preview file clears **Last output**.
+On a custom graph, connect those two values into the save node, then save the
+workflow again:
+
+1. The save node needs inputs for the folder and the filename. If they are
+   still widgets, convert them to inputs the same way the install steps convert
+   KSampler Steps and CFG.
+2. Connect **LT · Output Folder** to the folder input and **LT · Output
+   Filename** to the filename input. The sample graph already connects both
+   into Save Image to Folder.
+3. **Generation → Save Workflow**, then run **Once** again.
+
+An error that names a node class, a model file, or some other connection is
+still a ComfyUI canvas repair. Reconnect or replace that node there, restart
+ComfyUI when a pack was missing, then **Save Workflow**. This app will not
+guess a wiring it has not saved.
+
+Deleting the preview file the app did find clears **Last output**.
 
 ## A LoRA exists but a warning or the loader says it is missing
 

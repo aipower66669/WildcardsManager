@@ -209,6 +209,61 @@ Simulation reuses random traversal but records visits instead of output text.
 - Civitai site, API key, download folder **paths**, browse UI prefs, and window
   bounds.
 
+`src/domain/docsCoverage.test.ts` requires every non-chrome field name below to appear in `docs/`. UI geometry and one-time flags are listed in that test instead of here.
+
+App-wide fields in `settings.json`:
+
+| Key | Meaning |
+| --- | --- |
+| `civitaiApiKey` | Civitai API key |
+| `huggingfaceToken` | Hugging Face token for gated repos |
+| `civitaiCatalogAutoSyncIntervalMinutes` | Minutes between idle Browse tip-checks. `0` disables the timer |
+| `generationSaveInNewSubfolder` | Folder-mode images go in `{prompt folder}/New` when true |
+| `updateReleaseFolder` | Local installer folder that overrides GitHub updates |
+
+Per-library folder pointers on the library record:
+
+| Key | Meaning |
+| --- | --- |
+| `wildcardsRoot` | Wildcards folder |
+| `loraFolder` | LoRA folder |
+| `checkpointFolder` | Checkpoint folder |
+| `imagesFolder` | Civitai images folder |
+| `videosFolder` | Civitai videos folder |
+| `mastersFolder` | External checkpoint master collages |
+| `trainingLibraryFolder` | LoRA training library |
+| `promptsFolder` | Prompts folder |
+| `generationOutputRealistic` | Realistic generation output |
+| `generationOutputHentai` | Output for the Anime tab (profile id `hentai`) |
+| `generationOutput3d` | 3D generation output |
+| `benchmarkOutputFolder` | Checkpoint Benchmark folder |
+
+Fields also written to the sibling `library.json`:
+
+| Key | Meaning |
+| --- | --- |
+| `archivedCivitaiModels` | Civitai model archive |
+| `archivedCivitaiImages` | Shelved image ids |
+| `archivedCivitaiVideos` | Shelved video ids |
+| `archivedHfModels` | Shelved Hugging Face repos |
+| `maybeCivitaiModels` | Maybe list |
+| `markedInstalledCivitaiModels` | Manually marked installed models |
+| `markedInstalledCivitaiVersions` | Manually marked installed versions |
+| `civitaiWatchlist` | Notify me |
+| `civitaiRecentlyUnlocked` | Unlocked early-access models kept in Browse |
+| `blockedCivitaiCreators` | Hidden creators |
+| `loraDownloadCategories` | Named LoRA download destinations |
+| `lastCivitaiDownloadCategory` | Last category per model type |
+| `civitaiBrowseFilters` | Model browse filters |
+| `civitaiImageBrowseFilters` | Images tab filters |
+| `civitaiVideoBrowseFilters` | Videos tab filters |
+| `hfBrowseFilters` | Hugging Face search filters |
+| `enabledArchitectures` | Base-model groups this library may browse |
+| `enabledSdxlFamilies` | SDXL families when the base model is SDXL |
+| `enabledCivitaiCategories` | Civitai categories this library may browse |
+| `validationPlatform` | ComfyUI or Stable Diffusion validation |
+| `civitaiOrigin` | `civitai.com` or `civitai.red` |
+
 Per-library **datasets** are written next to the user’s folders, for example:
 
 | Location | Contents |

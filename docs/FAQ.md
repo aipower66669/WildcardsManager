@@ -86,7 +86,7 @@ The file with more membership rows wins where both define the same field. A fiel
 
 ### 20. Should I hand-edit `library.json` or `settings.json`?
 
-Use the app. Hand edits are easy to overwrite on the next save, and a bad `library.json` can drop lists. Settings in AppData are pointers and preferences. If a moved library still opens the old path, open a valid folder or use **Migrate library paths…** rather than deleting keys by hand.
+Use the app. Hand edits are easy to overwrite on the next save, and a bad `library.json` can drop lists. Settings in AppData are pointers and preferences. If a moved library still opens the old path, open a valid folder or use **Migrate library paths…** rather than deleting keys by hand. The one documented exception is a stuck startup: quit, then remove or null `lastRootFile` in `settings.json`, or use **Settings → Clear last file** when the window opens. Do not invent other hand edits.
 
 ## Wildcard syntax
 
@@ -158,7 +158,7 @@ It reindexes the open root now. The watcher debounces filesystem changes by abou
 
 ### 37. What do the issue codes mean?
 
-`missing_file` — exact target missing. `glob_no_match` — glob matched nothing. `cycle` — a reference loop. `unclosed_wildcard` — `__` left open. `unbalanced_brace` — bad `{` `}`. `bad_multiselect` — broken `$` / `$$` inside braces. `orphan_pipe` — `|` outside braces. `unsupported_wildcard_logic` — Dynamic Prompts logic inside `__…__` on a ComfyUI library. `empty_file` — no active lines. `read_error` — unreadable file or unsupported structured value. `missing_lora` — `<lora:…>` name not in the LoRA folder. `invalid_lora` — tag with no model name. `unused_lora` — a file on disk that no wildcard references.
+`missing_file` — exact target missing. `glob_no_match` — glob matched nothing. `cycle` — a reference loop. `unclosed_wildcard` — `__` left open. `unbalanced_brace` — bad `{` `}`. `unbalanced_paren` — bad `(` `)`. `unbalanced_bracket` — bad `[` `]`. `unbalanced_quote` — a `"` left open. `bad_multiselect` — broken `$` / `$$` inside braces. `orphan_pipe` — `|` outside braces. `unsupported_wildcard_logic` — Dynamic Prompts logic inside `__…__` on a ComfyUI library. `empty_file` — no active lines. `read_error` — unreadable file or the graph safety cap. `structured_parse_error` — YAML or JSON did not parse. `unsupported_structured_value` — a structured value this app does not expand. `duplicate_structured_key` — the same structured key twice, or a clash with a `.txt` file. `missing_lora` — `<lora:…>` name not in the LoRA folder. `invalid_lora` — tag with no model name. `unused_lora` — a file on disk that no wildcard references. `duplicate_lora_hash` — two LoRA files share one AutoV2 hash.
 
 ### 38. How do I fix a missing wildcard?
 

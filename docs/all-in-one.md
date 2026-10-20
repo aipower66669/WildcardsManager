@@ -1166,14 +1166,21 @@ reaches about half the panel, so the editor stays at least that tall. Use
 | `cycle` | A reference closes a recursive path |
 | `unclosed_wildcard` | Opening `__` has no closing `__` |
 | `unbalanced_brace` | `{` / `}` structure is invalid |
+| `unbalanced_paren` | `(` / `)` structure is invalid |
+| `unbalanced_bracket` | `[` / `]` structure is invalid |
+| `unbalanced_quote` | A `"` is left open |
 | `bad_multiselect` | `$` / `$$` inside `{…}` is malformed |
 | `orphan_pipe` | `|` occurs outside `{…}` |
 | `unsupported_wildcard_logic` | Dynamic Prompt logic inside `__…__` on a ComfyUI library |
 | `empty_file` | No active non-comment lines |
 | `read_error` | A file/graph limit or unsupported structured expansion was encountered |
+| `structured_parse_error` | A YAML or JSON wildcard file did not parse |
+| `unsupported_structured_value` | A structured key, list item, or document root is not a shape this app expands |
+| `duplicate_structured_key` | The same structured wildcard key is defined twice, or it collides with a `.txt` file |
 | `missing_lora` | A `<lora:…>` tag does not match any model in the configured LoRA folder |
 | `invalid_lora` | A `<lora:…>` tag is missing a model name (e.g. `<lora:>`) |
 | `unused_lora` | A LoRA file exists on disk but is not referenced by any wildcard file |
+| `duplicate_lora_hash` | Two or more LoRA files share one AutoV2 hash |
 
 Click an issue to focus its node and jump to the recorded source line. A missing
 issue jumps to the referring parent because the missing node has no source file.
@@ -1331,6 +1338,30 @@ Wildcards Manager targets the common syntax family used by
 and [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts).
 It validates and expands a documented subset; it is not a complete replacement
 for either runtime.
+
+## Official Dynamic Prompts documentation
+
+Wildcards Manager is a library management, validation, and analysis tool. It
+supports a documented subset of Dynamic Prompts syntax but is not a replacement
+for the Dynamic Prompts extensions themselves.
+
+For complete syntax documentation, advanced features, configuration, and runtime
+behaviour, refer to the extension corresponding to your image-generation
+environment:
+
+- Stable Diffusion WebUI (AUTOMATIC1111):
+  [Dynamic Prompts extension — Syntax reference](https://github.com/adieyal/sd-dynamic-prompts/blob/main/docs/SYNTAX.md)
+- ComfyUI:
+  [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts) —
+  the repository README and the documentation it links to
+
+Wildcards Manager does not implement every feature supported by these
+extensions. Its validation, expansion, and simulation engines follow the subset
+documented below. Some syntax and behaviour differ between AUTOMATIC1111 and
+ComfyUI.
+
+When using features not supported by Wildcards Manager, consult your extension's
+documentation and test the results in the actual generation environment.
 
 ## Text wildcard files
 
@@ -1846,15 +1877,36 @@ Work down this list:
    A missing UNET, CLIP, VAE, or custom node is ComfyUI’s install, not a
    wildcard-graph failure. Install steps are in the section above.
 
+This app can tell you whether the server answers, whether the saved graph has
+**LT · Prompt**, **LT · Seed**, and a save node, and whether an image landed in
+the folder it sent. A red node, a missing model file, a pack that failed to
+import, or a link you changed on the canvas is repaired in ComfyUI. After that
+repair, **Save Workflow** again. The app does not rewrite a custom graph.
+
 ## Last output stays empty after a successful ComfyUI image
 
-**Last output** is the preview the app loaded from the folder it sent as
-**LT · Output Folder** after the job. If the save node did not receive
-**LT · Output Folder** and **LT · Output Filename**, ComfyUI can still write an
-image somewhere else and this pane stays empty. The sample graph wires those
-into `SaveImageToFolder`.
+**Last output** is the image the app found in the folder it wrote into
+**LT · Output Folder**, under the filename stem `WCG`. ComfyUI can still write
+a picture somewhere else. This pane stays empty until a file shows up in that
+folder.
 
-Deleting that preview file clears **Last output**.
+On a custom graph, connect those two values into the save node, then save the
+workflow again:
+
+1. The save node needs inputs for the folder and the filename. If they are
+   still widgets, convert them to inputs the same way the install steps convert
+   KSampler Steps and CFG.
+2. Connect **LT · Output Folder** to the folder input and **LT · Output
+   Filename** to the filename input. The sample graph already connects both
+   into Save Image to Folder.
+3. **Generation → Save Workflow**, then run **Once** again.
+
+An error that names a node class, a model file, or some other connection is
+still a ComfyUI canvas repair. Reconnect or replace that node there, restart
+ComfyUI when a pack was missing, then **Save Workflow**. This app will not
+guess a wiring it has not saved.
+
+Deleting the preview file the app did find clears **Last output**.
 
 ## A LoRA exists but a warning or the loader says it is missing
 
@@ -2290,6 +2342,61 @@ Simulation reuses random traversal but records visits instead of output text.
 - Civitai site, API key, download folder **paths**, browse UI prefs, and window
   bounds.
 
+`src/domain/docsCoverage.test.ts` requires every non-chrome field name below to appear in `docs/`. UI geometry and one-time flags are listed in that test instead of here.
+
+App-wide fields in `settings.json`:
+
+| Key | Meaning |
+| --- | --- |
+| `civitaiApiKey` | Civitai API key |
+| `huggingfaceToken` | Hugging Face token for gated repos |
+| `civitaiCatalogAutoSyncIntervalMinutes` | Minutes between idle Browse tip-checks. `0` disables the timer |
+| `generationSaveInNewSubfolder` | Folder-mode images go in `{prompt folder}/New` when true |
+| `updateReleaseFolder` | Local installer folder that overrides GitHub updates |
+
+Per-library folder pointers on the library record:
+
+| Key | Meaning |
+| --- | --- |
+| `wildcardsRoot` | Wildcards folder |
+| `loraFolder` | LoRA folder |
+| `checkpointFolder` | Checkpoint folder |
+| `imagesFolder` | Civitai images folder |
+| `videosFolder` | Civitai videos folder |
+| `mastersFolder` | External checkpoint master collages |
+| `trainingLibraryFolder` | LoRA training library |
+| `promptsFolder` | Prompts folder |
+| `generationOutputRealistic` | Realistic generation output |
+| `generationOutputHentai` | Output for the Anime tab (profile id `hentai`) |
+| `generationOutput3d` | 3D generation output |
+| `benchmarkOutputFolder` | Checkpoint Benchmark folder |
+
+Fields also written to the sibling `library.json`:
+
+| Key | Meaning |
+| --- | --- |
+| `archivedCivitaiModels` | Civitai model archive |
+| `archivedCivitaiImages` | Shelved image ids |
+| `archivedCivitaiVideos` | Shelved video ids |
+| `archivedHfModels` | Shelved Hugging Face repos |
+| `maybeCivitaiModels` | Maybe list |
+| `markedInstalledCivitaiModels` | Manually marked installed models |
+| `markedInstalledCivitaiVersions` | Manually marked installed versions |
+| `civitaiWatchlist` | Notify me |
+| `civitaiRecentlyUnlocked` | Unlocked early-access models kept in Browse |
+| `blockedCivitaiCreators` | Hidden creators |
+| `loraDownloadCategories` | Named LoRA download destinations |
+| `lastCivitaiDownloadCategory` | Last category per model type |
+| `civitaiBrowseFilters` | Model browse filters |
+| `civitaiImageBrowseFilters` | Images tab filters |
+| `civitaiVideoBrowseFilters` | Videos tab filters |
+| `hfBrowseFilters` | Hugging Face search filters |
+| `enabledArchitectures` | Base-model groups this library may browse |
+| `enabledSdxlFamilies` | SDXL families when the base model is SDXL |
+| `enabledCivitaiCategories` | Civitai categories this library may browse |
+| `validationPlatform` | ComfyUI or Stable Diffusion validation |
+| `civitaiOrigin` | `civitai.com` or `civitai.red` |
+
 Per-library **datasets** are written next to the user’s folders, for example:
 
 | Location | Contents |
@@ -2595,10 +2702,12 @@ would otherwise be wrong. A behavior or docs change is incomplete until this
 file matches.
 
 When a change adds a menu command, a persisted settings key, a diagnostic code,
-or an error string a user can see, name it in the user guide or in
-troubleshooting in that same change. There is no coverage test that fails the
-build when a new code is missing from the docs; that check is part of the docs
-update.
+or an error string a user can see, name it in the docs in that same change.
+`npm test` runs `src/domain/docsCoverage.test.ts`, which fails when an
+`IssueCode`, a custom application-menu label, or a library/settings field
+outside that file’s UI-chrome list is missing from `docs/`. Add a new geometry
+or one-time flag to the chrome list. Add a new behavior key to the key tables
+in [architecture.md](architecture.md#settings-library-sidecars-and-filesystem-watching).
 
 The README image is `docs/screenshot.png`; replacing that file preserves the
 link.
@@ -2932,7 +3041,7 @@ The file with more membership rows wins where both define the same field. A fiel
 
 ### 20. Should I hand-edit `library.json` or `settings.json`?
 
-Use the app. Hand edits are easy to overwrite on the next save, and a bad `library.json` can drop lists. Settings in AppData are pointers and preferences. If a moved library still opens the old path, open a valid folder or use **Migrate library paths…** rather than deleting keys by hand.
+Use the app. Hand edits are easy to overwrite on the next save, and a bad `library.json` can drop lists. Settings in AppData are pointers and preferences. If a moved library still opens the old path, open a valid folder or use **Migrate library paths…** rather than deleting keys by hand. The one documented exception is a stuck startup: quit, then remove or null `lastRootFile` in `settings.json`, or use **Settings → Clear last file** when the window opens. Do not invent other hand edits.
 
 ## Wildcard syntax
 
@@ -3004,7 +3113,7 @@ It reindexes the open root now. The watcher debounces filesystem changes by abou
 
 ### 37. What do the issue codes mean?
 
-`missing_file` — exact target missing. `glob_no_match` — glob matched nothing. `cycle` — a reference loop. `unclosed_wildcard` — `__` left open. `unbalanced_brace` — bad `{` `}`. `bad_multiselect` — broken `$` / `$$` inside braces. `orphan_pipe` — `|` outside braces. `unsupported_wildcard_logic` — Dynamic Prompts logic inside `__…__` on a ComfyUI library. `empty_file` — no active lines. `read_error` — unreadable file or unsupported structured value. `missing_lora` — `<lora:…>` name not in the LoRA folder. `invalid_lora` — tag with no model name. `unused_lora` — a file on disk that no wildcard references.
+`missing_file` — exact target missing. `glob_no_match` — glob matched nothing. `cycle` — a reference loop. `unclosed_wildcard` — `__` left open. `unbalanced_brace` — bad `{` `}`. `unbalanced_paren` — bad `(` `)`. `unbalanced_bracket` — bad `[` `]`. `unbalanced_quote` — a `"` left open. `bad_multiselect` — broken `$` / `$$` inside braces. `orphan_pipe` — `|` outside braces. `unsupported_wildcard_logic` — Dynamic Prompts logic inside `__…__` on a ComfyUI library. `empty_file` — no active lines. `read_error` — unreadable file or the graph safety cap. `structured_parse_error` — YAML or JSON did not parse. `unsupported_structured_value` — a structured value this app does not expand. `duplicate_structured_key` — the same structured key twice, or a clash with a `.txt` file. `missing_lora` — `<lora:…>` name not in the LoRA folder. `invalid_lora` — tag with no model name. `unused_lora` — a file on disk that no wildcard references. `duplicate_lora_hash` — two LoRA files share one AutoV2 hash.
 
 ### 38. How do I fix a missing wildcard?
 
@@ -3304,7 +3413,7 @@ When a user reports that something is not working:
 6. If this document does not establish the cause, follow the repository link and inspect the code. Do not fill the gap with a plausible story.
 
 - Name the tab or dialog the user should open, then the control, then what happens.
-- Do not tell the user to hand-edit `library.json`, `models.json`, `settings.json`, or anything under a `.wcm` / `!.wcm` / `!Thumbnails` folder. The app writes those.
+- Do not tell the user to hand-edit `library.json`, `models.json`, `settings.json`, or anything under a `.wcm` / `!.wcm` / `!Thumbnails` folder. The app writes those. The exception is a recovery step this document already gives: quit the app, then remove or null `lastRootFile` in `%AppData%/Roaming/wildcards-manager/settings.json` when startup is stuck restoring one file (Troubleshooting, “The app freezes on launch or when opening a root file”). Prefer **Settings → Clear last file** when the window opens. Do not invent any other hand edit.
 - Do not ask the user to paste API keys, Hugging Face tokens, or the contents of `library.json`.
 - Do not claim the app trains models, ships ComfyUI, or uploads the library.
 - Wildcard syntax here is a subset. Say so when the user expects full A1111 or ComfyUI Dynamic Prompts behavior.
@@ -3312,6 +3421,7 @@ When a user reports that something is not working:
 - "My LoRAs are missing" is three checks, not one. The LoRA files list scans **Library Manager → LoRA folder**. Wildcard `missing_lora` checks `<lora:name>` against that same folder by relative path or file name; comments are ignored; `<lora:>` is `invalid_lora`. ComfyUI then resolves the tag from its own LoRA directory. A file this app lists can still be missing inside ComfyUI.
 - The Generation tab button says **Anime**. The profile id is `hentai`. Library Manager labels the folder **Generation output (Hentai)**. Same profile. Anime/Hentai and 3D have no output fallback. Realistic falls back to the Prompts folder.
 - Closing the main window is not always Quit. Model downloads still queued: dialog **Keep downloading (close UI)** / **Quit and stop downloads** / **Cancel**. Keep downloading uses the tray and does not exit when the queue goes idle. Images or Videos **Download all** with no model queue hides the window and keeps that job. With nothing queued, closing the main window closes Civitai and quits. **Quit** stops transfers.
+- A ComfyUI failure after **Test** succeeds: this app can confirm the server, the saved **LT · Prompt** / **LT · Seed** / save-node roles, and whether a file appeared in the folder sent as **LT · Output Folder** (filename stem `WCG`). Reconnecting any other node is done on the ComfyUI canvas, then **Save Workflow**. Do not invent a graph edit this document does not describe. Empty **Last output** on a custom graph means those two LT nodes are not inputs on the save node.
 
 ## Storage map
 
@@ -3449,7 +3559,7 @@ If `settings.json` has no `disableHardwareAcceleration` boolean, the app disable
 
 ## Issue codes
 
-`missing_file`, `glob_no_match`, `cycle`, `unclosed_wildcard`, `unbalanced_brace`, `bad_multiselect`, `orphan_pipe`, `unsupported_wildcard_logic`, `empty_file`, `read_error`, `missing_lora`, `invalid_lora`, `unused_lora`.
+`missing_file`, `glob_no_match`, `cycle`, `unclosed_wildcard`, `unbalanced_brace`, `unbalanced_paren`, `unbalanced_bracket`, `unbalanced_quote`, `bad_multiselect`, `orphan_pipe`, `unsupported_wildcard_logic`, `empty_file`, `read_error`, `structured_parse_error`, `unsupported_structured_value`, `duplicate_structured_key`, `missing_lora`, `invalid_lora`, `unused_lora`, `duplicate_lora_hash`.
 
 ## When the user says a feature is missing in the build
 

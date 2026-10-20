@@ -6,6 +6,30 @@ and [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts)
 It validates and expands a documented subset; it is not a complete replacement
 for either runtime.
 
+## Official Dynamic Prompts documentation
+
+Wildcards Manager is a library management, validation, and analysis tool. It
+supports a documented subset of Dynamic Prompts syntax but is not a replacement
+for the Dynamic Prompts extensions themselves.
+
+For complete syntax documentation, advanced features, configuration, and runtime
+behaviour, refer to the extension corresponding to your image-generation
+environment:
+
+- Stable Diffusion WebUI (AUTOMATIC1111):
+  [Dynamic Prompts extension — Syntax reference](https://github.com/adieyal/sd-dynamic-prompts/blob/main/docs/SYNTAX.md)
+- ComfyUI:
+  [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts) —
+  the repository README and the documentation it links to
+
+Wildcards Manager does not implement every feature supported by these
+extensions. Its validation, expansion, and simulation engines follow the subset
+documented below. Some syntax and behaviour differ between AUTOMATIC1111 and
+ComfyUI.
+
+When using features not supported by Wildcards Manager, consult your extension's
+documentation and test the results in the actual generation environment.
+
 ## Text wildcard files
 
 For `.txt`, each non-empty, non-comment line is one candidate. A line may contain

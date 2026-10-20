@@ -632,14 +632,21 @@ reaches about half the panel, so the editor stays at least that tall. Use
 | `cycle` | A reference closes a recursive path |
 | `unclosed_wildcard` | Opening `__` has no closing `__` |
 | `unbalanced_brace` | `{` / `}` structure is invalid |
+| `unbalanced_paren` | `(` / `)` structure is invalid |
+| `unbalanced_bracket` | `[` / `]` structure is invalid |
+| `unbalanced_quote` | A `"` is left open |
 | `bad_multiselect` | `$` / `$$` inside `{…}` is malformed |
 | `orphan_pipe` | `|` occurs outside `{…}` |
 | `unsupported_wildcard_logic` | Dynamic Prompt logic inside `__…__` on a ComfyUI library |
 | `empty_file` | No active non-comment lines |
 | `read_error` | A file/graph limit or unsupported structured expansion was encountered |
+| `structured_parse_error` | A YAML or JSON wildcard file did not parse |
+| `unsupported_structured_value` | A structured key, list item, or document root is not a shape this app expands |
+| `duplicate_structured_key` | The same structured wildcard key is defined twice, or it collides with a `.txt` file |
 | `missing_lora` | A `<lora:…>` tag does not match any model in the configured LoRA folder |
 | `invalid_lora` | A `<lora:…>` tag is missing a model name (e.g. `<lora:>`) |
 | `unused_lora` | A LoRA file exists on disk but is not referenced by any wildcard file |
+| `duplicate_lora_hash` | Two or more LoRA files share one AutoV2 hash |
 
 Click an issue to focus its node and jump to the recorded source line. A missing
 issue jumps to the referring parent because the missing node has no source file.
