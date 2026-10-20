@@ -266,7 +266,7 @@ ComfyUI is running (or a launch shortcut is set under **Settings → AI**). **Te
 
 ### 63. What do Edit Workflow and Save Workflow do?
 
-**Edit Workflow** opens the graph in ComfyUI so you can change it. **Save Workflow** stores the API graph and the LiteGraph UI JSON in `%AppData%/Roaming/wildcards-manager/comfy-workflow.json`. Until that file exists, Generation has nothing to queue. Save again after you change the graph. The prompt toolbar shows whether the saved graph is ready, including missing nodes.
+**Edit Workflow** opens the graph in ComfyUI so you can change it. **Save Workflow** stores the API graph and the LiteGraph UI JSON in `%AppData%/Roaming/wildcards-manager/comfy-workflow.json`. Until that file exists, Generation has nothing to queue. Save again after you change the graph. The prompt toolbar stays quiet when the graph is ready. It warns when no workflow is saved, and names the missing nodes when the saved graph cannot run.
 
 ### 64. What is Use this prompt versus a prompt folder?
 

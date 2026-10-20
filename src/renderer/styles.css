@@ -91,6 +91,11 @@ button.primary {
   white-space: nowrap;
 }
 
+.topbar-library {
+  color: #9aa3b2;
+  font-weight: 600;
+}
+
 .topbar-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1059,6 +1064,10 @@ button.status-bar-queue-btn:hover {
   gap: 4px;
   margin: 0;
   white-space: nowrap;
+}
+
+.generation-workflow-status.warn-text {
+  color: #e3b341;
 }
 
 .panel-toolbar .icon-btn {

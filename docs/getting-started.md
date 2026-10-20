@@ -68,6 +68,11 @@ The main window has these top-level tabs:
 | **Generation** | ComfyUI generation from a typed prompt or prompt folder (Settings → AI) |
 | **Search** | Find wildcard names/content and LoRA / checkpoint filenames |
 
+The window title is the open library and the selected tab, separated by an
+em dash: `Library name — Prompts Library`, `Library name — Image Generation`,
+`Library name — Wildcards file manager`, `Library name — LoRAs file manager`,
+`Library name — Checkpoints file manager`, or `Library name — Advanced Search`.
+
 The toolbar **Search** (magnifying glass) opens a quick launcher into the same
 search. Wildcards lists (Archive, Maybe, Notify, LoRA download categories) and
 caches live in a sibling `<wildcardsBasename>.wcm/` folder beside your wildcards

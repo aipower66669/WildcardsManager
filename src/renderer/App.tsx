@@ -158,6 +158,15 @@ import {
 } from './SearchWorkspace';
 import { modalOverlayDismiss } from './modalOverlayDismiss';
 
+const WORKSPACE_TAB_TITLE: Record<WorkspaceTabId, string> = {
+  prompts: 'Prompts Library',
+  generation: 'Image Generation',
+  wildcards: 'Wildcards file manager',
+  loras: 'LoRAs file manager',
+  checkpoints: 'Checkpoints file manager',
+  search: 'Advanced Search',
+};
+
 const DEFAULT_TAB_PANEL_WIDTHS: Record<WorkspaceTabId, TabPanelWidthsDto> = {
   prompts: { filesPanelWidth: 240, detailsPanelWidth: 330 },
   generation: { filesPanelWidth: 240, detailsPanelWidth: 420 },
@@ -3995,8 +4004,26 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="topbar-brand" title={activeLibraryName ?? undefined}>
-          <h1>{activeLibraryName || 'No library'}</h1>
+        <div
+          className="topbar-brand"
+          title={
+            root
+              ? `${activeLibraryName || 'Library'} — ${WORKSPACE_TAB_TITLE[workspaceTab]}`
+              : undefined
+          }
+        >
+          <h1>
+            {root ? (
+              <>
+                <span className="topbar-library">
+                  {activeLibraryName || 'Library'} —
+                </span>{' '}
+                {WORKSPACE_TAB_TITLE[workspaceTab]}
+              </>
+            ) : (
+              'No library'
+            )}
+          </h1>
         </div>
         <div className="topbar-actions">
           <div className="open-library-wrap" ref={openLibraryMenuRef}>

@@ -290,8 +290,9 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   load that checkpoint in the dropdown.
 - **Edit Workflow** / **Save Workflow** for the Comfy graph. **Save Workflow**
   writes the graph the app queues. Until that file exists, Generation has
-  nothing to run. The prompt toolbar, next to **Edit Workflow**, shows whether
-  that graph is ready or which nodes are missing.
+  nothing to run. The prompt toolbar, next to **Edit Workflow**, stays quiet
+  when the graph is ready. It shows a warning when no workflow is saved, and
+  the missing node names when the saved graph cannot run.
 - **Last output** preview can be collapsed for long unattended runs. Under the
   image, **Category** is the prompt folder that produced it (parents as a
   breadcrumb — useful when Randomize picked a sub-folder), then **Positive**

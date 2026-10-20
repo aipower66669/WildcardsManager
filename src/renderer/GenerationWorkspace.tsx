@@ -8,7 +8,6 @@ import {
   type MutableRefObject,
 } from 'react';
 import {
-  CheckCircle2,
   LineChart,
   Crosshair,
   Dices,
@@ -1770,33 +1769,18 @@ export function GenerationWorkspace({
             <div className="panel-toolbar">
               <strong>Prompt</strong>
               <div className="row-actions">
-                {contract ? (
+                {contract && !contract.ok ? (
                   <span
-                    className={`hint generation-workflow-status${
-                      contract.ok ? '' : ' error-text'
-                    }`}
-                    title={
-                      contract.ok
-                        ? 'Saved workflow matches the Generation contract'
-                        : `Missing: ${contract.requiredMissing.join(', ')}`
-                    }
+                    className="hint generation-workflow-status error-text"
+                    title={`Missing: ${contract.requiredMissing.join(', ')}`}
                   >
-                    {contract.ok ? (
-                      <>
-                        <CheckCircle2 size={12} /> Workflow ready
-                        {contract.usesContractNodes ? ' (pack nodes)' : ''}
-                      </>
-                    ) : (
-                      <>Missing: {contract.requiredMissing.join(', ')}</>
-                    )}
+                    Missing: {contract.requiredMissing.join(', ')}
                   </span>
-                ) : (
-                  <span className="hint generation-workflow-status">
-                    {hasWorkflow
-                      ? 'Workflow saved'
-                      : 'No workflow saved yet'}
+                ) : !contract && !hasWorkflow ? (
+                  <span className="hint generation-workflow-status warn-text">
+                    No workflow saved yet
                   </span>
-                )}
+                ) : null}
                 <button
                   type="button"
                   className="generation-action-btn"

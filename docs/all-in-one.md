@@ -299,6 +299,11 @@ The main window has these top-level tabs:
 | **Generation** | ComfyUI generation from a typed prompt or prompt folder (Settings → AI) |
 | **Search** | Find wildcard names/content and LoRA / checkpoint filenames |
 
+The window title is the open library and the selected tab, separated by an
+em dash: `Library name — Prompts Library`, `Library name — Image Generation`,
+`Library name — Wildcards file manager`, `Library name — LoRAs file manager`,
+`Library name — Checkpoints file manager`, or `Library name — Advanced Search`.
+
 The toolbar **Search** (magnifying glass) opens a quick launcher into the same
 search. Wildcards lists (Archive, Maybe, Notify, LoRA download categories) and
 caches live in a sibling `<wildcardsBasename>.wcm/` folder beside your wildcards
@@ -782,8 +787,9 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   load that checkpoint in the dropdown.
 - **Edit Workflow** / **Save Workflow** for the Comfy graph. **Save Workflow**
   writes the graph the app queues. Until that file exists, Generation has
-  nothing to run. The prompt toolbar, next to **Edit Workflow**, shows whether
-  that graph is ready or which nodes are missing.
+  nothing to run. The prompt toolbar, next to **Edit Workflow**, stays quiet
+  when the graph is ready. It shows a warning when no workflow is saved, and
+  the missing node names when the saved graph cannot run.
 - **Last output** preview can be collapsed for long unattended runs. Under the
   image, **Category** is the prompt folder that produced it (parents as a
   breadcrumb — useful when Randomize picked a sub-folder), then **Positive**
@@ -2835,7 +2841,7 @@ ComfyUI is running (or a launch shortcut is set under **Settings → AI**). **Te
 
 ### 63. What do Edit Workflow and Save Workflow do?
 
-**Edit Workflow** opens the graph in ComfyUI so you can change it. **Save Workflow** stores the API graph and the LiteGraph UI JSON in `%AppData%/Roaming/wildcards-manager/comfy-workflow.json`. Until that file exists, Generation has nothing to queue. Save again after you change the graph. The prompt toolbar shows whether the saved graph is ready, including missing nodes.
+**Edit Workflow** opens the graph in ComfyUI so you can change it. **Save Workflow** stores the API graph and the LiteGraph UI JSON in `%AppData%/Roaming/wildcards-manager/comfy-workflow.json`. Until that file exists, Generation has nothing to queue. Save again after you change the graph. The prompt toolbar stays quiet when the graph is ready. It warns when no workflow is saved, and names the missing nodes when the saved graph cannot run.
 
 ### 64. What is Use this prompt versus a prompt folder?
 
@@ -3052,7 +3058,7 @@ What's new opens a window with that version's GitHub release notes (the release 
 
 ## Workspace
 
-Tabs, in product language: Wildcard files, LoRA files, Checkpoint files, Prompts, Generation, Search. Civitai and Hugging Face are browsers opened from the toolbar (Civitai can be a modal or a detached window).
+Tabs, in product language: Wildcard files, LoRA files, Checkpoint files, Prompts, Generation, Search. The window title is `<library name> — <tab title>` (Prompts Library, Image Generation, Wildcards file manager, LoRAs file manager, Checkpoints file manager, Advanced Search). Civitai and Hugging Face are browsers opened from the toolbar (Civitai can be a modal or a detached window).
 
 Library Manager fields: wildcards root, LoRA folder, checkpoint folder, LoRA training library, prompts folder, generation output Realistic / Hentai / 3D, checkpoint benchmark folder. Images folder and Videos folder are set in Settings. Civitai site and validation platform are per library.
 
@@ -3098,7 +3104,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 - Deleting a benchmark image drops that timing and opens a slot.
 - Each style tab has Generation and Options. Options: CLIP, VAE, steps (default 20), cfg (default 7), sampler name, scheduler, denoise (default 1). Empty sampler or scheduler is not applied. Steps, cfg, and denoise are applied when those LT nodes are bound.
 - Required graph nodes: LT · Prompt, LT · Seed, and a save node (`LT · Save Output` or class name containing `SaveImage`). Optional fills: Negative, Model, CLIP, VAE, Width, Height, Steps, CFG, Sampler, Scheduler, Denoise, Output Folder, Output Filename.
-- Workflow-ready status is next to Edit Workflow, not in the Generation fields.
+- Next to Edit Workflow, a ready graph shows nothing. No saved workflow is a warning. Missing required nodes are named there.
 - Sample graph file: `ComfyUI-Workflow/WildcardManager-ComfyUI-Generation-Workflow.json`. Node pack zip: `ComfyUI-Workflow/comfyui-lora-training.zip` → `custom_nodes/comfyui-lora-training/`. The sample also needs ComfyUI Dynamic Prompts, a LoRA tag loader, Corza LoRA loader, Krea 2 enhancer, and a `SaveImageToFolder`-class node that is not in the LT zip.
 - Comfy connection UI is Settings → AI, not the Generation tab. The app can launch Comfy from the configured shortcut when the server is down.
 
