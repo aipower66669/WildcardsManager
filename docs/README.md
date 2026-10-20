@@ -51,3 +51,6 @@ Documentation describes the behavior in the current source tree, not every
 feature available in A1111 or ComfyUI wildcard implementations. When docs and
 code disagree, treat the tests and source as authoritative and please open a PR
 to correct the docs.
+
+[all-in-one.md](all-in-one.md) bundles these documents into the single help
+file. Rebuild it whenever a source document changes so that copy stays current.

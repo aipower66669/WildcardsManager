@@ -235,7 +235,15 @@ lives in `README.md`. Keep links relative. When behavior changes:
 - update [user-guide.md](user-guide.md);
 - update [syntax.md](syntax.md) for language semantics;
 - update [architecture.md](architecture.md) for boundaries/data flow;
-- move roadmap items from planned to shipped.
+- move roadmap items from planned to shipped;
+- rebuild [all-in-one.md](all-in-one.md) in the same change.
+
+`all-in-one.md` is the ultimate user help file: one copy of the docs plus the
+**Information for LLM models** section. Every `<!-- source: docs/... -->` block
+must stay a verbatim copy of that source. Update the LLM section when a
+mechanical rule (paths, seeds, settings keys, updates, generation fields)
+would otherwise be wrong. A behavior or docs change is incomplete until this
+file matches.
 
 The README image is `docs/screenshot.png`; replacing that file preserves the
 link.
