@@ -9,6 +9,7 @@ import {
 import {
   Decoration,
   EditorView,
+  placeholder,
   crosshairCursor,
   drawSelection,
   dropCursor,
@@ -64,6 +65,7 @@ import {
   Crosshair,
   FilePlus,
   FolderOpen,
+  Hash,
   Pencil,
   Redo2,
   Scissors,
@@ -74,6 +76,7 @@ import {
   findCivitaiModelUrlAbove,
   type ParsedCivitaiModelPageUrl,
 } from '../domain/civitaiSnippet.js';
+import { commentLine, uncommentLine } from '../domain/lineComment';
 import { wildcardLanguage } from './wildcardLang';
 
 /** Marks doc updates that come from React props, not the user. */
@@ -143,6 +146,8 @@ type Props = {
   fileExt?: string;
   /** Addressable keys offered after an opening `__` delimiter. */
   wildcardKeys?: string[];
+  /** Shown while the document is empty. */
+  placeholderText?: string;
   /** Open / focus a resolved `__wildcard__` reference under the cursor. */
   onOpenWildcard?: (name: string) => void;
   /** Create a missing `__wildcard__` file from the name under the cursor. */
@@ -167,6 +172,40 @@ type EditorContextMenu = {
   wildcard: EditorWildcardTarget | null;
   lora: EditorLoraTarget | null;
 };
+
+function selectedLineNumbers(state: EditorState): number[] {
+  const doc = state.doc;
+  const numbers = new Set<number>();
+  for (const range of state.selection.ranges) {
+    const start = doc.lineAt(range.from);
+    if (range.empty) {
+      numbers.add(start.number);
+      continue;
+    }
+    let end = doc.lineAt(range.to);
+    if (range.to === end.from && end.number > start.number) {
+      end = doc.line(end.number - 1);
+    }
+    for (let n = start.number; n <= end.number; n += 1) numbers.add(n);
+  }
+  return [...numbers].sort((a, b) => a - b);
+}
+
+function applyLineComment(
+  view: EditorView,
+  mode: 'comment' | 'uncomment',
+): void {
+  const { state } = view;
+  const changes: { from: number; to?: number; insert?: string }[] = [];
+  for (const number of selectedLineNumbers(state)) {
+    const line = state.doc.line(number);
+    const next = mode === 'comment' ? commentLine(line.text) : uncommentLine(line.text);
+    if (next === line.text) continue;
+    changes.push({ from: line.from, to: line.to, insert: next });
+  }
+  if (changes.length === 0) return;
+  view.dispatch({ changes, userEvent: 'input' });
+}
 
 const WILDCARD_AT_RE = /__([^_\n](?:[^_\n]|_(?!_))*)__/g;
 const LORA_AT_RE = /<lora:([^:>\n]*)(?::[^>\n]*)?>/gi;
@@ -353,6 +392,9 @@ const editorTheme = EditorView.theme(
       caretColor: '#e7eaf0',
       padding: '8px 0',
     },
+    '.cm-placeholder': {
+      color: '#6d7686',
+    },
     '.cm-gutters': {
       backgroundColor: '#0b0e13',
       color: '#6b7383',
@@ -451,6 +493,7 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
       readOnly = false,
       fileExt,
       wildcardKeys = [],
+      placeholderText,
       onOpenWildcard,
       onCreateWildcard,
       onRenameLora,
@@ -471,6 +514,7 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
     const langCompartment = useRef(new Compartment()).current;
     const editableCompartment = useRef(new Compartment()).current;
     const completionCompartment = useRef(new Compartment()).current;
+    const placeholderCompartment = useRef(new Compartment()).current;
     const [contextMenu, setContextMenu] = useState<EditorContextMenu | null>(
       null,
     );
@@ -572,7 +616,7 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
       const menuHeight =
         (wildcard ? 110 : 0) +
         (lora ? 126 + (lora.civitai ? 36 : 0) : 0) +
-        (editable ? 250 : 90);
+        (editable ? 322 : 90);
       setContextMenu({
         x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
         y: Math.max(
@@ -682,6 +726,9 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
           editorSetup,
           syntaxHighlighting(brightHighlightStyle),
           langCompartment.of(languageForExt(fileExt)),
+          placeholderCompartment.of(
+            placeholderText ? placeholder(placeholderText) : [],
+          ),
           completionCompartment.of(
             autocompletion({
               override: [wildcardCompletionSource(wildcardKeys)],
@@ -766,6 +813,16 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
         ),
       });
     }, [completionCompartment, wildcardKeys]);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: placeholderCompartment.reconfigure(
+          placeholderText ? placeholder(placeholderText) : [],
+        ),
+      });
+    }, [placeholderCompartment, placeholderText]);
 
     return (
       <>
@@ -933,6 +990,37 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
               >
                 <ClipboardPaste size={14} /> Paste
               </button>
+            ) : null}
+            {!readOnly ? (
+              <>
+                <div className="file-context-menu-separator" role="separator" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    const view = viewRef.current;
+                    setContextMenu(null);
+                    if (!view) return;
+                    applyLineComment(view, 'comment');
+                    view.focus();
+                  }}
+                >
+                  <Hash size={14} /> Comment
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    const view = viewRef.current;
+                    setContextMenu(null);
+                    if (!view) return;
+                    applyLineComment(view, 'uncomment');
+                    view.focus();
+                  }}
+                >
+                  <Hash size={14} /> Uncomment
+                </button>
+              </>
             ) : null}
             <div className="file-context-menu-separator" role="separator" />
             <button

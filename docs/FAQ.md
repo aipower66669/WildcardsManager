@@ -14,7 +14,7 @@ No. Generation sends a job to ComfyUI. The Windows installer does not install Co
 
 ### 3. Which installers exist?
 
-Tagged releases build a Windows x64 NSIS `.exe`, macOS `.dmg` files for Intel and Apple silicon, and a Linux x64 `.AppImage`. Release builds are unsigned, so Windows SmartScreen or macOS Gatekeeper may warn on first launch.
+GitHub releases publish a Windows x64 NSIS `.exe` only. The release workflow does not build macOS or Linux packages, and those systems have not been tested. The app might run there from source, but there is no installer to download. The Windows build is unsigned, so SmartScreen may warn on first launch.
 
 With no folder under **Settings → General → App updates**, **Check for update** uses the public [GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases) and only reports whether a newer installer exists. It does not open a window. **What's new** is a separate button for that version's release notes. **Install** downloads the installer, closes the app, and runs it. A folder you set yourself overrides GitHub: the check, the installer, and **What's new** stay in that folder and do not contact GitHub. **What's new** reads `RELEASE_NOTES.md` there, or in the folder above it.
 
@@ -58,7 +58,7 @@ Yes. **Library Manager** stores several libraries. Each has its own wildcards ro
 
 ### 13. What if Realistic output is empty?
 
-Realistic falls back to the Prompts folder. Hentai and 3D do not. Set those roots before generating with that style.
+Realistic falls back to the Prompts folder. The Generation tab labels the second style **Anime**. Library Manager calls that same profile **Generation output (Hentai)** (stored id `hentai`). Anime/Hentai and 3D do not fall back. Set those roots before generating with that style.
 
 ### 14. Where do folder-mode images go?
 
@@ -240,7 +240,7 @@ Each checkpoint is ticked on by default. Untick it to drop that file from this l
 
 ### 57. Where are checkpoint ratings stored?
 
-A local half-star rating is stored in the checkpoint root’s `!.wcm/models.json`, not in AppData. The Benchmark chart’s rating order is separate: it reads `field_rating` from each sample folder’s `mfe_meta` stream and hides folders that have no rating.
+A local half-star rating is stored in the checkpoint root’s `!.wcm/models.json`, not in AppData. The Benchmark chart uses `field_rating` from each sample folder’s `mfe_meta` stream when that stream exists, and otherwise this catalog rating. A 5-star catalog rating sorts and weighs the same as an ADS rating of 10. Folders with neither rating are hidden from Rating and Weight order.
 
 ### 58. What is on the checkpoint details pane?
 
@@ -282,7 +282,7 @@ The dice sets Seed to −1. Any seed of 0 or below, or a non-numeric seed, rolls
 
 ### 67. What is on Generation versus Options?
 
-Under each style tab (**Realistic**, **Anime**, **3D**), **Generation** holds the prompt folder, checkpoint, seed, size, and prompts. **Options** holds CLIP, VAE, and the KSampler fields: Steps, CFG, Sampler, Scheduler, and Denoise. Each style keeps its own values. Steps, CFG, and Denoise apply when **LT · Steps**, **LT · CFG**, and **LT · Denoise** are in the saved workflow. Sampler and Scheduler apply only when you pick a name; blank keeps the name already on **LT · Sampler** or **LT · Scheduler**. Defaults for a new style are 20 steps, CFG 7, and denoise 1. Hover a label for a short explanation. Additional Positive and Negative resize vertically, and that height is remembered.
+Under each style tab (**Realistic**, **Anime**, **3D**), **Generation** holds the prompt folder, checkpoint, seed, size, and prompts. **Anime** is the tab label for the profile Library Manager calls **Hentai**. **Options** holds CLIP, VAE, and the KSampler fields: Steps, CFG, Sampler, Scheduler, and Denoise. Each style keeps its own values. Steps, CFG, and Denoise apply when **LT · Steps**, **LT · CFG**, and **LT · Denoise** are in the saved workflow. Sampler and Scheduler apply only when you pick a name; blank keeps the name already on **LT · Sampler** or **LT · Scheduler**. Defaults for a new style are 20 steps, CFG 7, and denoise 1. Hover a label for a short explanation. Additional Positive and Negative use the same prompt editor as **Use this prompt** (wildcard highlighting and `__` completion). They resize vertically, and that height is remembered.
 
 ### 68. Why did reusing a seed not match the Infinite image?
 
@@ -330,7 +330,7 @@ A Generation checkbox that walks every `.safetensors` in the checkpoint folder t
 
 ### 79. How do I read the benchmark chart?
 
-Open it from the graph button next to the Benchmark checkbox. Every saved timing is drawn. The blue average and the min–max bar use the 5 fastest runs only. Filter names without caring about case. **Rating** order uses `field_rating` in each sample folder’s `mfe_meta` and hides folders with no rating. **Weight** mixes that rating with average time: 100 means fastest and highest rated; a fast low-rated result or a slow top-rated one scores lower. The name filter and the sort are remembered. Hover a point for the name. Click a point to load that checkpoint in the dropdown. The window is movable and resizable.
+Open it from the graph button next to the Benchmark checkbox. Every saved timing is drawn. The blue average and the min–max bar use the 5 fastest runs only. Filter names without caring about case. **Rating** order uses `field_rating` in each sample folder’s `mfe_meta` when that stream exists, otherwise the Checkpoint tab rating, and hides checkpoints with neither. A 5-star catalog rating matches an ADS rating of 10. **Weight** mixes that rating with average time: 100 means fastest and highest rated; a fast low-rated result or a slow top-rated one scores lower. The name filter and the sort are remembered. Hover a point for the name. Click a point to load that checkpoint in the dropdown. The window is movable and resizable.
 
 ### 80. Can Generation start ComfyUI for me?
 
@@ -392,7 +392,7 @@ For early-access models. They leave Browse and sit on **Notify me** with a count
 
 ### 93. Do downloads keep going if I leave the browser?
 
-Yes. The queue runs in the main process. Switching from Images back to LoRA, or closing the Civitai panel, does not cancel model or **Download all** jobs. If you close the main window while model downloads are still queued, the app can stay running in the background until that queue is idle. Quitting the app stops it.
+Yes. The queue runs in the main process. Switching from Images back to LoRA, or closing the Civitai panel, does not cancel model or **Download all** jobs. Closing the main window while model downloads are queued opens a dialog: **Keep downloading (close UI)**, **Quit and stop downloads**, or **Cancel**. Keep downloading closes the windows, shows a tray icon, and leaves the process running after the queue finishes until you open the app or quit from the tray. **File → Close UI & keep downloading** (`Ctrl+Shift+W`) does that directly. Images or Videos **Download all** with no model queue hides the window and keeps that job running. **Quit** stops transfers.
 
 ### 94. What is a LoRA download category?
 
@@ -408,7 +408,7 @@ It skips the dialog and queues with the same defaults as opening the dialog and 
 
 ### 97. Can I detach the Civitai window?
 
-Yes. **Detach** opens a separate window and the app reopens it detached next time. **Attach** docks it back into the main window. Size, position, maximized state, and that preference are remembered. Quitting the app closes the Civitai window too.
+Yes. **Detach** opens a separate window and the app reopens it detached next time. **Attach** docks it back into the main window. Size, position, maximized state, and that preference are remembered. Quitting the app closes the Civitai window too. Closing the main window while downloads are queued is a separate choice: keep downloading in the tray, or quit and stop them.
 
 ### 98. How do browse filters work?
 
@@ -434,6 +434,6 @@ Same browse, sort, content filter, and Download all behavior, with a **Videos fo
 
 ### 103. How do I use Hugging Face, and what should I not expect the app to do?
 
-The **Hugging Face** button searches the Hub, with filters remembered per library. A token under **Settings → AI** is for gated repos. Downloads use their own queue (pause, resume, cancel) next to Civitai model downloads. Archived Hub models are per library.
+The **Hugging Face** button searches the Hub, with filters remembered per library. A token under **Settings → AI** is for gated repos. Clicking a repo name opens that Hub page in a side panel in the Hugging Face window. The external-link icon still opens the system browser. Downloads use their own queue (pause, resume, cancel) next to Civitai model downloads. When the repo contains a `.safetensors` file, that file is downloaded instead of a `.bin` such as `optimizer.bin`. The saved name is the repo id with `/` replaced by `-` (`org/name` → `org-name.safetensors`). A finished download leaves Browse and is listed on **Downloaded** (between Browse and Archive). The LoRA category on the download dialog is the last one queued, shared with Civitai downloads. **Show in search** returns it to Browse and does not delete the file. Archived Hub models are per library.
 
 The app will not train a LoRA, install ComfyUI for you, rewrite globs on rename, rename a single YAML key for you, survive undo across a restart, or implement every A1111 or ComfyUI wildcard feature. It does not upload your library anywhere. When you ask an assistant for help, describe the tab and the message you see. Do not paste API keys. You do not need to paste `library.json` for ordinary how-to questions.

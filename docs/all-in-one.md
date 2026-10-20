@@ -6,6 +6,27 @@ The separate files in this folder remain the sources. This bundle is a copy for 
 
 The documents through Roadmap are unchanged copies. **FAQ** is a copy of `docs/FAQ.md`. **Information for LLM models** exists only in this bundle: extra rules so an assistant can answer without inventing behavior.
 
+Links written as `syntax.md` or `user-guide.md#…` are paths inside the `docs/` folder. In this file, use the heading with the same title. `https://` links are the ones that leave the document. The repository is [aipower66669/WildcardsManager](https://github.com/aipower66669/WildcardsManager). When two passages in this file disagree, **Information for LLM models** wins on the mechanical points it states. When this file and the source code disagree, the code wins.
+
+## Question and symptom index
+
+| Question or symptom | Heading in this file |
+| --- | --- |
+| Install, open a library, workspace tabs | Getting started |
+| Day-to-day controls | User guide |
+| Realistic / Anime / Hentai / 3D | Library Manager; Generation workspace |
+| Editor comment and uncomment | Editor |
+| What undo actually keeps | Undo, redo, and backups |
+| Exact syntax, including failures | Supported syntax and compatibility; Examples that pass and fail |
+| No library, missing files, odd globs | Troubleshooting (symptom table at the top of that section) |
+| Civitai 401, retry pause, installed tag, missing snippet | Civitai download fails or is gated; the three download sections after it |
+| Test succeeds, Generation refuses, Last output empty | ComfyUI answers Test but Generation is rejected; Last output stays empty after a successful ComfyUI image |
+| LoRA file exists and something says missing | A LoRA exists but a warning or the loader says it is missing |
+| Slow open or a freeze | The library is slow to open |
+| Closing the window versus quitting | Civitai browser; FAQ “Do downloads keep going if I leave the browser?” |
+| Direct answers | FAQ |
+| Rules an assistant must not soften | Information for LLM models |
+
 ## Documents in this file
 
 | Section | Source | What it covers |
@@ -82,6 +103,9 @@ to correct the docs.
 
 [all-in-one.md](all-in-one.md) bundles these documents into the single help
 file. Rebuild it whenever a source document changes so that copy stays current.
+Its opening index is for that one file. Links such as `user-guide.md` are for
+this folder; inside the bundle, follow the heading with the same title. When
+this text and the source code disagree, the code wins.
 
 ---
 
@@ -188,7 +212,8 @@ Shipped today:
 - seeded random and bounded exhaustive text/YAML/JSON expansion;
 - seeded Monte Carlo reach/balance analysis;
 - persisted recent roots, last file, panel width, and simulation defaults;
-- packaged targets and CI for Windows, macOS, and Linux;
+- Windows x64 NSIS installer, built and attached by the tagged release workflow
+  (macOS and Linux are not published or tested);
 - Civitai browser for LoRAs/checkpoints (`civitai.com` SFW / `civitai.red` NSFW;
   API key required for many gated downloads; queued downloads, categories,
   Shift+click, extra comment/prompt, download console);
@@ -238,14 +263,11 @@ editing a file, and producing a packaged desktop app.
 
 ### Downloaded release
 
-Tagged releases are built for:
+Tagged releases publish a Windows x64 NSIS installer (`.exe`). There is no
+macOS or Linux download. Those systems have not been tested. Running from
+source might work there, but that is untested.
 
-- Windows x64 (`.exe`, NSIS installer)
-- macOS Intel and Apple silicon (`.dmg`)
-- Linux x64 (`.AppImage`)
-
-Release builds are currently unsigned. Windows SmartScreen or macOS Gatekeeper
-may warn before first launch.
+The Windows build is unsigned. SmartScreen may warn before first launch.
 
 ### Run from source
 
@@ -316,7 +338,9 @@ configured **images folder** (Settings) and an AppData download registry.
 - Top bar **Civitai** → **Images** or **Videos** for community gallery
   browse/download. Set the matching folder in Settings first.
 - **Hugging Face** button for Hub search/downloads (token under Settings → AI
-  when a repo is gated).
+  when a repo is gated). Click a repo name to open its page in the side panel.
+  Download saves a `.safetensors` file when the repo has one, named from the
+  repo id (`org/name` → `org-name.safetensors`).
 - **Settings → General → App updates** checks GitHub Releases when the folder
   is empty. **Check for update** only reports a newer installer. **What's new**
   is a separate button for that version's notes. **Install** downloads it.
@@ -486,17 +510,16 @@ npm test
 npm run build
 ```
 
-Package for the current or a named platform:
+Package the Windows installer:
 
 ```powershell
 npm run dist
 npm run dist:win
-npm run dist:mac
-npm run dist:linux
 ```
 
-Cross-platform packages should be produced on their native operating systems.
-Artifacts are written to `release/`.
+Artifacts are written to `release/`. GitHub releases attach that Windows
+installer only. `npm run dist:mac` and `npm run dist:linux` exist in
+`package.json` and have not been tested. They are not published.
 
 ## Next reading
 
@@ -565,7 +588,7 @@ Folder pointers on a library:
 | **Checkpoint folder** | Installed checkpoints and benchmark source files |
 | **LoRA training library** | Dataset folders with `dataset.json` for multi-step LoRA series previews |
 | **Prompts folder** | `!gen.txt` trees and sample images (shared by every Generation style) |
-| **Generation output (Realistic / Hentai / 3D)** | Where that style writes images. Realistic may fall back to the Prompts folder. Hentai and 3D need their own roots before you generate with that style |
+| **Generation output (Realistic / Hentai / 3D)** | Where that style writes images. The Generation tab labels the middle profile **Anime**; this folder and the stored id `hentai` are that same profile. Realistic may fall back to the Prompts folder. Anime/Hentai and 3D need their own roots before you generate with that style |
 | **Checkpoint Benchmark folder** | WCG samples and `benchmark-stats.json` from Generation → Benchmark |
 | **Images folder** / **Videos folder** | Civitai community downloads (`<folder>/<base model>/…`), set in Settings |
 
@@ -763,12 +786,15 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   folder selected, on includes that folder and sub-folders that have
   `!gen.txt`; off uses only that folder. **Select… [Randomize]** (no folder)
   picks a folder from the seed.
-- Style profiles (**Realistic** / **Anime** / **3D**). Each profile has
+- Style profiles (**Realistic** / **Anime** / **3D**). The middle button says
+  **Anime**. Library Manager names that profile’s output folder **Generation
+  output (Hentai)** and stores the id `hentai`. Each profile has
   **Generation** (prompt folder, checkpoint, seed, size, additional positive,
   negative) and **Options** (CLIP, VAE, Steps, CFG, Sampler, Scheduler,
   Denoise). Values are not shared across the three styles. Hover a label for
-  a short explanation. Additional Positive and Negative resize vertically, and
-  that height is remembered.
+  a short explanation. Additional Positive and Negative use the same prompt
+  editor as **Use this prompt** (wildcard highlighting and `__` completion).
+  They resize vertically, and that height is remembered.
 - Seed **1 or higher** repeats the same image on **Once** and **Infinite**:
   the same dropdown and the same Recursive setting pick the same folder and
   the same line. Seed **0 or below** (the dice) rolls a new seed from the
@@ -799,9 +825,12 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   (selected by default when samples exist; **Website** is the Civitai page).
   Use the graph button next to the Benchmark checkbox for a sortable avg-time
   line graph (movable/resizable window). Filter the names (case-insensitive).
-  Rating order uses `field_rating` from each sample folder’s `mfe_meta` stream,
-  hides folders that have no rating, and draws the number under each point.
-  Weight order mixes that rating with the average time: 100 means the checkpoint
+  Rating order prefers `field_rating` on each sample folder’s `mfe_meta`
+  stream. When that stream has no rating, it uses the half-star rating from
+  the Checkpoint tab. A 5-star catalog rating sorts and weighs the same as an
+  ADS rating of 10. Folders with neither rating are hidden, and the number
+  under each point is the rating that was used. Weight order mixes that
+  rating with the average time: 100 means the checkpoint
   is both the fastest and the highest rated, and a fast weak result or a slow
   top-rated one scores lower. The weight is drawn under each point.
   The name filter and the sort are remembered when the window is closed.
@@ -902,8 +931,8 @@ The repo ships the two node packs and that graph in
      **Test**. **Test** only checks that the server answers (latency and how
      many node classes it reported). It does not look at your graph.
    - **Library Manager:** prompts folder, and a Generation output root for each
-     style you use (Realistic, Hentai, 3D). Realistic defaults to the prompts
-     folder.
+     style you use (Realistic, Anime, 3D). The Anime tab writes to **Generation
+     output (Hentai)**. Realistic defaults to the prompts folder.
    - **Generation → Save Workflow.** That copies the open ComfyUI graph into
      the app. Use **Edit Workflow** later when you change the graph in ComfyUI,
      then save again.
@@ -955,7 +984,20 @@ matching workspace (wildcard editor, LoRA, or Checkpoint).
 
 Use the topbar **Civitai** button to search and download LoRAs and checkpoints,
 or switch to **Images** for the community gallery. A separate **Hugging Face**
-control opens Hub search/downloads.
+control opens Hub search/downloads. Hub results are cards: the repo name,
+stats, and **Download** / **Archive** sit together on the card. Clicking the
+repo name opens that Hub page in a side panel inside the Hugging Face window.
+The external-link icon still opens it in the system browser. Drag the divider
+to resize the panel, and use the collapse button to hide it. **Download**
+prefers a `.safetensors` weight when the repo has one, so a trainer leftover
+such as `optimizer.bin` is not the file that is saved. The saved name is the
+repo id with `/` replaced by `-`: `misapapa71/model-rinka-krea2` and
+`pytorch_lora_weights.safetensors` become
+`misapapa71-model-rinka-krea2.safetensors`. A finished download leaves Browse
+and appears on **Downloaded**, between Browse and Archive. **Show in search**
+puts that repo back in Browse and leaves the file on disk. The LoRA category
+on that download dialog is the last one you queued, the same memory Civitai
+downloads use.
 
 #### SFW vs NSFW sites
 
@@ -985,7 +1027,17 @@ Also configure **LoRA folder**, **checkpoint folder**, and (for Images)
 - Prefer a separate window? Click **Detach** in the browser header (it reopens
   detached next time). **Attach** docks it back as a modal. Size, position,
   maximized state, and attach/detach preference are remembered. Closing the
-  main app also closes the Civitai window and quits.
+  Civitai window does not quit the app. Closing the main window with nothing
+  queued does: it closes the Civitai window and quits. If model downloads are
+  still queued, a dialog offers **Keep downloading (close UI)**, **Quit and
+  stop downloads**, or **Cancel**. Keep downloading closes the windows, leaves
+  a tray icon, and keeps the process running until you open the app from the
+  tray or choose **Quit (stop downloads)**. The queue finishing does not quit
+  by itself. **File → Close UI & keep downloading** (`Ctrl+Shift+W`) is the
+  same choice when a queue is active. Images or Videos **Download all**, with
+  no model queue, hides the main window and keeps that job running, without
+  that dialog. **Quit** stops transfers. A large partial file starts over on
+  the next launch.
 - Mode chips: **LoRA**, **Checkpoint**, **Images**, **Videos** (remembered per library).
 - Model tabs: **Browse**, **Queued**, **Downloaded**, **Maybe**, **Archive**,
   **Notify me**. Badges and status tags include **New**, **Installed** (local
@@ -1156,6 +1208,8 @@ The CodeMirror editor provides:
 
 - line numbers and active-line highlighting;
 - `Ctrl+F` search (`Esc` closes search);
+- right-click **Comment** / **Uncomment** puts or removes `# ` at the start of
+  each selected line (the current line when nothing is selected);
 - wildcard/variant/weight/multiselect highlighting for `.txt`;
 - native YAML and JSON highlighting;
 - issue-line highlighting and line/column jumps.
@@ -1203,8 +1257,9 @@ Always inspect impact previews. Both operations can affect many files.
 
 ## Undo, redo, and backups
 
-Every app-initiated edit, create, rename, delete, consolidation, absorption,
-missing-reference cleanup, and cycle fix becomes one history entry.
+Save, missing-reference cleanup, and cycle fix each become one history entry.
+Create, rename, delete, consolidate, and absorb do not stay undoable: they
+reopen the library and clear the undo stack, including the change just applied.
 
 - History is in memory, capped at 50 entries, and scoped to the open library
   session.
@@ -1489,6 +1544,20 @@ Editing or renaming an individual nested key remains a manual source edit.
 - Recursion is stopped and reported instead of looping indefinitely.
 - Missing targets remain as literal `__name__` text in expansion output.
 
+## Examples that pass and fail
+
+| Situation | Accepted | Rejected or different | Why |
+| --- | --- | --- | --- |
+| One path segment | `__artists/*__` matches `artists/ink` | the same pattern does not match `artists/history/modern` | `*` stays inside one segment |
+| Any depth | `__artists/**__` matches `artists/history/modern` | a single `*` is not a substitute | `**` crosses directories |
+| Comment | a line `# hat, red` is ignored | `hat # note` stays active | the trimmed line must start with `#` |
+| Multi-select | `{2$$red\|green\|blue}` | `{2$red\|green}` inside braces | a broken `$` run inside `{…}` is `bad_multiselect` |
+| Dollar in a trigger | `trigger$word` stays literal text | it is not read as multi-select | `$` outside braces is literal |
+| Simple forwarder | one active line `__new-name__`, with comments allowed above it | `prefix __new-name__`, two refs, or a glob | Consolidate and Absorb need exactly one non-glob ref |
+| YAML value | a list of strings under a mapping key | a nested mapping that never reaches a scalar or a list of scalars | only those values expand |
+| Missing target | the graph reports `missing_file` | expansion does not drop the token | the sample still contains `__name__` |
+| Validation escape | `# NO VALIDATION` on line 1 | the same words on line 2 | the marker is the physical first line only |
+
 ## Not implemented
 
 - Jinja2 templates;
@@ -1507,6 +1576,25 @@ and version that will execute it.
 <!-- source: docs/troubleshooting.md -->
 
 # Troubleshooting
+
+Start from the symptom, then the check, then the remedy in the section it names.
+Do not delete AppData, a `.wcm` sidecar, or a model folder to “reset” a problem
+unless that section says what the deletion removes.
+
+| Symptom | Section |
+| --- | --- |
+| No library on launch | [The app opens with no library](#the-app-opens-with-no-library) |
+| Expected wildcard file is absent | [My files do not appear](#my-files-do-not-appear) |
+| A wildcard you can see is reported missing | [A valid wildcard is shown as missing](#a-valid-wildcard-is-shown-as-missing) |
+| Glob matches more or less than A1111 | [A glob matches differently in A1111/ComfyUI](#a-glob-matches-differently-in-a1111comfyui) |
+| Civitai download returns 401 | [Civitai download fails or is gated](#civitai-download-fails-or-is-gated) |
+| Downloads pause and retry | [Civitai downloads keep pausing and retrying](#civitai-downloads-keep-pausing-and-retrying) |
+| A finished download is not marked installed | [A finished download is not listed as installed](#a-finished-download-is-not-listed-as-installed) |
+| The wildcard file did not gain a LoRA line | [A LoRA download did not change the wildcard file](#a-lora-download-did-not-change-the-wildcard-file) |
+| **Test** succeeds and Generation still refuses | [ComfyUI answers Test but Generation is rejected](#comfyui-answers-test-but-generation-is-rejected) |
+| ComfyUI saved an image and Last output is empty | [Last output stays empty after a successful ComfyUI image](#last-output-stays-empty-after-a-successful-comfyui-image) |
+| A LoRA file exists and something still says missing | [A LoRA exists but a warning or the loader says it is missing](#a-lora-exists-but-a-warning-or-the-loader-says-it-is-missing) |
+| Opening a library is slow or the window freezes | [The library is slow to open](#the-library-is-slow-to-open) |
 
 ## The app opens with no library
 
@@ -1629,6 +1717,45 @@ Civitai. Use the **Archive** tab, then **Unarchive**.
 category / defaults — open the dialog once if you need to change category,
 weights, or extra comment/prompt.
 
+## Civitai downloads keep pausing and retrying
+
+A transient network error pauses the model queue for about 60 seconds, then
+retries. **Resume** starts the queue sooner. The download console at the bottom
+of the browser is the log of API waits, retries, and transfers. That pause is
+the retry behavior; it does not mean the job was deleted.
+
+`401 Unauthorized` is not this case. It stops on authentication. Add a key from
+the same site, as in the section above.
+
+## A finished download is not listed as installed
+
+**Installed** means the local file matched by **AutoV2** hash or by filename, or
+you used **Mark as installed**. **Possible match** is a similar name. Open the
+file and confirm it before treating that tag as proof.
+
+Check the destination next:
+
+- LoRA and checkpoint weights go to the folders in **Library Manager**, not to
+  an arbitrary path you had open in Explorer.
+- **Archive** hides a model from Browse. It is still on the **Archive** tab.
+- Hugging Face moves a finished repo from Browse to **Downloaded**. **Show in
+  search** puts it back on Browse and does not delete the file.
+
+If the LoRA or Checkpoint file list is empty and the files are on another
+drive, see [LoRA / checkpoint list is missing models on another
+drive](#lora--checkpoint-list-is-missing-models-on-another-drive).
+
+## A LoRA download did not change the wildcard file
+
+A checkpoint download never appends a wildcard line. A LoRA download appends
+only when the chosen category names a wildcard file. The line is written into
+that file. It is not copied to the clipboard.
+
+If that stem is already in the file, a later download of the same stem does not
+append again. **Shift+click Download** uses the last category, default weights,
+and no extra comment or prompt, so the line can be shorter than the one you
+expected from a filled-in dialog.
+
 ## Civitai Images: download disabled or “already downloaded” wrong
 
 1. Set an **images folder** under Settings (Library / Civitai paths) before
@@ -1696,6 +1823,64 @@ the end of the Civitai feed.
    Last output and in the style output folder. A red node in ComfyUI is still
    an install problem. An error that names a wildcard or a LoRA is a library
    problem.
+
+## ComfyUI answers Test but Generation is rejected
+
+**Test** only checks that the server answers. **Check install** reads the saved
+workflow for **LT · Prompt**, **LT · Seed**, and a save node. It does not look
+for missing custom-node packs. A red node on the ComfyUI canvas is how a
+missing pack shows up.
+
+Work down this list:
+
+1. **Save Workflow** has never succeeded. Generation has no graph yet, and
+   **Check install** says there is no saved workflow.
+2. The saved graph is missing one of those three roles. The status next to
+   **Edit Workflow** names what is missing. A ready graph shows no status.
+3. The style has no output folder. Realistic can use the Prompts folder.
+   **Anime** (Library Manager: **Generation output (Hentai)**) and **3D**
+   cannot. Set the folder before generating with that style.
+4. The prompt source is a folder whose `!gen.txt` is empty or missing. The
+   error names that folder. Infinite skips that image and continues.
+5. ComfyUI rejects the prompt after the queue starts. Read the ComfyUI error.
+   A missing UNET, CLIP, VAE, or custom node is ComfyUI’s install, not a
+   wildcard-graph failure. Install steps are in the section above.
+
+## Last output stays empty after a successful ComfyUI image
+
+**Last output** is the preview the app loaded from the folder it sent as
+**LT · Output Folder** after the job. If the save node did not receive
+**LT · Output Folder** and **LT · Output Filename**, ComfyUI can still write an
+image somewhere else and this pane stays empty. The sample graph wires those
+into `SaveImageToFolder`.
+
+Deleting that preview file clears **Last output**.
+
+## A LoRA exists but a warning or the loader says it is missing
+
+Decide which of the three checks failed. They do not share a folder.
+
+| Check | What it looks at | What to verify |
+| --- | --- | --- |
+| LoRA files list | **Library Manager → LoRA folder**, including symlinks and junctions. Extensions `.safetensors`, `.ckpt`, `.pt` | The file is inside that root. Rescan after you change the folder |
+| Wildcard validation | `<lora:name>` in a wildcard file, against that same folder, by relative path or file name, case-insensitive. Comments are ignored | The tag’s name matches a file. `<lora:>` with no name is `invalid_lora`, not a missing file. A tag inside a `#` comment is not checked |
+| ComfyUI loader | ComfyUI’s own LoRA directory, after this app has written the tag into the prompt | ComfyUI’s `models/loras` (or the extra paths it scans) contains the file. A file this app lists can still be missing inside ComfyUI |
+
+A `missing_lora` warning is the second row. A ComfyUI error or a red loader
+node that names the file is the third row.
+
+## The library is slow to open
+
+The drawing is capped (depth, children per parent, and total visible nodes).
+That cap does not limit validation. The analyzed graph stops at 5,000 nodes and
+reports a `read_error` if it has to truncate.
+
+If an older build hangs while restoring one huge root file, use
+**Settings → Clear last file**, or remove `lastRootFile` from
+`userData/settings.json` as described under
+[The app freezes on launch or when opening a root
+file](#the-app-freezes-on-launch-or-when-opening-a-root-file). Leave
+`library.json` and the wildcard files in place.
 
 ## In-app update finds nothing / Install does nothing
 
@@ -1867,15 +2052,14 @@ generated and gitignored.
 
 ## Packaging succeeds but the OS warns
 
-Current packages are unsigned. SmartScreen/Gatekeeper warnings are expected for
-unsigned artifacts. Signing and notarization are roadmap items. In-app **App
-updates** downloads the newer installer from GitHub Releases when the update
-folder is empty. A folder you set still launches the installer already in that
-folder.
+The Windows package is unsigned. SmartScreen warnings are expected. Signing is
+a roadmap item. In-app **App updates** downloads the newer Windows installer
+from GitHub Releases when the update folder is empty. A folder you set still
+launches the installer already in that folder.
 
 A version tag builds the Windows installer in GitHub Actions and attaches the
-`.exe` to that release. macOS and Linux packages are still built locally
-(`npm run dist:mac` / `dist:linux`).
+`.exe` to that release. macOS and Linux have no published build and have not
+been tested. Running from source on those systems might work.
 
 ## Reporting a bug
 
@@ -2066,7 +2250,10 @@ rewritten; plans report currently matching glob users.
 5. applies file operations;
 6. pushes one entry onto the undo stack and clears redo.
 
-History is process memory, capped at 50, and reset on library open. Undo restores
+History is process memory, capped at 50, and reset on library open. Create,
+rename, delete, consolidate, and absorb reopen the library after the mutation,
+which clears this stack, including the entry just pushed. Save,
+missing-reference cleanup, and cycle fix do not reopen the library. Undo restores
 before snapshots; redo restores after snapshots.
 
 Backups are stored under:
@@ -2142,8 +2329,9 @@ out/renderer/index.html + assets
 ```
 
 Electron Builder packages those bundles plus `sample_wildcards/` as an external
-resource. Configured targets are Windows x64 NSIS, macOS x64/arm64 DMG, and Linux
-x64 AppImage.
+resource. The published target is Windows x64 NSIS. `package.json` also lists
+macOS DMG and Linux AppImage targets. GitHub Actions does not build them, they
+have not been tested, and there is no macOS or Linux download.
 
 ## Testing boundaries
 
@@ -2185,9 +2373,9 @@ npm ci
 | `npm run check` | Same gates as GitHub `tests.yml` / build: typecheck then vitest |
 | `npm run test:watch` | Run Vitest interactively |
 | `npm run dist` | Build/package for the current OS |
-| `npm run dist:win` | Windows x64 NSIS |
-| `npm run dist:mac` | macOS x64 + arm64 DMG |
-| `npm run dist:linux` | Linux x64 AppImage |
+| `npm run dist:win` | Windows x64 NSIS (the installer GitHub publishes) |
+| `npm run dist:mac` | macOS DMG target in the electron-builder config; untested, not published |
+| `npm run dist:linux` | Linux AppImage target in the electron-builder config; untested, not published |
 
 Generated directories (`node_modules/`, `out/`, `release/`, `dist/`) are
 gitignored.
@@ -2350,8 +2538,8 @@ skips the bump (`GITHUB_ACTIONS` / `CI`) so tagged releases keep the version
 that matches the tag. To package the current version without bumping:
 `npm run dist:nobump`.
 
-There is currently no configured custom icon, signing certificate, or macOS
-notarization. In-app updates download from GitHub Releases when Settings →
+There is currently no signing certificate for the Windows installer. In-app
+updates download that Windows build from GitHub Releases when Settings →
 App updates has no folder. A configured `release/` folder still overrides
 that and launches the installer already on disk.
 
@@ -2365,7 +2553,8 @@ dispatch. A tag push typechecks and tests, then builds the Windows NSIS
 installer (`npm run build:win`, no version bump) and attaches
 `WildcardsManager-*.exe`, the blockmap, and `latest.yml` to that GitHub
 Release, using `RELEASE_NOTES.md` as the body. Manual dispatch only runs the
-check. macOS and Linux installers are still packaged locally.
+check. macOS and Linux are not built or tested. There is no installer to
+download for those systems. Running from source there might work.
 
 Before tagging:
 
@@ -2404,6 +2593,12 @@ must stay a verbatim copy of that source. Update the LLM section when a
 mechanical rule (paths, seeds, settings keys, updates, generation fields)
 would otherwise be wrong. A behavior or docs change is incomplete until this
 file matches.
+
+When a change adds a menu command, a persisted settings key, a diagnostic code,
+or an error string a user can see, name it in the user guide or in
+troubleshooting in that same change. There is no coverage test that fails the
+build when a new code is missing from the docs; that check is part of the docs
+update.
 
 The README image is `docs/screenshot.png`; replacing that file preserves the
 link.
@@ -2529,10 +2724,11 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - Domain tests for parsing/graph, expansion/simulation, refactors, cycle fixes,
   and the shipped sample library.
 - Deterministic 69-file SFW `sample_wildcards/` with `0main`.
-- Windows NSIS, macOS DMG (x64/arm64), and Linux AppImage packaging config.
+- Windows NSIS packaging. electron-builder also lists macOS DMG and Linux
+  AppImage targets; those are not built, not tested, and not published.
 - Test workflow on Windows/Linux for pushes and pull requests.
 - Tagged `v*` release workflow: Windows NSIS installer attached to the GitHub
-  Release (`RELEASE_NOTES.md` is the body). macOS and Linux packages stay local.
+  Release (`RELEASE_NOTES.md` is the body).
 - User/developer documentation and README screenshot.
 - PolyForm Noncommercial licensing for code and CC BY-NC-SA for sample content.
 
@@ -2608,15 +2804,14 @@ foundation but not a single report.
 
 ## Release and project readiness
 
-Already available: multiplatform build workflows, artifacts, README, detailed
+Already available: Windows installer workflow, artifacts, README, detailed
 docs, dual licensing, contribution guidance, changelog, and v0.2 release notes.
 
 Still needed for a polished public release:
 
 - replace the placeholder copyright holder with the legal name/organization;
-- configure app icons for Windows/macOS/Linux (icons landed in-tree; packaging
-  polish and signing still open);
-- code-sign Windows and macOS builds; notarize macOS;
+- finish Windows icon packaging and signing (icons landed in-tree);
+- code-sign the Windows build;
 - test first tagged artifacts on clean machines;
 - add issue and PR templates;
 - optionally add dependency/update automation;
@@ -2665,7 +2860,7 @@ No. Generation sends a job to ComfyUI. The Windows installer does not install Co
 
 ### 3. Which installers exist?
 
-Tagged releases build a Windows x64 NSIS `.exe`, macOS `.dmg` files for Intel and Apple silicon, and a Linux x64 `.AppImage`. Release builds are unsigned, so Windows SmartScreen or macOS Gatekeeper may warn on first launch.
+GitHub releases publish a Windows x64 NSIS `.exe` only. The release workflow does not build macOS or Linux packages, and those systems have not been tested. The app might run there from source, but there is no installer to download. The Windows build is unsigned, so SmartScreen may warn on first launch.
 
 With no folder under **Settings → General → App updates**, **Check for update** uses the public [GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases) and only reports whether a newer installer exists. It does not open a window. **What's new** is a separate button for that version's release notes. **Install** downloads the installer, closes the app, and runs it. A folder you set yourself overrides GitHub: the check, the installer, and **What's new** stay in that folder and do not contact GitHub. **What's new** reads `RELEASE_NOTES.md` there, or in the folder above it.
 
@@ -2709,7 +2904,7 @@ Yes. **Library Manager** stores several libraries. Each has its own wildcards ro
 
 ### 13. What if Realistic output is empty?
 
-Realistic falls back to the Prompts folder. Hentai and 3D do not. Set those roots before generating with that style.
+Realistic falls back to the Prompts folder. The Generation tab labels the second style **Anime**. Library Manager calls that same profile **Generation output (Hentai)** (stored id `hentai`). Anime/Hentai and 3D do not fall back. Set those roots before generating with that style.
 
 ### 14. Where do folder-mode images go?
 
@@ -2891,7 +3086,7 @@ Each checkpoint is ticked on by default. Untick it to drop that file from this l
 
 ### 57. Where are checkpoint ratings stored?
 
-A local half-star rating is stored in the checkpoint root’s `!.wcm/models.json`, not in AppData. The Benchmark chart’s rating order is separate: it reads `field_rating` from each sample folder’s `mfe_meta` stream and hides folders that have no rating.
+A local half-star rating is stored in the checkpoint root’s `!.wcm/models.json`, not in AppData. The Benchmark chart uses `field_rating` from each sample folder’s `mfe_meta` stream when that stream exists, and otherwise this catalog rating. A 5-star catalog rating sorts and weighs the same as an ADS rating of 10. Folders with neither rating are hidden from Rating and Weight order.
 
 ### 58. What is on the checkpoint details pane?
 
@@ -2933,7 +3128,7 @@ The dice sets Seed to −1. Any seed of 0 or below, or a non-numeric seed, rolls
 
 ### 67. What is on Generation versus Options?
 
-Under each style tab (**Realistic**, **Anime**, **3D**), **Generation** holds the prompt folder, checkpoint, seed, size, and prompts. **Options** holds CLIP, VAE, and the KSampler fields: Steps, CFG, Sampler, Scheduler, and Denoise. Each style keeps its own values. Steps, CFG, and Denoise apply when **LT · Steps**, **LT · CFG**, and **LT · Denoise** are in the saved workflow. Sampler and Scheduler apply only when you pick a name; blank keeps the name already on **LT · Sampler** or **LT · Scheduler**. Defaults for a new style are 20 steps, CFG 7, and denoise 1. Hover a label for a short explanation. Additional Positive and Negative resize vertically, and that height is remembered.
+Under each style tab (**Realistic**, **Anime**, **3D**), **Generation** holds the prompt folder, checkpoint, seed, size, and prompts. **Anime** is the tab label for the profile Library Manager calls **Hentai**. **Options** holds CLIP, VAE, and the KSampler fields: Steps, CFG, Sampler, Scheduler, and Denoise. Each style keeps its own values. Steps, CFG, and Denoise apply when **LT · Steps**, **LT · CFG**, and **LT · Denoise** are in the saved workflow. Sampler and Scheduler apply only when you pick a name; blank keeps the name already on **LT · Sampler** or **LT · Scheduler**. Defaults for a new style are 20 steps, CFG 7, and denoise 1. Hover a label for a short explanation. Additional Positive and Negative use the same prompt editor as **Use this prompt** (wildcard highlighting and `__` completion). They resize vertically, and that height is remembered.
 
 ### 68. Why did reusing a seed not match the Infinite image?
 
@@ -2981,7 +3176,7 @@ A Generation checkbox that walks every `.safetensors` in the checkpoint folder t
 
 ### 79. How do I read the benchmark chart?
 
-Open it from the graph button next to the Benchmark checkbox. Every saved timing is drawn. The blue average and the min–max bar use the 5 fastest runs only. Filter names without caring about case. **Rating** order uses `field_rating` in each sample folder’s `mfe_meta` and hides folders with no rating. **Weight** mixes that rating with average time: 100 means fastest and highest rated; a fast low-rated result or a slow top-rated one scores lower. The name filter and the sort are remembered. Hover a point for the name. Click a point to load that checkpoint in the dropdown. The window is movable and resizable.
+Open it from the graph button next to the Benchmark checkbox. Every saved timing is drawn. The blue average and the min–max bar use the 5 fastest runs only. Filter names without caring about case. **Rating** order uses `field_rating` in each sample folder’s `mfe_meta` when that stream exists, otherwise the Checkpoint tab rating, and hides checkpoints with neither. A 5-star catalog rating matches an ADS rating of 10. **Weight** mixes that rating with average time: 100 means fastest and highest rated; a fast low-rated result or a slow top-rated one scores lower. The name filter and the sort are remembered. Hover a point for the name. Click a point to load that checkpoint in the dropdown. The window is movable and resizable.
 
 ### 80. Can Generation start ComfyUI for me?
 
@@ -3043,7 +3238,7 @@ For early-access models. They leave Browse and sit on **Notify me** with a count
 
 ### 93. Do downloads keep going if I leave the browser?
 
-Yes. The queue runs in the main process. Switching from Images back to LoRA, or closing the Civitai panel, does not cancel model or **Download all** jobs. If you close the main window while model downloads are still queued, the app can stay running in the background until that queue is idle. Quitting the app stops it.
+Yes. The queue runs in the main process. Switching from Images back to LoRA, or closing the Civitai panel, does not cancel model or **Download all** jobs. Closing the main window while model downloads are queued opens a dialog: **Keep downloading (close UI)**, **Quit and stop downloads**, or **Cancel**. Keep downloading closes the windows, shows a tray icon, and leaves the process running after the queue finishes until you open the app or quit from the tray. **File → Close UI & keep downloading** (`Ctrl+Shift+W`) does that directly. Images or Videos **Download all** with no model queue hides the window and keeps that job running. **Quit** stops transfers.
 
 ### 94. What is a LoRA download category?
 
@@ -3059,7 +3254,7 @@ It skips the dialog and queues with the same defaults as opening the dialog and 
 
 ### 97. Can I detach the Civitai window?
 
-Yes. **Detach** opens a separate window and the app reopens it detached next time. **Attach** docks it back into the main window. Size, position, maximized state, and that preference are remembered. Quitting the app closes the Civitai window too.
+Yes. **Detach** opens a separate window and the app reopens it detached next time. **Attach** docks it back into the main window. Size, position, maximized state, and that preference are remembered. Quitting the app closes the Civitai window too. Closing the main window while downloads are queued is a separate choice: keep downloading in the tray, or quit and stop them.
 
 ### 98. How do browse filters work?
 
@@ -3085,7 +3280,7 @@ Same browse, sort, content filter, and Download all behavior, with a **Videos fo
 
 ### 103. How do I use Hugging Face, and what should I not expect the app to do?
 
-The **Hugging Face** button searches the Hub, with filters remembered per library. A token under **Settings → AI** is for gated repos. Downloads use their own queue (pause, resume, cancel) next to Civitai model downloads. Archived Hub models are per library.
+The **Hugging Face** button searches the Hub, with filters remembered per library. A token under **Settings → AI** is for gated repos. Clicking a repo name opens that Hub page in a side panel in the Hugging Face window. The external-link icon still opens the system browser. Downloads use their own queue (pause, resume, cancel) next to Civitai model downloads. When the repo contains a `.safetensors` file, that file is downloaded instead of a `.bin` such as `optimizer.bin`. The saved name is the repo id with `/` replaced by `-` (`org/name` → `org-name.safetensors`). A finished download leaves Browse and is listed on **Downloaded** (between Browse and Archive). The LoRA category on the download dialog is the last one queued, shared with Civitai downloads. **Show in search** returns it to Browse and does not delete the file. Archived Hub models are per library.
 
 The app will not train a LoRA, install ComfyUI for you, rewrite globs on rename, rename a single YAML key for you, survive undo across a restart, or implement every A1111 or ComfyUI wildcard feature. It does not upload your library anywhere. When you ask an assistant for help, describe the tab and the message you see. Do not paste API keys. You do not need to paste `library.json` for ordinary how-to questions.
 
@@ -3093,9 +3288,20 @@ The app will not train a LoRA, install ComfyUI for you, rewrite globs on rename,
 
 # INFORMATION FOR LLM MODELS
 
-This section is for an assistant reading the bundle. Prefer these rules when a user asks how the app behaves. The FAQ and the user guide are the human-facing copy. If they conflict with this section, this section wins on the mechanical points below. If the running app conflicts with both, the app wins. Do not invent menus, file names, or syntax.
+This section is for an assistant reading the bundle. Prefer these rules when a user asks how the app behaves. The FAQ and the user guide are the human-facing copy. If they conflict with this section, this section wins on the mechanical points below.
+
+The source code is the ultimate source of truth. Repository: `https://github.com/aipower66669/WildcardsManager`. If this document does not establish the answer, do not invent a convenient menu, path, error meaning, or fix. Open that repository and read the code (and its tests) that implement the behavior. If you cannot read the repository, say that this document does not establish the cause and stop.
 
 ## How to answer
+
+When a user reports that something is not working:
+
+1. Name the subsystem and the exact symptom: tab, control, and the message they see.
+2. Check the prerequisite and the expected behavior in this document before suggesting a change.
+3. Separate an application error from Civitai or Hugging Face, the filesystem, and ComfyUI. Those four do not fail for the same reason.
+4. Give the shortest check that does not delete or rewrite anything.
+5. Do not tell the user to delete AppData, a cache, `library.json`, or a `.wcm` / `!.wcm` folder unless you also say what that deletion removes.
+6. If this document does not establish the cause, follow the repository link and inspect the code. Do not fill the gap with a plausible story.
 
 - Name the tab or dialog the user should open, then the control, then what happens.
 - Do not tell the user to hand-edit `library.json`, `models.json`, `settings.json`, or anything under a `.wcm` / `!.wcm` / `!Thumbnails` folder. The app writes those.
@@ -3103,6 +3309,9 @@ This section is for an assistant reading the bundle. Prefer these rules when a u
 - Do not claim the app trains models, ships ComfyUI, or uploads the library.
 - Wildcard syntax here is a subset. Say so when the user expects full A1111 or ComfyUI Dynamic Prompts behavior.
 - "Settings did not carry from dev to the installed app" is usually the shared AppData folder versus the library sidecar. See storage map.
+- "My LoRAs are missing" is three checks, not one. The LoRA files list scans **Library Manager → LoRA folder**. Wildcard `missing_lora` checks `<lora:name>` against that same folder by relative path or file name; comments are ignored; `<lora:>` is `invalid_lora`. ComfyUI then resolves the tag from its own LoRA directory. A file this app lists can still be missing inside ComfyUI.
+- The Generation tab button says **Anime**. The profile id is `hentai`. Library Manager labels the folder **Generation output (Hentai)**. Same profile. Anime/Hentai and 3D have no output fallback. Realistic falls back to the Prompts folder.
+- Closing the main window is not always Quit. Model downloads still queued: dialog **Keep downloading (close UI)** / **Quit and stop downloads** / **Cancel**. Keep downloading uses the tray and does not exit when the queue goes idle. Images or Videos **Download all** with no model queue hides the window and keeps that job. With nothing queued, closing the main window closes Civitai and quits. **Quit** stops transfers.
 
 ## Storage map
 
@@ -3128,7 +3337,7 @@ Both `userData` and `sessionData` are pinned to that folder, so the few UI toggl
 
 ## App updates
 
-Settings → General → App updates. An empty folder (the default) checks `https://github.com/aipower66669/WildcardsManager/releases` through the GitHub API (`/releases/latest`) and downloads the installer for this computer. A saved folder overrides that and uses `latest.yml` or `WildcardsManager-<version>-*.exe|dmg|AppImage` in the folder. Clearing the folder returns to GitHub. An existing folder is left as it is.
+Settings → General → App updates. An empty folder (the default) checks `https://github.com/aipower66669/WildcardsManager/releases` through the GitHub API (`/releases/latest`) and downloads the Windows NSIS installer. GitHub releases publish that `.exe` only. macOS and Linux have no downloadable build and have not been tested; running from source on those systems might work and is untested. A saved folder overrides GitHub and uses `latest.yml` or `WildcardsManager-<version>-*.exe` in the folder. The matcher also accepts a `.dmg` or `.AppImage` if a file with that name is already in the folder; GitHub does not publish those. Clearing the folder returns to GitHub. An existing folder is left as it is.
 
 Check for update only reports whether a newer installer exists. It does not open What's new. What's new is a separate button and opens a window with that version's notes rendered as markdown. An empty update folder uses the GitHub release body, otherwise `RELEASE_NOTES.md` on the tag, otherwise a local `RELEASE_NOTES.md`. A saved update folder does not contact GitHub: notes are `RELEASE_NOTES.md` in that folder or the folder above it. Install confirms, downloads when the source is GitHub, launches the installer, and quits. Leave Run checked. Two-part tags such as `v0.7` compare as `0.7.0`.
 
@@ -3138,7 +3347,7 @@ Tabs, in product language: Wildcard files, LoRA files, Checkpoint files, Prompts
 
 Library Manager fields: wildcards root, LoRA folder, checkpoint folder, LoRA training library, prompts folder, generation output Realistic / Hentai / 3D, checkpoint benchmark folder. Images folder and Videos folder are set in Settings. Civitai site and validation platform are per library.
 
-Realistic output empty → use the Prompts folder. Hentai and 3D have no fallback.
+Generation style tabs are labeled Realistic, Anime, and 3D. The middle profile id is `hentai`. Library Manager calls that output folder Generation output (Hentai). Realistic output empty → use the Prompts folder. Anime/Hentai and 3D have no fallback.
 
 Generation output paths: folder mode `{styleOutput}/{promptFolder}`. Append `/New` only when Settings → AI **Save folder-mode images in a New subfolder** is saved on (default off). The app does not mkdir that folder. Typed prompt → style output root.
 
@@ -3177,9 +3386,9 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 - Benchmark is a separate checkbox. It walks `.safetensors` in the checkpoint folder that are not in this library’s `ignoredCheckpoints`. Once = one image each. Infinite = until each included stem has 10 images or the user cancels.
 - Output: `{benchmarkRoot}/{fileStem}/`. Stats: `{benchmarkRoot}/benchmark-stats.json`.
 - A saved timing is sampler steps from the first reported step through the last. Model load and file save are outside that range. If the run never reports the full range, the image is deleted and the slot is retried.
-- Chart: all saved timings are drawn. Average and min–max use the 5 fastest only. Rating sort reads `field_rating` from `mfe_meta` in the sample folder and hides folders with no rating. Weight sort mixes that rating with average time (100 = fastest and highest rated). Name filter is case-insensitive. Filter and sort persist.
+- Chart: all saved timings are drawn. Average and min–max use the 5 fastest only. Rating sort uses `field_rating` from `mfe_meta` in the sample folder when that stream exists, otherwise the Checkpoint-tab half-star rating in `!.wcm/models.json`. A 5-star catalog rating scores the same as ADS 10 (`rating / 5` vs `rating / 10`). Checkpoints with neither rating are hidden from Rating and Weight order. Weight sort mixes that score with average time (100 = fastest and highest rated). Name filter is case-insensitive. Filter and sort persist. The drawn number is the raw rating (`ratingSource` is `ads` or `catalog`).
 - Deleting a benchmark image drops that timing and opens a slot.
-- Each style tab has Generation and Options. Options: CLIP, VAE, steps (default 20), cfg (default 7), sampler name, scheduler, denoise (default 1). Empty sampler or scheduler is not applied. Steps, cfg, and denoise are applied when those LT nodes are bound.
+- Each style tab has Generation and Options. Options: CLIP, VAE, steps (default 20), cfg (default 7), sampler name, scheduler, denoise (default 1). Empty sampler or scheduler is not applied. Steps, cfg, and denoise are applied when those LT nodes are bound. Additional positive and negative use the same wildcard editor as Use this prompt (highlighting and `__` completion). Their heights persist per the settings keys `generationAdditionalPositiveHeight` and `generationNegativePromptHeight`.
 - Required graph nodes: LT · Prompt, LT · Seed, and a save node (`LT · Save Output` or class name containing `SaveImage`). Optional fills: Negative, Model, CLIP, VAE, Width, Height, Steps, CFG, Sampler, Scheduler, Denoise, Output Folder, Output Filename.
 - Next to Edit Workflow, a ready graph shows nothing. No saved workflow is a warning. Missing required nodes are named there.
 - Sample graph is Krea 2 only as an example: `ComfyUI-Workflow/WildcardManager-ComfyUI-Generation-Workflow.json`. Zips: `comfyui-lora-training.zip` → `custom_nodes/comfyui-lora-training/`, and `comfyui-custom-save-node.zip` → `custom_nodes/comfyui-custom-save-node/` (class `SaveImageToFolder`; needs `piexif` or the pack fails to import). Also: ComfyUI Dynamic Prompts, badjeff/comfyui_lora_tag_loader, CoreyCorza/comfyui-lora-loader, capitan01R/ComfyUI-Krea2T-Enhancer. **Test** checks the server. **Check install** runs after **Save Workflow** and only checks the saved graph for prompt, seed, and a save node. It does not scan ComfyUI for missing node packs.
@@ -3190,7 +3399,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 - Extensions scanned: `.safetensors`, `.ckpt`, `.pt`; checkpoints also `.gguf`. Symlinks and Windows junctions are followed.
 - `<lora:name:weight>` matches relative path or basename, case-insensitive, comments ignored.
 - `ignoredCheckpoints`: per library, in `library.json`. Untick label in the UI: **Use in this library**. Bare filename matches any subfolder. Other libraries sharing the folder keep their own list.
-- Ratings in `!.wcm/models.json` are local half-stars. Chart ratings are `mfe_meta` `field_rating` on benchmark samples. Do not conflate them.
+- Ratings in `!.wcm/models.json` are local half-stars (0.5–5). Chart rating prefers sample-folder `mfe_meta` `field_rating` (ADS, about 1–10). If that stream is missing, the chart uses the catalog half-star. Compare them as fractions of their max: 5 stars = ADS 10.
 - Hash shortcut file is `{stem}.txt` (example `ModelName.txt` beside `ModelName.safetensors`) with `HASH256` / `SHA256` / `AutoV2`. Not `{filename}.txt`.
 - Unused LoRA ignore list: `ignoredUnusedLoras` in `library.json`.
 - Training library only displays `dataset.json` preview images for step-series names. It does not train.
@@ -3201,12 +3410,12 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 - Browse works without an API key. Downloads often 401 without a key created on the same site.
 - Model tabs: Browse, Queued, Downloaded, Maybe, Archive, Notify me. **Archive shown** archives on-screen cards only.
 - Notify me is early access. Countdown refresh is about once a minute.
-- Queue pause on transient network errors is about 60s plus manual Resume. Leaving the browser does not cancel the queue. Closing the main window with model downloads still queued can keep the process alive until the queue is idle.
+- Queue pause on transient network errors is about 60s plus manual Resume. Leaving the browser does not cancel the queue. Closing the main window with model downloads still queued opens Keep downloading / Quit and stop downloads / Cancel. Keep downloading stays in the tray after the queue is idle until the user opens the app or quits from the tray.
 - LoRA category download appends a snippet to a wildcard file and does not copy it to the clipboard. Shift+click uses last category, default weights, preferred non-early-access file, no extra comment/prompt. Checkpoints do not append a wildcard.
 - Image/video files: `<folder>/<base model>/…`, mtime = Civitai upload time. Id registries live in AppData and do not reset when the folder path changes.
 - Download all: skip archived and already downloaded, archive after save, summary, then about 5 minutes, then the next sort. Tip watermarks stop a later run from re-walking covered Newest (and ranked feeds after a full exhaust). **Continue to end** ignores the tip for the current Browse walk.
 - Blocked creators are per library and hide model and media cards.
-- Hugging Face: separate browser, token for gated repos, own download queue, per-library archive list.
+- Hugging Face: separate browser, token for gated repos, own download queue, per-library archive list. Tabs: Browse, Downloaded, Archive, Queue. A finished download is stored as `downloadedHfModels` in that library's `library.json` and leaves Browse. The Hugging Face download dialog's LoRA category is `lastLoraDownloadCategoryId` (same value Civitai queues write). It is saved when the download is queued. Show in search removes it from that list and does not delete the file. Clicking a repo name opens the Hub page in a side panel (`persist:hf-preview`). The external-link icon opens the system browser. Download prefers `.safetensors` over `.bin` (so `optimizer.bin` is not the default). The saved file name is the repo id with `/` replaced by `-`, plus that weight's extension (`org/name` + `pytorch_lora_weights.safetensors` → `org-name.safetensors`).
 
 ## Syntax decisions the model must not soften
 
@@ -3222,6 +3431,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 ## Edits and history
 
 - Editor disk write is Save only.
+- Editor context menu **Comment** inserts `# ` at column 0 of each line in the selection (or the caret line). **Uncomment** removes one leading `#` and the single space after it, after any leading spaces. A trimmed line that starts with `#` is a comment.
 - Rename rewrites exact refs case-insensitively and does not rewrite globs.
 - Delete strips exact inbound refs; globs remain as warnings.
 - Consolidate: single-line non-glob forwarder → point callers at the target, delete the forwarder.

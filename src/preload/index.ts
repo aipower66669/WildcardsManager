@@ -396,6 +396,9 @@ const api: WcmDesktopApi = {
     unarchiveModel: (repoId) =>
       ipcRenderer.invoke(IPC.huggingfaceUnarchiveModel, repoId),
     listArchived: () => ipcRenderer.invoke(IPC.huggingfaceListArchived),
+    listDownloaded: () => ipcRenderer.invoke(IPC.huggingfaceListDownloaded),
+    forgetDownloaded: (repoId) =>
+      ipcRenderer.invoke(IPC.huggingfaceForgetDownloaded, repoId),
     downloadModel: (opts) =>
       ipcRenderer.invoke(IPC.huggingfaceDownloadModel, opts),
     checkDownloadDestination: (opts) =>

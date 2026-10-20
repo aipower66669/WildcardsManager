@@ -92,6 +92,7 @@ export type LibraryLocalPayload = {
   archivedCivitaiImages?: Array<{ origin: CivitaiOrigin; imageId: number }>;
   archivedCivitaiVideos?: Array<{ origin: CivitaiOrigin; imageId: number }>;
   archivedHfModels?: ArchivedHfModel[];
+  downloadedHfModels?: ArchivedHfModel[];
   maybeCivitaiModels?: MaybeCivitaiModel[];
   markedInstalledCivitaiModels?: ArchivedCivitaiModel[];
   markedInstalledCivitaiVersions?: MarkedInstalledCivitaiVersion[];
@@ -125,6 +126,7 @@ export type LibraryLocalSource = {
   archivedCivitaiImages?: Array<{ origin: CivitaiOrigin; imageId: number }>;
   archivedCivitaiVideos?: Array<{ origin: CivitaiOrigin; imageId: number }>;
   archivedHfModels?: ArchivedHfModel[];
+  downloadedHfModels?: ArchivedHfModel[];
   maybeCivitaiModels?: MaybeCivitaiModel[];
   markedInstalledCivitaiModels?: ArchivedCivitaiModel[];
   markedInstalledCivitaiVersions?: MarkedInstalledCivitaiVersion[];
@@ -158,6 +160,7 @@ export function libraryConfigToPayload(
     archivedCivitaiImages: lib.archivedCivitaiImages ?? [],
     archivedCivitaiVideos: lib.archivedCivitaiVideos ?? [],
     archivedHfModels: lib.archivedHfModels ?? [],
+    downloadedHfModels: lib.downloadedHfModels ?? [],
     maybeCivitaiModels: lib.maybeCivitaiModels ?? [],
     markedInstalledCivitaiModels: lib.markedInstalledCivitaiModels ?? [],
     markedInstalledCivitaiVersions: lib.markedInstalledCivitaiVersions ?? [],
@@ -200,6 +203,8 @@ export function applyPayloadToLibrary<T extends LibraryLocalSource>(
     archivedCivitaiVideos:
       payload.archivedCivitaiVideos ?? lib.archivedCivitaiVideos,
     archivedHfModels: payload.archivedHfModels ?? lib.archivedHfModels,
+    downloadedHfModels:
+      payload.downloadedHfModels ?? lib.downloadedHfModels,
     maybeCivitaiModels: payload.maybeCivitaiModels ?? lib.maybeCivitaiModels,
     markedInstalledCivitaiModels:
       payload.markedInstalledCivitaiModels ?? lib.markedInstalledCivitaiModels,
@@ -242,6 +247,7 @@ const PROTECTED_LIST_KEYS = [
   'archivedCivitaiImages',
   'archivedCivitaiVideos',
   'archivedHfModels',
+  'downloadedHfModels',
   'maybeCivitaiModels',
   'markedInstalledCivitaiModels',
   'markedInstalledCivitaiVersions',

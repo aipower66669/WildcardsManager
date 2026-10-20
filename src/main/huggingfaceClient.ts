@@ -12,6 +12,7 @@ import {
   type HfBrowseFilters,
   type HfFamilyQueryBranch,
 } from '../domain/huggingfaceSearch.js';
+import { compareHfWeightFiles } from '../domain/huggingfaceWeightPick.js';
 import { getHuggingFaceToken } from './settingsStore.js';
 
 export type HuggingFaceModelHit = {
@@ -274,7 +275,7 @@ export async function getHuggingFaceModelDetail(
       oid: asString(s.blob_id) ?? asString(s.oid) ?? undefined,
     });
   }
-  siblings.sort((a, b) => a.path.localeCompare(b.path));
+  siblings.sort(compareHfWeightFiles);
 
   return {
     id: asString(row.id) ?? id,

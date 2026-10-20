@@ -7,14 +7,11 @@ editing a file, and producing a packaged desktop app.
 
 ### Downloaded release
 
-Tagged releases are built for:
+Tagged releases publish a Windows x64 NSIS installer (`.exe`). There is no
+macOS or Linux download. Those systems have not been tested. Running from
+source might work there, but that is untested.
 
-- Windows x64 (`.exe`, NSIS installer)
-- macOS Intel and Apple silicon (`.dmg`)
-- Linux x64 (`.AppImage`)
-
-Release builds are currently unsigned. Windows SmartScreen or macOS Gatekeeper
-may warn before first launch.
+The Windows build is unsigned. SmartScreen may warn before first launch.
 
 ### Run from source
 
@@ -85,7 +82,9 @@ configured **images folder** (Settings) and an AppData download registry.
 - Top bar **Civitai** → **Images** or **Videos** for community gallery
   browse/download. Set the matching folder in Settings first.
 - **Hugging Face** button for Hub search/downloads (token under Settings → AI
-  when a repo is gated).
+  when a repo is gated). Click a repo name to open its page in the side panel.
+  Download saves a `.safetensors` file when the repo has one, named from the
+  repo id (`org/name` → `org-name.safetensors`).
 - **Settings → General → App updates** checks GitHub Releases when the folder
   is empty. **Check for update** only reports a newer installer. **What's new**
   is a separate button for that version's notes. **Install** downloads it.
@@ -255,17 +254,16 @@ npm test
 npm run build
 ```
 
-Package for the current or a named platform:
+Package the Windows installer:
 
 ```powershell
 npm run dist
 npm run dist:win
-npm run dist:mac
-npm run dist:linux
 ```
 
-Cross-platform packages should be produced on their native operating systems.
-Artifacts are written to `release/`.
+Artifacts are written to `release/`. GitHub releases attach that Windows
+installer only. `npm run dist:mac` and `npm run dist:linux` exist in
+`package.json` and have not been tested. They are not published.
 
 ## Next reading
 

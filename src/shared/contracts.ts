@@ -200,6 +200,8 @@ export const IPC = {
   huggingfaceArchiveModel: 'wcm:huggingface:archiveModel',
   huggingfaceUnarchiveModel: 'wcm:huggingface:unarchiveModel',
   huggingfaceListArchived: 'wcm:huggingface:listArchived',
+  huggingfaceListDownloaded: 'wcm:huggingface:listDownloaded',
+  huggingfaceForgetDownloaded: 'wcm:huggingface:forgetDownloaded',
   huggingfaceDownloadModel: 'wcm:huggingface:downloadModel',
   huggingfaceCheckDownloadDestination:
     'wcm:huggingface:checkDownloadDestination',
@@ -1317,10 +1319,13 @@ export type CheckpointBenchmarkResultRowDto = {
   /** Every recorded run duration (ms). The chart draws all of them. */
   runDurationsMs: number[];
   /**
-   * `field_rating` from the sample folder’s `mfe_meta` ADS, when that stream
-   * exists. Null when the folder has no rating.
+   * Sample-folder `mfe_meta` `field_rating` when that stream exists (about
+   * 1–10). Otherwise the Checkpoint-tab half-star rating (0.5–5) when one is
+   * set. Null when neither exists.
    */
   rating: number | null;
+  /** Which store `rating` came from. Null when unrated. */
+  ratingSource: 'ads' | 'catalog' | null;
 };
 
 export type CheckpointBenchmarkResultsDto = {
@@ -2072,6 +2077,10 @@ export type HuggingFaceSearchResultDto = {
 };
 
 export type ArchivedHfModelDto = {
+  repoId: string;
+};
+
+export type DownloadedHfModelDto = {
   repoId: string;
 };
 
@@ -3406,6 +3415,8 @@ export type WcmDesktopApi = {
     archiveModel(repoId: string): Promise<ArchivedHfModelDto[]>;
     unarchiveModel(repoId: string): Promise<ArchivedHfModelDto[]>;
     listArchived(): Promise<ArchivedHfModelDto[]>;
+    listDownloaded(): Promise<DownloadedHfModelDto[]>;
+    forgetDownloaded(repoId: string): Promise<DownloadedHfModelDto[]>;
     downloadModel(
       opts: HfModelDownloadOptionsDto,
     ): Promise<HfDownloadQueueSnapshotDto>;

@@ -737,6 +737,25 @@ button.status-bar-queue-btn:hover {
   overflow: auto;
 }
 
+.generation-side-prompt {
+  resize: vertical;
+  overflow: hidden;
+  width: 100%;
+  min-height: 72px;
+  max-height: 70vh;
+  height: 96px;
+}
+
+.generation-side-prompt.is-negative {
+  height: 120px;
+}
+
+.generation-side-prompt-editor.wildcard-editor {
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+}
+
 .generation-seed-row .generation-action-btn {
   justify-content: center;
   width: 26px;
@@ -5218,21 +5237,32 @@ label.field select {
   background: #0d1117;
 }
 
+.hf-preview-split {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.hf-preview-split .hf-results {
+  min-height: 0;
+}
+
 .hf-result-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  align-items: stretch;
 }
 
 .hf-result-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  height: 100%;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid #2a313d;
   border-radius: 8px;
@@ -5243,7 +5273,13 @@ label.field select {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  flex-shrink: 0;
+  width: 100%;
+  margin-top: auto;
+}
+
+.hf-result-actions button {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .hf-window-app,
@@ -5270,7 +5306,7 @@ label.field select {
 }
 
 .hf-window-shell .hf-results {
-  min-height: 280px;
+  min-height: 0;
 }
 
 .hf-head-tabs {
@@ -5371,14 +5407,49 @@ label.field select {
   min-width: 0;
 }
 
-.hf-result-id {
-  display: inline-flex;
-  align-items: center;
+.hf-result-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hf-result-row .hf-result-id {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-start;
   gap: 6px;
+  min-width: 0;
+  width: auto;
   font-weight: 600;
   font-size: 13px;
   text-align: left;
-  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.hf-result-external {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #8f98a8;
+  cursor: pointer;
+}
+
+.hf-result-external:hover {
+  color: #e7ecf3;
+  background: rgb(255 255 255 / 7%);
+}
+
+.hf-result-row.is-previewing {
+  border-color: #4c6fff;
 }
 
 .hf-result-meta {

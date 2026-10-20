@@ -218,6 +218,20 @@ Editing or renaming an individual nested key remains a manual source edit.
 - Recursion is stopped and reported instead of looping indefinitely.
 - Missing targets remain as literal `__name__` text in expansion output.
 
+## Examples that pass and fail
+
+| Situation | Accepted | Rejected or different | Why |
+| --- | --- | --- | --- |
+| One path segment | `__artists/*__` matches `artists/ink` | the same pattern does not match `artists/history/modern` | `*` stays inside one segment |
+| Any depth | `__artists/**__` matches `artists/history/modern` | a single `*` is not a substitute | `**` crosses directories |
+| Comment | a line `# hat, red` is ignored | `hat # note` stays active | the trimmed line must start with `#` |
+| Multi-select | `{2$$red\|green\|blue}` | `{2$red\|green}` inside braces | a broken `$` run inside `{…}` is `bad_multiselect` |
+| Dollar in a trigger | `trigger$word` stays literal text | it is not read as multi-select | `$` outside braces is literal |
+| Simple forwarder | one active line `__new-name__`, with comments allowed above it | `prefix __new-name__`, two refs, or a glob | Consolidate and Absorb need exactly one non-glob ref |
+| YAML value | a list of strings under a mapping key | a nested mapping that never reaches a scalar or a list of scalars | only those values expand |
+| Missing target | the graph reports `missing_file` | expansion does not drop the token | the sample still contains `__name__` |
+| Validation escape | `# NO VALIDATION` on line 1 | the same words on line 2 | the marker is the physical first line only |
+
 ## Not implemented
 
 - Jinja2 templates;

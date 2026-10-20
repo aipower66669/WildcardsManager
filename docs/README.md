@@ -54,3 +54,6 @@ to correct the docs.
 
 [all-in-one.md](all-in-one.md) bundles these documents into the single help
 file. Rebuild it whenever a source document changes so that copy stays current.
+Its opening index is for that one file. Links such as `user-guide.md` are for
+this folder; inside the bundle, follow the heading with the same title. When
+this text and the source code disagree, the code wins.

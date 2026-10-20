@@ -25,9 +25,9 @@ npm ci
 | `npm run check` | Same gates as GitHub `tests.yml` / build: typecheck then vitest |
 | `npm run test:watch` | Run Vitest interactively |
 | `npm run dist` | Build/package for the current OS |
-| `npm run dist:win` | Windows x64 NSIS |
-| `npm run dist:mac` | macOS x64 + arm64 DMG |
-| `npm run dist:linux` | Linux x64 AppImage |
+| `npm run dist:win` | Windows x64 NSIS (the installer GitHub publishes) |
+| `npm run dist:mac` | macOS DMG target in the electron-builder config; untested, not published |
+| `npm run dist:linux` | Linux AppImage target in the electron-builder config; untested, not published |
 
 Generated directories (`node_modules/`, `out/`, `release/`, `dist/`) are
 gitignored.
@@ -190,8 +190,8 @@ skips the bump (`GITHUB_ACTIONS` / `CI`) so tagged releases keep the version
 that matches the tag. To package the current version without bumping:
 `npm run dist:nobump`.
 
-There is currently no configured custom icon, signing certificate, or macOS
-notarization. In-app updates download from GitHub Releases when Settings →
+There is currently no signing certificate for the Windows installer. In-app
+updates download that Windows build from GitHub Releases when Settings →
 App updates has no folder. A configured `release/` folder still overrides
 that and launches the installer already on disk.
 
@@ -205,7 +205,8 @@ dispatch. A tag push typechecks and tests, then builds the Windows NSIS
 installer (`npm run build:win`, no version bump) and attaches
 `WildcardsManager-*.exe`, the blockmap, and `latest.yml` to that GitHub
 Release, using `RELEASE_NOTES.md` as the body. Manual dispatch only runs the
-check. macOS and Linux installers are still packaged locally.
+check. macOS and Linux are not built or tested. There is no installer to
+download for those systems. Running from source there might work.
 
 Before tagging:
 
@@ -244,6 +245,12 @@ must stay a verbatim copy of that source. Update the LLM section when a
 mechanical rule (paths, seeds, settings keys, updates, generation fields)
 would otherwise be wrong. A behavior or docs change is incomplete until this
 file matches.
+
+When a change adds a menu command, a persisted settings key, a diagnostic code,
+or an error string a user can see, name it in the user guide or in
+troubleshooting in that same change. There is no coverage test that fails the
+build when a new code is missing from the docs; that check is part of the docs
+update.
 
 The README image is `docs/screenshot.png`; replacing that file preserves the
 link.

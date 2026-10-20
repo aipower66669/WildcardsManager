@@ -1,6 +1,6 @@
 {
   "name": "wildcards-manager",
-  "version": "0.8.5",
+  "version": "0.8.9",
   "private": true,
   "description": "Desktop manager to visualize, validate, edit, refactor, and analyze Dynamic Prompts wildcard libraries",
   "author": "Wildcards Manager",

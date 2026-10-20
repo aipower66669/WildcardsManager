@@ -17,6 +17,27 @@ export type BenchmarkWeightInput = {
   rating: number | null;
 };
 
+/** My File Explorer `field_rating` is a 10-point score. */
+export const BENCHMARK_ADS_RATING_MAX = 10;
+/** Checkpoint-tab ratings are half-stars from 0.5 to 5. */
+export const BENCHMARK_CATALOG_RATING_MAX = 5;
+
+export type BenchmarkRatingSource = 'ads' | 'catalog';
+
+/**
+ * Comparable 0–1 score. ADS 10 and a 5-star catalog rating are both 1.
+ * Missing or non-positive ratings are unset.
+ */
+export function benchmarkRatingScore(
+  rating: number | null,
+  source: BenchmarkRatingSource | null,
+): number | null {
+  if (rating == null || !Number.isFinite(rating) || rating <= 0) return null;
+  if (source === 'ads') return rating / BENCHMARK_ADS_RATING_MAX;
+  if (source === 'catalog') return rating / BENCHMARK_CATALOG_RATING_MAX;
+  return null;
+}
+
 export function benchmarkWeightByKey(
   rows: readonly BenchmarkWeightInput[],
 ): Map<string, number> {

@@ -1,5 +1,24 @@
 # Troubleshooting
 
+Start from the symptom, then the check, then the remedy in the section it names.
+Do not delete AppData, a `.wcm` sidecar, or a model folder to “reset” a problem
+unless that section says what the deletion removes.
+
+| Symptom | Section |
+| --- | --- |
+| No library on launch | [The app opens with no library](#the-app-opens-with-no-library) |
+| Expected wildcard file is absent | [My files do not appear](#my-files-do-not-appear) |
+| A wildcard you can see is reported missing | [A valid wildcard is shown as missing](#a-valid-wildcard-is-shown-as-missing) |
+| Glob matches more or less than A1111 | [A glob matches differently in A1111/ComfyUI](#a-glob-matches-differently-in-a1111comfyui) |
+| Civitai download returns 401 | [Civitai download fails or is gated](#civitai-download-fails-or-is-gated) |
+| Downloads pause and retry | [Civitai downloads keep pausing and retrying](#civitai-downloads-keep-pausing-and-retrying) |
+| A finished download is not marked installed | [A finished download is not listed as installed](#a-finished-download-is-not-listed-as-installed) |
+| The wildcard file did not gain a LoRA line | [A LoRA download did not change the wildcard file](#a-lora-download-did-not-change-the-wildcard-file) |
+| **Test** succeeds and Generation still refuses | [ComfyUI answers Test but Generation is rejected](#comfyui-answers-test-but-generation-is-rejected) |
+| ComfyUI saved an image and Last output is empty | [Last output stays empty after a successful ComfyUI image](#last-output-stays-empty-after-a-successful-comfyui-image) |
+| A LoRA file exists and something still says missing | [A LoRA exists but a warning or the loader says it is missing](#a-lora-exists-but-a-warning-or-the-loader-says-it-is-missing) |
+| Opening a library is slow or the window freezes | [The library is slow to open](#the-library-is-slow-to-open) |
+
 ## The app opens with no library
 
 Choose **Open folder** and select the wildcard root itself—not a single file.
@@ -121,6 +140,45 @@ Civitai. Use the **Archive** tab, then **Unarchive**.
 category / defaults — open the dialog once if you need to change category,
 weights, or extra comment/prompt.
 
+## Civitai downloads keep pausing and retrying
+
+A transient network error pauses the model queue for about 60 seconds, then
+retries. **Resume** starts the queue sooner. The download console at the bottom
+of the browser is the log of API waits, retries, and transfers. That pause is
+the retry behavior; it does not mean the job was deleted.
+
+`401 Unauthorized` is not this case. It stops on authentication. Add a key from
+the same site, as in the section above.
+
+## A finished download is not listed as installed
+
+**Installed** means the local file matched by **AutoV2** hash or by filename, or
+you used **Mark as installed**. **Possible match** is a similar name. Open the
+file and confirm it before treating that tag as proof.
+
+Check the destination next:
+
+- LoRA and checkpoint weights go to the folders in **Library Manager**, not to
+  an arbitrary path you had open in Explorer.
+- **Archive** hides a model from Browse. It is still on the **Archive** tab.
+- Hugging Face moves a finished repo from Browse to **Downloaded**. **Show in
+  search** puts it back on Browse and does not delete the file.
+
+If the LoRA or Checkpoint file list is empty and the files are on another
+drive, see [LoRA / checkpoint list is missing models on another
+drive](#lora--checkpoint-list-is-missing-models-on-another-drive).
+
+## A LoRA download did not change the wildcard file
+
+A checkpoint download never appends a wildcard line. A LoRA download appends
+only when the chosen category names a wildcard file. The line is written into
+that file. It is not copied to the clipboard.
+
+If that stem is already in the file, a later download of the same stem does not
+append again. **Shift+click Download** uses the last category, default weights,
+and no extra comment or prompt, so the line can be shorter than the one you
+expected from a filled-in dialog.
+
 ## Civitai Images: download disabled or “already downloaded” wrong
 
 1. Set an **images folder** under Settings (Library / Civitai paths) before
@@ -188,6 +246,64 @@ the end of the Civitai feed.
    Last output and in the style output folder. A red node in ComfyUI is still
    an install problem. An error that names a wildcard or a LoRA is a library
    problem.
+
+## ComfyUI answers Test but Generation is rejected
+
+**Test** only checks that the server answers. **Check install** reads the saved
+workflow for **LT · Prompt**, **LT · Seed**, and a save node. It does not look
+for missing custom-node packs. A red node on the ComfyUI canvas is how a
+missing pack shows up.
+
+Work down this list:
+
+1. **Save Workflow** has never succeeded. Generation has no graph yet, and
+   **Check install** says there is no saved workflow.
+2. The saved graph is missing one of those three roles. The status next to
+   **Edit Workflow** names what is missing. A ready graph shows no status.
+3. The style has no output folder. Realistic can use the Prompts folder.
+   **Anime** (Library Manager: **Generation output (Hentai)**) and **3D**
+   cannot. Set the folder before generating with that style.
+4. The prompt source is a folder whose `!gen.txt` is empty or missing. The
+   error names that folder. Infinite skips that image and continues.
+5. ComfyUI rejects the prompt after the queue starts. Read the ComfyUI error.
+   A missing UNET, CLIP, VAE, or custom node is ComfyUI’s install, not a
+   wildcard-graph failure. Install steps are in the section above.
+
+## Last output stays empty after a successful ComfyUI image
+
+**Last output** is the preview the app loaded from the folder it sent as
+**LT · Output Folder** after the job. If the save node did not receive
+**LT · Output Folder** and **LT · Output Filename**, ComfyUI can still write an
+image somewhere else and this pane stays empty. The sample graph wires those
+into `SaveImageToFolder`.
+
+Deleting that preview file clears **Last output**.
+
+## A LoRA exists but a warning or the loader says it is missing
+
+Decide which of the three checks failed. They do not share a folder.
+
+| Check | What it looks at | What to verify |
+| --- | --- | --- |
+| LoRA files list | **Library Manager → LoRA folder**, including symlinks and junctions. Extensions `.safetensors`, `.ckpt`, `.pt` | The file is inside that root. Rescan after you change the folder |
+| Wildcard validation | `<lora:name>` in a wildcard file, against that same folder, by relative path or file name, case-insensitive. Comments are ignored | The tag’s name matches a file. `<lora:>` with no name is `invalid_lora`, not a missing file. A tag inside a `#` comment is not checked |
+| ComfyUI loader | ComfyUI’s own LoRA directory, after this app has written the tag into the prompt | ComfyUI’s `models/loras` (or the extra paths it scans) contains the file. A file this app lists can still be missing inside ComfyUI |
+
+A `missing_lora` warning is the second row. A ComfyUI error or a red loader
+node that names the file is the third row.
+
+## The library is slow to open
+
+The drawing is capped (depth, children per parent, and total visible nodes).
+That cap does not limit validation. The analyzed graph stops at 5,000 nodes and
+reports a `read_error` if it has to truncate.
+
+If an older build hangs while restoring one huge root file, use
+**Settings → Clear last file**, or remove `lastRootFile` from
+`userData/settings.json` as described under
+[The app freezes on launch or when opening a root
+file](#the-app-freezes-on-launch-or-when-opening-a-root-file). Leave
+`library.json` and the wildcard files in place.
 
 ## In-app update finds nothing / Install does nothing
 
@@ -359,15 +475,14 @@ generated and gitignored.
 
 ## Packaging succeeds but the OS warns
 
-Current packages are unsigned. SmartScreen/Gatekeeper warnings are expected for
-unsigned artifacts. Signing and notarization are roadmap items. In-app **App
-updates** downloads the newer installer from GitHub Releases when the update
-folder is empty. A folder you set still launches the installer already in that
-folder.
+The Windows package is unsigned. SmartScreen warnings are expected. Signing is
+a roadmap item. In-app **App updates** downloads the newer Windows installer
+from GitHub Releases when the update folder is empty. A folder you set still
+launches the installer already in that folder.
 
 A version tag builds the Windows installer in GitHub Actions and attaches the
-`.exe` to that release. macOS and Linux packages are still built locally
-(`npm run dist:mac` / `dist:linux`).
+`.exe` to that release. macOS and Linux have no published build and have not
+been tested. Running from source on those systems might work.
 
 ## Reporting a bug
 

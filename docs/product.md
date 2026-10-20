@@ -99,7 +99,8 @@ Shipped today:
 - seeded random and bounded exhaustive text/YAML/JSON expansion;
 - seeded Monte Carlo reach/balance analysis;
 - persisted recent roots, last file, panel width, and simulation defaults;
-- packaged targets and CI for Windows, macOS, and Linux;
+- Windows x64 NSIS installer, built and attached by the tagged release workflow
+  (macOS and Linux are not published or tested);
 - Civitai browser for LoRAs/checkpoints (`civitai.com` SFW / `civitai.red` NSFW;
   API key required for many gated downloads; queued downloads, categories,
   Shift+click, extra comment/prompt, download console);

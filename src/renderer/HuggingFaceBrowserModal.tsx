@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import {
   Archive,
   ArchiveRestore,
@@ -6,6 +13,7 @@ import {
   ExternalLink,
   ListOrdered,
   Loader2,
+  PanelRightClose,
   Pause,
   Play,
   RotateCcw,
@@ -29,9 +37,13 @@ import {
   HF_MODEL_TYPES,
   HF_PIPELINE_TAGS,
   HF_SORTS,
+  huggingfaceModelPageUrl,
 } from '../domain/huggingfaceSearch';
 import { DEFAULT_LORA_DOWNLOAD_WEIGHTS } from '../domain/loraDownloadCategory';
-import { proposeDownloadSaveFileName } from '../domain/civitaiDownloadFileName';
+import {
+  hfRepoSaveFileName,
+  pickPreferredHfWeight,
+} from '../domain/huggingfaceWeightPick';
 import { modalOverlayDismiss } from './modalOverlayDismiss';
 
 function formatCount(n: number): string {
@@ -86,7 +98,7 @@ function highlightTags(tags: string[]): string[] {
   return [...new Set(out)].slice(0, 8);
 }
 
-type Tab = 'browse' | 'archive' | 'queue';
+type Tab = 'browse' | 'downloaded' | 'archive' | 'queue';
 
 type DownloadConfirm = {
   hit: HuggingFaceModelHitDto;
@@ -121,6 +133,7 @@ export function HuggingFaceBrowserModal({
   const [searched, setSearched] = useState(false);
   const [tab, setTab] = useState<Tab>('browse');
   const [archived, setArchived] = useState<ArchivedHfModelDto[]>([]);
+  const [downloaded, setDownloaded] = useState<ArchivedHfModelDto[]>([]);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [progress, setProgress] = useState<HfDownloadProgressDto | null>(null);
@@ -135,6 +148,15 @@ export function HuggingFaceBrowserModal({
   );
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipPersist = useRef(true);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [selectedPreview, setSelectedPreview] = useState<{
+    repoId: string;
+    pageUrl: string;
+  } | null>(null);
+  const [splitRatio, setSplitRatio] = useState(0.46);
+  const [resizingSplit, setResizingSplit] = useState(false);
+  const splitRowRef = useRef<HTMLDivElement | null>(null);
+  const liveSplitRatioRef = useRef(0.46);
 
   const flashError = useCallback(
     (message: string) => {
@@ -144,18 +166,76 @@ export function HuggingFaceBrowserModal({
     [onError],
   );
 
+  const openHubPreview = useCallback((repoId: string) => {
+    const id = repoId.trim();
+    if (!id) return;
+    setSelectedPreview({ repoId: id, pageUrl: huggingfaceModelPageUrl(id) });
+    setPreviewOpen(true);
+  }, []);
+
+  const openHubExternal = useCallback(
+    (repoId: string) => {
+      void window.wcm.huggingface.openModelPage(repoId).catch((err) => {
+        flashError(err instanceof Error ? err.message : String(err));
+      });
+    },
+    [flashError],
+  );
+
+  const clampSplitRatio = (ratio: number) =>
+    Math.min(0.7, Math.max(0.22, ratio));
+
+  const beginSplitResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setResizingSplit(true);
+  };
+
+  const moveSplitResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!resizingSplit || !splitRowRef.current) return;
+    const rect = splitRowRef.current.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const next = clampSplitRatio((event.clientX - rect.left) / rect.width);
+    liveSplitRatioRef.current = next;
+    setSplitRatio(next);
+  };
+
+  const finishSplitResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!resizingSplit) return;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // ignore
+    }
+    setResizingSplit(false);
+  };
+
   const archivedSet = useMemo(
     () => new Set(archived.map((a) => a.repoId.toLowerCase())),
     [archived],
   );
+  const downloadedSet = useMemo(
+    () => new Set(downloaded.map((a) => a.repoId.toLowerCase())),
+    [downloaded],
+  );
 
   const visibleItems = useMemo(() => {
     if (tab === 'archive') {
-      // Show archived ids as lightweight rows when we don't have full hit data.
       return items.filter((i) => archivedSet.has(i.id.toLowerCase()));
     }
-    return items.filter((i) => !archivedSet.has(i.id.toLowerCase()));
-  }, [items, archivedSet, tab]);
+    if (tab === 'downloaded') {
+      return items.filter(
+        (i) =>
+          downloadedSet.has(i.id.toLowerCase()) &&
+          !archivedSet.has(i.id.toLowerCase()),
+      );
+    }
+    return items.filter(
+      (i) =>
+        !archivedSet.has(i.id.toLowerCase()) &&
+        !downloadedSet.has(i.id.toLowerCase()),
+    );
+  }, [items, archivedSet, downloadedSet, tab]);
 
   const archivedOnlyRows = useMemo(() => {
     if (tab !== 'archive') return [];
@@ -163,21 +243,33 @@ export function HuggingFaceBrowserModal({
     return archived.filter((a) => !present.has(a.repoId.toLowerCase()));
   }, [tab, archived, visibleItems]);
 
+  const downloadedOnlyRows = useMemo(() => {
+    if (tab !== 'downloaded') return [];
+    const present = new Set(visibleItems.map((i) => i.id.toLowerCase()));
+    return downloaded.filter(
+      (a) =>
+        !archivedSet.has(a.repoId.toLowerCase()) &&
+        !present.has(a.repoId.toLowerCase()),
+    );
+  }, [tab, downloaded, archivedSet, visibleItems]);
+
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
       window.wcm.ui.getHfBrowseFilters(),
       window.wcm.huggingface.listArchived(),
+      window.wcm.huggingface.listDownloaded(),
       window.wcm.huggingface.listDownloadQueue(),
       window.wcm.civitai.listLoraDownloadCategories().catch(() => null),
       window.wcm.civitai
         .listDownloadCategories('Checkpoint')
         .catch(() => ({ categories: [] as string[] })),
     ])
-      .then(([saved, arch, queue, cats, ckCats]) => {
+      .then(([saved, arch, downloadedRows, queue, cats, ckCats]) => {
         if (cancelled) return;
         setFilters(saved);
         setArchived(arch);
+        setDownloaded(downloadedRows);
         setQueueSnap(queue);
         setLoraCategories(cats);
         setCheckpointCategories(ckCats?.categories ?? []);
@@ -214,6 +306,11 @@ export function HuggingFaceBrowserModal({
     const offProgress = window.wcm.huggingface.onDownloadProgress((p) => {
       setProgress(p.done && !p.error ? null : p);
       if (p.done && p.saved) {
+        setDownloaded((prev) => {
+          const key = p.repoId.toLowerCase();
+          if (prev.some((row) => row.repoId.toLowerCase() === key)) return prev;
+          return [...prev, { repoId: p.repoId }];
+        });
         setStatusNotice(`Saved ${p.fileName}`);
         window.setTimeout(() => setStatusNotice(null), 2500);
       }
@@ -319,6 +416,15 @@ export function HuggingFaceBrowserModal({
     }
   };
 
+  const showInSearch = async (repoId: string) => {
+    try {
+      const next = await window.wcm.huggingface.forgetDownloaded(repoId);
+      setDownloaded(next);
+    } catch (err) {
+      flashError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   const openDownloadConfirm = async (hit: HuggingFaceModelHitDto) => {
     setConfirmBusy(true);
     setStatusError(null);
@@ -327,18 +433,23 @@ export function HuggingFaceBrowserModal({
       if (detail.siblings.length === 0) {
         throw new Error('No weight files (.safetensors / .ckpt / …) found in this repo');
       }
-      const filePath = detail.siblings[0]!.path;
+      const filePath =
+        pickPreferredHfWeight(detail.siblings)?.path ??
+        detail.siblings[0]!.path;
       const type: HfDownloadTypeDto =
         detail.suggestedType ??
         (filters.modelType === 'checkpoint' ? 'Checkpoint' : 'LORA');
-      const fileName = proposeDownloadSaveFileName(
-        filePath.split('/').pop() || filePath,
-        'model.safetensors',
-      );
+      const fileName = hfRepoSaveFileName(hit.id, filePath);
+      const cats =
+        (await window.wcm.civitai
+          .listLoraDownloadCategories()
+          .catch(() => null)) ?? loraCategories;
+      if (cats) setLoraCategories(cats);
       const loraCategoryId =
-        loraCategories?.lastCategoryId ??
-        loraCategories?.categories[0]?.id ??
-        '';
+        cats?.lastCategoryId &&
+        cats.categories.some((c) => c.id === cats.lastCategoryId)
+          ? cats.lastCategoryId
+          : cats?.categories[0]?.id ?? '';
       const category = checkpointCategories[0] ?? '';
       const next: DownloadConfirm = {
         hit,
@@ -411,6 +522,12 @@ export function HuggingFaceBrowserModal({
         weights: confirm.type === 'LORA' ? confirm.weights : undefined,
       });
       setQueueSnap(snap);
+      if (confirm.type === 'LORA' && confirm.loraCategoryId) {
+        const remembered = confirm.loraCategoryId;
+        setLoraCategories((prev) =>
+          prev ? { ...prev, lastCategoryId: remembered } : prev,
+        );
+      }
       setConfirm(null);
       setStatusNotice(`Queued ${confirm.hit.id}`);
       window.setTimeout(() => setStatusNotice(null), 2000);
@@ -431,6 +548,9 @@ export function HuggingFaceBrowserModal({
 
   const queueCount =
     (queueSnap?.queuedCount ?? 0) + (queueSnap?.active ? 1 : 0);
+  const downloadedCount = downloaded.filter(
+    (row) => !archivedSet.has(row.repoId.toLowerCase()),
+  ).length;
 
   const body = (
     <>
@@ -445,6 +565,13 @@ export function HuggingFaceBrowserModal({
             onClick={() => setTab('browse')}
           >
             Browse
+          </button>
+          <button
+            type="button"
+            className={tab === 'downloaded' ? 'active' : ''}
+            onClick={() => setTab('downloaded')}
+          >
+            Downloaded ({downloadedCount})
           </button>
           <button
             type="button"
@@ -759,13 +886,32 @@ export function HuggingFaceBrowserModal({
                   </label>
                 </div>
               </>
+            ) : tab === 'downloaded' ? (
+              <p className="hint">
+                Downloaded Hub repos are hidden from Browse. Show in search
+                puts one back. The file stays on disk.
+              </p>
             ) : (
               <p className="hint">
                 Archived Hub repos are hidden from Browse. Unarchive to restore.
               </p>
             )}
 
-            <div className="hf-results">
+            <div
+              className={`civitai-split hf-preview-split${previewOpen ? '' : ' is-collapsed'}${resizingSplit ? ' resizing' : ''}`}
+              ref={splitRowRef}
+            >
+            <div
+              className="hf-results civitai-split-grid"
+              style={{
+                flex: previewOpen ? `0 0 ${splitRatio * 100}%` : '1 1 auto',
+              }}
+              onClick={(event) => {
+                if (!previewOpen) return;
+                if (event.target !== event.currentTarget) return;
+                setPreviewOpen(false);
+              }}
+            >
               {tab === 'browse' && !searched && !busy ? (
                 <p className="hint">Run a search to list Hub models.</p>
               ) : null}
@@ -783,6 +929,11 @@ export function HuggingFaceBrowserModal({
               archivedOnlyRows.length === 0 ? (
                 <p className="hint">Nothing archived yet.</p>
               ) : null}
+              {tab === 'downloaded' &&
+              visibleItems.length === 0 &&
+              downloadedOnlyRows.length === 0 ? (
+                <p className="hint">Nothing downloaded yet.</p>
+              ) : null}
 
               <ul className="hf-result-list">
                 {visibleItems.map((item) => {
@@ -790,27 +941,34 @@ export function HuggingFaceBrowserModal({
                   const gated = gatedLabel(item.gated);
                   const isArchived = archivedSet.has(item.id.toLowerCase());
                   return (
-                    <li key={item.id} className="hf-result-row">
+                    <li
+                      key={item.id}
+                      className={`hf-result-row${
+                        previewOpen && selectedPreview?.repoId === item.id
+                          ? ' is-previewing'
+                          : ''
+                      }`}
+                    >
                       <div className="hf-result-main">
-                        <button
-                          type="button"
-                          className="link-btn hf-result-id"
-                          title="Open on Hugging Face"
-                          onClick={() => {
-                            void window.wcm.huggingface
-                              .openModelPage(item.id)
-                              .catch((err) =>
-                                flashError(
-                                  err instanceof Error
-                                    ? err.message
-                                    : String(err),
-                                ),
-                              );
-                          }}
-                        >
-                          {item.id}
-                          <ExternalLink size={12} />
-                        </button>
+                        <div className="hf-result-title">
+                          <button
+                            type="button"
+                            className="link-btn hf-result-id"
+                            title="Preview on Hugging Face"
+                            onClick={() => openHubPreview(item.id)}
+                          >
+                            {item.id}
+                          </button>
+                          <button
+                            type="button"
+                            className="hf-result-external"
+                            title="Open in external browser"
+                            aria-label="Open in external browser"
+                            onClick={() => openHubExternal(item.id)}
+                          >
+                            <ExternalLink size={12} />
+                          </button>
+                        </div>
                         <div className="hf-result-meta">
                           <span>{formatCount(item.downloads)}↓</span>
                           <span>{formatCount(item.likes)}♥</span>
@@ -835,7 +993,26 @@ export function HuggingFaceBrowserModal({
                         ) : null}
                       </div>
                       <div className="hf-result-actions">
-                        {!isArchived ? (
+                        {tab === 'downloaded' ? (
+                          <>
+                            <button
+                              type="button"
+                              className="ghost-btn"
+                              title="Show in Browse again. The file stays on disk."
+                              onClick={() => void showInSearch(item.id)}
+                            >
+                              Show in search
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost-btn"
+                              title="Hide from Browse"
+                              onClick={() => void archiveRepo(item.id)}
+                            >
+                              <Archive size={14} /> Archive
+                            </button>
+                          </>
+                        ) : !isArchived ? (
                           <>
                             <button
                               type="button"
@@ -869,9 +1046,34 @@ export function HuggingFaceBrowserModal({
                   );
                 })}
                 {archivedOnlyRows.map((row) => (
-                  <li key={row.repoId} className="hf-result-row">
+                  <li
+                    key={row.repoId}
+                    className={`hf-result-row${
+                      previewOpen && selectedPreview?.repoId === row.repoId
+                        ? ' is-previewing'
+                        : ''
+                    }`}
+                  >
                     <div className="hf-result-main">
-                      <strong className="hf-result-id">{row.repoId}</strong>
+                      <div className="hf-result-title">
+                        <button
+                          type="button"
+                          className="link-btn hf-result-id"
+                          title="Preview on Hugging Face"
+                          onClick={() => openHubPreview(row.repoId)}
+                        >
+                          {row.repoId}
+                        </button>
+                        <button
+                          type="button"
+                          className="hf-result-external"
+                          title="Open in external browser"
+                          aria-label="Open in external browser"
+                          onClick={() => openHubExternal(row.repoId)}
+                        >
+                          <ExternalLink size={12} />
+                        </button>
+                      </div>
                       <div className="hf-result-meta">
                         <span className="hf-badge">Archived</span>
                       </div>
@@ -883,6 +1085,59 @@ export function HuggingFaceBrowserModal({
                         onClick={() => void unarchiveRepo(row.repoId)}
                       >
                         <ArchiveRestore size={14} /> Unarchive
+                      </button>
+                    </div>
+                  </li>
+                ))}
+                {downloadedOnlyRows.map((row) => (
+                  <li
+                    key={`downloaded-${row.repoId}`}
+                    className={`hf-result-row${
+                      previewOpen && selectedPreview?.repoId === row.repoId
+                        ? ' is-previewing'
+                        : ''
+                    }`}
+                  >
+                    <div className="hf-result-main">
+                      <div className="hf-result-title">
+                        <button
+                          type="button"
+                          className="link-btn hf-result-id"
+                          title="Preview on Hugging Face"
+                          onClick={() => openHubPreview(row.repoId)}
+                        >
+                          {row.repoId}
+                        </button>
+                        <button
+                          type="button"
+                          className="hf-result-external"
+                          title="Open in external browser"
+                          aria-label="Open in external browser"
+                          onClick={() => openHubExternal(row.repoId)}
+                        >
+                          <ExternalLink size={12} />
+                        </button>
+                      </div>
+                      <div className="hf-result-meta">
+                        <span className="hf-badge">Downloaded</span>
+                      </div>
+                    </div>
+                    <div className="hf-result-actions">
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        title="Show in Browse again. The file stays on disk."
+                        onClick={() => void showInSearch(row.repoId)}
+                      >
+                        Show in search
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        title="Hide from Browse"
+                        onClick={() => void archiveRepo(row.repoId)}
+                      >
+                        <Archive size={14} /> Archive
                       </button>
                     </div>
                   </li>
@@ -908,6 +1163,75 @@ export function HuggingFaceBrowserModal({
                   </button>
                 </div>
               ) : null}
+            </div>
+            <div
+              className={`panel-splitter civitai-splitter${resizingSplit ? ' active' : ''}`}
+              role="separator"
+              aria-label="Resize Hugging Face preview"
+              aria-orientation="vertical"
+              aria-valuemin={22}
+              aria-valuemax={70}
+              aria-valuenow={Math.round(splitRatio * 100)}
+              aria-hidden={!previewOpen}
+              tabIndex={previewOpen ? 0 : -1}
+              title={`Results ${Math.round(splitRatio * 100)}% · drag to resize · double-click to reset`}
+              onPointerDown={previewOpen ? beginSplitResize : undefined}
+              onPointerMove={previewOpen ? moveSplitResize : undefined}
+              onPointerUp={previewOpen ? finishSplitResize : undefined}
+              onPointerCancel={previewOpen ? finishSplitResize : undefined}
+              onDoubleClick={
+                previewOpen
+                  ? () => {
+                      const next = 0.46;
+                      liveSplitRatioRef.current = next;
+                      setSplitRatio(next);
+                    }
+                  : undefined
+              }
+            >
+              <span />
+            </div>
+            <div className="civitai-split-preview" aria-hidden={!previewOpen}>
+              {selectedPreview ? (
+                <>
+                  <div className="civitai-preview-bar">
+                    <strong title={selectedPreview.repoId}>
+                      {selectedPreview.repoId}
+                    </strong>
+                    <div className="civitai-preview-bar-actions">
+                      <button
+                        type="button"
+                        className="civitai-icon-btn action-open"
+                        title="Open in external browser"
+                        aria-label="Open in external browser"
+                        onClick={() => openHubExternal(selectedPreview.repoId)}
+                      >
+                        <ExternalLink size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="civitai-icon-btn"
+                        title="Collapse browser panel"
+                        aria-label="Collapse browser panel"
+                        onClick={() => setPreviewOpen(false)}
+                      >
+                        <PanelRightClose size={15} />
+                      </button>
+                    </div>
+                  </div>
+                  <webview
+                    className="civitai-preview-webview"
+                    src={selectedPreview.pageUrl}
+                    allowpopups={true}
+                    partition="persist:hf-preview"
+                  />
+                </>
+              ) : (
+                <div className="civitai-preview-empty">
+                  <p>Select a model to preview its Hugging Face page here.</p>
+                </div>
+              )}
+            </div>
             </div>
           </>
         )}
@@ -939,10 +1263,7 @@ export function HuggingFaceBrowserModal({
                   value={confirm.filePath}
                   onChange={(e) => {
                     const filePath = e.target.value;
-                    const fileName = proposeDownloadSaveFileName(
-                      filePath.split('/').pop() || filePath,
-                      'model.safetensors',
-                    );
+                    const fileName = hfRepoSaveFileName(confirm.hit.id, filePath);
                     void refreshDestError({ ...confirm, filePath, fileName });
                   }}
                 >

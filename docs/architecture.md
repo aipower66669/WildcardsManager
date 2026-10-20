@@ -169,7 +169,10 @@ rewritten; plans report currently matching glob users.
 5. applies file operations;
 6. pushes one entry onto the undo stack and clears redo.
 
-History is process memory, capped at 50, and reset on library open. Undo restores
+History is process memory, capped at 50, and reset on library open. Create,
+rename, delete, consolidate, and absorb reopen the library after the mutation,
+which clears this stack, including the entry just pushed. Save,
+missing-reference cleanup, and cycle fix do not reopen the library. Undo restores
 before snapshots; redo restores after snapshots.
 
 Backups are stored under:
@@ -245,8 +248,9 @@ out/renderer/index.html + assets
 ```
 
 Electron Builder packages those bundles plus `sample_wildcards/` as an external
-resource. Configured targets are Windows x64 NSIS, macOS x64/arm64 DMG, and Linux
-x64 AppImage.
+resource. The published target is Windows x64 NSIS. `package.json` also lists
+macOS DMG and Linux AppImage targets. GitHub Actions does not build them, they
+have not been tested, and there is no macOS or Linux download.
 
 ## Testing boundaries
 

@@ -191,6 +191,8 @@ export type LibraryConfig = {
   archivedCivitaiVideos?: ArchivedCivitaiImage[];
   /** Shelved Hugging Face Hub repos (`org/name`) for this library. */
   archivedHfModels?: ArchivedHfModel[];
+  /** Hub repos this library has downloaded. Hidden from Browse. */
+  downloadedHfModels?: ArchivedHfModel[];
   maybeCivitaiModels?: MaybeCivitaiModel[];
   markedInstalledCivitaiModels?: ArchivedCivitaiModel[];
   /** Per-version/file “Mark as Downloaded” from the download dialog. */
@@ -1070,6 +1072,7 @@ function parseLibraryConfig(
     archivedCivitaiImages: parseArchivedCivitaiImages(row.archivedCivitaiImages),
     archivedCivitaiVideos: parseArchivedCivitaiImages(row.archivedCivitaiVideos),
     archivedHfModels: parseArchivedHfModels(row.archivedHfModels),
+    downloadedHfModels: parseArchivedHfModels(row.downloadedHfModels),
     maybeCivitaiModels: parseArchivedCivitaiModels(row.maybeCivitaiModels),
     markedInstalledCivitaiModels: parseArchivedCivitaiModels(
       row.markedInstalledCivitaiModels,
@@ -1163,6 +1166,7 @@ function createEmptyLibrary(name: string): LibraryConfig {
     archivedCivitaiImages: [],
     archivedCivitaiVideos: [],
     archivedHfModels: [],
+    downloadedHfModels: [],
     maybeCivitaiModels: [],
     markedInstalledCivitaiModels: [],
     markedInstalledCivitaiVersions: [],
@@ -2652,6 +2656,32 @@ export function isHfModelArchived(repoIdRaw: string): boolean {
   return listArchivedHfModels().some(
     (m) => m.repoId.toLowerCase() === repoId.toLowerCase(),
   );
+}
+
+export function listDownloadedHfModels(): ArchivedHfModel[] {
+  return getActiveLibrary().downloadedHfModels ?? [];
+}
+
+export function markDownloadedHfModel(repoIdRaw: string): ArchivedHfModel[] {
+  const repoId = normalizeHfRepoId(repoIdRaw);
+  if (!repoId) return listDownloadedHfModels();
+  const current = listDownloadedHfModels();
+  if (current.some((m) => m.repoId.toLowerCase() === repoId.toLowerCase())) {
+    return current;
+  }
+  const next = [...current, { repoId }];
+  patchActiveLibrary({ downloadedHfModels: next }, { flushImmediate: true });
+  return next;
+}
+
+export function forgetDownloadedHfModel(repoIdRaw: string): ArchivedHfModel[] {
+  const repoId = normalizeHfRepoId(repoIdRaw);
+  if (!repoId) return listDownloadedHfModels();
+  const next = listDownloadedHfModels().filter(
+    (m) => m.repoId.toLowerCase() !== repoId.toLowerCase(),
+  );
+  patchActiveLibrary({ downloadedHfModels: next }, { flushImmediate: true });
+  return next;
 }
 
 /** Default idle tip-check interval (minutes). */

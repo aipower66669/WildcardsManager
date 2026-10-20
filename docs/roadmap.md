@@ -109,10 +109,11 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - Domain tests for parsing/graph, expansion/simulation, refactors, cycle fixes,
   and the shipped sample library.
 - Deterministic 69-file SFW `sample_wildcards/` with `0main`.
-- Windows NSIS, macOS DMG (x64/arm64), and Linux AppImage packaging config.
+- Windows NSIS packaging. electron-builder also lists macOS DMG and Linux
+  AppImage targets; those are not built, not tested, and not published.
 - Test workflow on Windows/Linux for pushes and pull requests.
 - Tagged `v*` release workflow: Windows NSIS installer attached to the GitHub
-  Release (`RELEASE_NOTES.md` is the body). macOS and Linux packages stay local.
+  Release (`RELEASE_NOTES.md` is the body).
 - User/developer documentation and README screenshot.
 - PolyForm Noncommercial licensing for code and CC BY-NC-SA for sample content.
 
@@ -188,15 +189,14 @@ foundation but not a single report.
 
 ## Release and project readiness
 
-Already available: multiplatform build workflows, artifacts, README, detailed
+Already available: Windows installer workflow, artifacts, README, detailed
 docs, dual licensing, contribution guidance, changelog, and v0.2 release notes.
 
 Still needed for a polished public release:
 
 - replace the placeholder copyright holder with the legal name/organization;
-- configure app icons for Windows/macOS/Linux (icons landed in-tree; packaging
-  polish and signing still open);
-- code-sign Windows and macOS builds; notarize macOS;
+- finish Windows icon packaging and signing (icons landed in-tree);
+- code-sign the Windows build;
 - test first tagged artifacts on clean machines;
 - add issue and PR templates;
 - optionally add dependency/update automation;

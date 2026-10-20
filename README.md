@@ -59,7 +59,7 @@ turning into a ComfyUI or A1111 plugin.
 | **Use structured data** | Strict YAML/JSON parsing; global nested mapping keys as first-class graph nodes; exact path and duplicate-key validation; scalar/list expansion and simulation |
 | **Preview prompts** | Seeded weighted random expansion and bounded exhaustive expansion with nested variants/wildcards, globs, multi-select, custom separators, recursion protection, combination estimates, and copy-out |
 | **Analyze reach and balance** | Seeded Monte Carlo simulation up to 1,000,000 runs; hit, visit, overall-reach, parent-share, glob fan-out, and sibling-balance overlays |
-| **Test and distribute** | Validated 69-file SFW sample library, diagnostic fixtures, domain test suite, and packaging for Windows NSIS, macOS x64/arm64 DMG, and Linux AppImage |
+| **Test and distribute** | Validated 69-file SFW sample library, diagnostic fixtures, domain test suite, and a Windows NSIS installer on GitHub Releases |
 
 ## Quick start
 
@@ -76,7 +76,7 @@ Then **Open folder** → `sample_wildcards/` → select `0main.txt` (or `portrai
 
 ```powershell
 npm run check       # typecheck + vitest (same as GitHub Tests / Build gates)
-npm run dist        # platform installer (win / mac / linux via CI tags)
+npm run dist        # Windows installer (GitHub tags publish this .exe only)
 ```
 
 If you need any additional help, I invite you to download and feed an AI (ChatGPT/Grok/Qwen/Etc.) this file which should contain all relevant information gathered across the whole repo: https://github.com/aipower66669/WildcardsManager/blob/main/docs/all-in-one.md

@@ -17,7 +17,7 @@ import { getLoraDownloadCategoryById } from './loraDownloadCategoryService.js';
 import { ingestDownloadedModelFile } from './ingestDownloadedModel.js';
 import { seedCachedFileAutoV2, computeFileAutoV2 } from './modelHashCache.js';
 import { appendLoraSnippetInMemory } from './wildcardMemoryEdit.js';
-import { loadSettings } from './settingsStore.js';
+import { loadSettings, markDownloadedHfModel } from './settingsStore.js';
 import {
   appendDownloadLog,
   formatErrorDetail,
@@ -384,6 +384,7 @@ export async function downloadHuggingFaceFile(
   }
 
   appendDownloadLog('info', `Saved ${saveName}`, logCtx);
+  markDownloadedHfModel(opts.repoId);
   push({
     receivedBytes,
     totalBytes: totalBytes ?? receivedBytes,

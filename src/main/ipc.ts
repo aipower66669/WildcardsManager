@@ -57,6 +57,8 @@ import {
   archiveHfModel,
   unarchiveHfModel,
   listArchivedHfModels,
+  listDownloadedHfModels,
+  forgetDownloadedHfModel,
   getCivitaiCatalogAutoSyncIntervalMinutes,
   setCivitaiCatalogAutoSyncIntervalMinutes,
   getDisableHardwareAcceleration,
@@ -2172,6 +2174,20 @@ export function registerIpc(): void {
   });
 
   ipcMain.handle(IPC.huggingfaceListArchived, async () => listArchivedHfModels());
+
+  ipcMain.handle(IPC.huggingfaceListDownloaded, async () =>
+    listDownloadedHfModels(),
+  );
+
+  ipcMain.handle(
+    IPC.huggingfaceForgetDownloaded,
+    async (_e, repoId: unknown) => {
+      if (typeof repoId !== 'string' || !repoId.trim()) {
+        throw new Error('Invalid Hugging Face model id');
+      }
+      return forgetDownloadedHfModel(repoId);
+    },
+  );
 
   ipcMain.handle(IPC.huggingfaceDownloadModel, async (_e, opts: unknown) => {
     if (!opts || typeof opts !== 'object') {

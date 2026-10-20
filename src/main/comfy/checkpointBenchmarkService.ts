@@ -29,7 +29,36 @@ import type {
 import { checkpointEnabledForRelativePath } from '../checkpointEnabled.js';
 import { getConfiguredCheckpointIndex } from '../checkpointService.js';
 import { readMfeFieldRating } from '../mfeMetaAds.js';
+import { getModelRating, UNRATED } from '../modelRatings.js';
 import { getActiveLibrary } from '../settingsStore.js';
+
+function catalogCheckpointRating(relativePath: string): number | null {
+  const root = getActiveLibrary().checkpointFolder?.trim();
+  if (!root) return null;
+  const absolutePath = path.resolve(
+    root,
+    ...relativePath.split('/').filter(Boolean),
+  );
+  const rating = getModelRating(absolutePath);
+  if (rating === UNRATED || rating < 0.5) return null;
+  return rating;
+}
+
+function benchmarkRowRating(
+  sampleFolder: string,
+  relativePath: string,
+): {
+  rating: number | null;
+  ratingSource: 'ads' | 'catalog' | null;
+} {
+  const ads = readMfeFieldRating(sampleFolder);
+  if (ads != null && Number.isFinite(ads)) {
+    return { rating: ads, ratingSource: 'ads' };
+  }
+  const catalog = catalogCheckpointRating(relativePath);
+  if (catalog == null) return { rating: null, ratingSource: null };
+  return { rating: catalog, ratingSource: 'catalog' };
+}
 
 export function resolveBenchmarkOutputRoot(): string {
   const root = getActiveLibrary().benchmarkOutputFolder?.trim();
@@ -247,12 +276,13 @@ export function getCheckpointBenchmarkResults(): CheckpointBenchmarkResultsDto {
     const representative = representativeBenchmarkDurations(
       entry.runs.map((run) => run.durationMs),
     );
+    const relativePath =
+      byStem.get(stem) ||
+      entry.relativePath.replaceAll('\\', '/') ||
+      `${stem}.safetensors`;
     rows.push({
       stem,
-      relativePath:
-        byStem.get(stem) ||
-        entry.relativePath.replaceAll('\\', '/') ||
-        `${stem}.safetensors`,
+      relativePath,
       imageCount:
         typeof diskCount === 'number' ? diskCount : entry.imageCount,
       runCount: entry.runs.length,
@@ -261,7 +291,7 @@ export function getCheckpointBenchmarkResults(): CheckpointBenchmarkResultsDto {
       minDurationMs: representative.minDurationMs,
       maxDurationMs: representative.maxDurationMs,
       runDurationsMs: entry.runs.map((r) => r.durationMs),
-      rating: readMfeFieldRating(stemFolder(root, stem)),
+      ...benchmarkRowRating(stemFolder(root, stem), relativePath),
     });
   }
   return {

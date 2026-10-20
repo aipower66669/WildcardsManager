@@ -172,18 +172,9 @@ function formatBenchmarkAvgMs(ms: number): string {
   return `${min}m ${rem}s`;
 }
 
-/** Prompt folder breadcrumb (`portraits/boys` → `portraits › boys`). */
-function applyPromptBoxHeight(
-  el: HTMLTextAreaElement | null,
-  height: number | null,
-): void {
-  if (!el || height == null || !Number.isFinite(height)) return;
-  el.style.height = `${Math.round(height)}px`;
-}
-
 /** Persist vertical resizes. The first observation is the layout size, not a drag. */
 function watchPromptBoxHeight(
-  el: HTMLTextAreaElement | null,
+  el: HTMLElement | null,
   onHeight: (height: number) => void,
 ): () => void {
   if (!el || typeof ResizeObserver === 'undefined') return () => {};
@@ -315,8 +306,14 @@ export function GenerationWorkspace({
   const [previewCollapsed, setPreviewCollapsed] = useState(
     readLegacyPreviewCollapsed,
   );
-  const additionalPositiveRef = useRef<HTMLTextAreaElement>(null);
-  const negativePromptRef = useRef<HTMLTextAreaElement>(null);
+  const additionalPositiveRef = useRef<HTMLDivElement>(null);
+  const negativePromptRef = useRef<HTMLDivElement>(null);
+  const [additionalPositiveHeight, setAdditionalPositiveHeight] = useState<
+    number | null
+  >(null);
+  const [negativePromptHeight, setNegativePromptHeight] = useState<
+    number | null
+  >(null);
   const [deletingLast, setDeletingLast] = useState(false);
   const [webviewSrc, setWebviewSrc] = useState('');
   const [formHydrated, setFormHydrated] = useState(false);
@@ -1161,14 +1158,18 @@ export function GenerationWorkspace({
         setPreviewCollapsed(legacy);
         void window.wcm.ui.setGenerationPreviewCollapsed(legacy);
       }
-      applyPromptBoxHeight(
-        additionalPositiveRef.current,
-        settings.generationAdditionalPositiveHeight,
-      );
-      applyPromptBoxHeight(
-        negativePromptRef.current,
-        settings.generationNegativePromptHeight,
-      );
+      if (
+        typeof settings.generationAdditionalPositiveHeight === 'number' &&
+        Number.isFinite(settings.generationAdditionalPositiveHeight)
+      ) {
+        setAdditionalPositiveHeight(settings.generationAdditionalPositiveHeight);
+      }
+      if (
+        typeof settings.generationNegativePromptHeight === 'number' &&
+        Number.isFinite(settings.generationNegativePromptHeight)
+      ) {
+        setNegativePromptHeight(settings.generationNegativePromptHeight);
+      }
       clearLegacyPreviewCollapsed();
     });
     return () => {
@@ -1177,18 +1178,22 @@ export function GenerationWorkspace({
   }, []);
 
   useEffect(() => {
+    if (formSection !== 'generation') return;
     return watchPromptBoxHeight(additionalPositiveRef.current, (height) => {
+      setAdditionalPositiveHeight(height);
       void window.wcm.ui.setGenerationPromptBoxHeights({
         additionalPositive: height,
       });
     });
-  }, []);
+  }, [formSection]);
 
   useEffect(() => {
+    if (formSection !== 'generation') return;
     return watchPromptBoxHeight(negativePromptRef.current, (height) => {
+      setNegativePromptHeight(height);
       void window.wcm.ui.setGenerationPromptBoxHeights({ negative: height });
     });
-  }, []);
+  }, [formSection]);
 
   const setPreviewCollapsedPersist = (collapsed: boolean) => {
     setPreviewCollapsed(collapsed);
@@ -1488,20 +1493,35 @@ export function GenerationWorkspace({
           >
             Additional Positive Prompt
           </label>
-          <textarea
+          <div
             ref={additionalPositiveRef}
-            className="text-input generation-prompt-textarea"
-            rows={2}
-            value={additionalPositive}
-            placeholder={
-              profile === 'hentai'
-                ? 'e.g. __style-hentai__'
-                : profile === '3d'
-                  ? 'e.g. __style-3d__'
-                  : 'e.g. realistic photograph, natural colors'
+            className="generation-side-prompt"
+            style={
+              additionalPositiveHeight
+                ? { height: additionalPositiveHeight }
+                : undefined
             }
-            onChange={(e) => setAdditionalPositive(e.target.value)}
-          />
+          >
+            <WildcardEditor
+              className="wildcard-editor generation-side-prompt-editor"
+              value={additionalPositive}
+              fileExt=".txt"
+              wildcardKeys={wildcardKeys}
+              placeholderText={
+                profile === 'hentai'
+                  ? 'e.g. __style-hentai__'
+                  : profile === '3d'
+                    ? 'e.g. __style-3d__'
+                    : 'e.g. realistic photograph, natural colors'
+              }
+              onOpenWildcard={onOpenWildcard}
+              onCreateWildcard={onCreateWildcard}
+              onRenameLora={onRenameLora}
+              onOpenLora={onOpenLora}
+              onOpenLoraInCivitaiCatalog={onOpenLoraInCivitaiCatalog}
+              onChange={setAdditionalPositive}
+            />
+          </div>
 
           <label
             className="field-label"
@@ -1509,13 +1529,26 @@ export function GenerationWorkspace({
           >
             Negative Prompt
           </label>
-          <textarea
+          <div
             ref={negativePromptRef}
-            className="text-input generation-prompt-textarea"
-            rows={3}
-            value={negative}
-            onChange={(e) => setNegative(e.target.value)}
-          />
+            className="generation-side-prompt is-negative"
+            style={
+              negativePromptHeight ? { height: negativePromptHeight } : undefined
+            }
+          >
+            <WildcardEditor
+              className="wildcard-editor generation-side-prompt-editor"
+              value={negative}
+              fileExt=".txt"
+              wildcardKeys={wildcardKeys}
+              onOpenWildcard={onOpenWildcard}
+              onCreateWildcard={onCreateWildcard}
+              onRenameLora={onRenameLora}
+              onOpenLora={onOpenLora}
+              onOpenLoraInCivitaiCatalog={onOpenLoraInCivitaiCatalog}
+              onChange={setNegative}
+            />
+          </div>
           </>
           ) : (
           <>

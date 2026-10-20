@@ -19,7 +19,10 @@ import type {
   CheckpointBenchmarkResultRowDto,
   CheckpointBenchmarkResultsDto,
 } from '../shared/contracts';
-import { benchmarkWeightByKey } from '../domain/benchmarkWeight';
+import {
+  benchmarkRatingScore,
+  benchmarkWeightByKey,
+} from '../domain/benchmarkWeight';
 import {
   BENCHMARK_RESULTS_FILTER_MAX,
   parseBenchmarkResultsView,
@@ -57,23 +60,29 @@ function isWeightSort(sort: BenchmarkResultsSort): boolean {
   return sort === 'weight-desc' || sort === 'weight-asc';
 }
 
-/** Rating and weight both need a field_rating. */
+/** Rating and weight both need an ADS or catalog rating. */
 function hidesUnrated(sort: BenchmarkResultsSort): boolean {
   return isRatingSort(sort) || isWeightSort(sort);
 }
 
-/** Rated folders only. Callers drop rows with no `field_rating` first. */
+function ratingScore(row: CheckpointBenchmarkResultRowDto): number | null {
+  return benchmarkRatingScore(row.rating, row.ratingSource);
+}
+
+/** Rated rows only. Missing scores sort last. ADS 10 ties a 5-star catalog rating. */
 function byRating(
   a: CheckpointBenchmarkResultRowDto,
   b: CheckpointBenchmarkResultRowDto,
   direction: 1 | -1,
 ): number {
-  const aMissing = a.rating == null;
-  const bMissing = b.rating == null;
+  const aScore = ratingScore(a);
+  const bScore = ratingScore(b);
+  const aMissing = aScore == null;
+  const bMissing = bScore == null;
   if (aMissing && bMissing) return byName(a, b);
   if (aMissing) return 1;
   if (bMissing) return -1;
-  return (a.rating! - b.rating!) * direction || byName(a, b);
+  return (aScore - bScore) * direction || byName(a, b);
 }
 
 function sortRows(
@@ -287,7 +296,7 @@ export function CheckpointBenchmarkResultsModal({
         (data?.rows ?? []).map((row) => ({
           key: row.stem,
           avgDurationMs: row.avgDurationMs,
-          rating: row.rating,
+          rating: benchmarkRatingScore(row.rating, row.ratingSource),
         })),
       ),
     [data?.rows],
@@ -493,7 +502,8 @@ export function CheckpointBenchmarkResultsModal({
                 {nameQuery
                   ? `No rated checkpoints match “${nameQuery}”.`
                   : 'No rated checkpoints.'}{' '}
-                Rating is field_rating on each sample folder’s mfe_meta stream.
+                Rating uses the sample folder’s mfe_meta field_rating when that
+                stream exists, otherwise the Checkpoint tab rating.
               </p>
             )
           ) : null}
@@ -729,7 +739,15 @@ export function CheckpointBenchmarkResultsModal({
               {weights.get(hover.row.stem) != null
                 ? ` · weight ${weights.get(hover.row.stem)}`
                 : ''}
-              {hover.row.rating != null ? ` · rating ${hover.row.rating}` : ''}
+              {hover.row.rating != null
+                ? ` · rating ${hover.row.rating}${
+                    hover.row.ratingSource === 'catalog'
+                      ? ' (catalog)'
+                      : hover.row.ratingSource === 'ads'
+                        ? ' (ADS)'
+                        : ''
+                  }`
+                : ''}
             </span>
             <span className="hint mono">{hover.row.relativePath}</span>
           </div>

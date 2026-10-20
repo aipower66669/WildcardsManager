@@ -54,7 +54,7 @@ Folder pointers on a library:
 | **Checkpoint folder** | Installed checkpoints and benchmark source files |
 | **LoRA training library** | Dataset folders with `dataset.json` for multi-step LoRA series previews |
 | **Prompts folder** | `!gen.txt` trees and sample images (shared by every Generation style) |
-| **Generation output (Realistic / Hentai / 3D)** | Where that style writes images. Realistic may fall back to the Prompts folder. Hentai and 3D need their own roots before you generate with that style |
+| **Generation output (Realistic / Hentai / 3D)** | Where that style writes images. The Generation tab labels the middle profile **Anime**; this folder and the stored id `hentai` are that same profile. Realistic may fall back to the Prompts folder. Anime/Hentai and 3D need their own roots before you generate with that style |
 | **Checkpoint Benchmark folder** | WCG samples and `benchmark-stats.json` from Generation → Benchmark |
 | **Images folder** / **Videos folder** | Civitai community downloads (`<folder>/<base model>/…`), set in Settings |
 
@@ -252,12 +252,15 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   folder selected, on includes that folder and sub-folders that have
   `!gen.txt`; off uses only that folder. **Select… [Randomize]** (no folder)
   picks a folder from the seed.
-- Style profiles (**Realistic** / **Anime** / **3D**). Each profile has
+- Style profiles (**Realistic** / **Anime** / **3D**). The middle button says
+  **Anime**. Library Manager names that profile’s output folder **Generation
+  output (Hentai)** and stores the id `hentai`. Each profile has
   **Generation** (prompt folder, checkpoint, seed, size, additional positive,
   negative) and **Options** (CLIP, VAE, Steps, CFG, Sampler, Scheduler,
   Denoise). Values are not shared across the three styles. Hover a label for
-  a short explanation. Additional Positive and Negative resize vertically, and
-  that height is remembered.
+  a short explanation. Additional Positive and Negative use the same prompt
+  editor as **Use this prompt** (wildcard highlighting and `__` completion).
+  They resize vertically, and that height is remembered.
 - Seed **1 or higher** repeats the same image on **Once** and **Infinite**:
   the same dropdown and the same Recursive setting pick the same folder and
   the same line. Seed **0 or below** (the dice) rolls a new seed from the
@@ -288,9 +291,12 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   (selected by default when samples exist; **Website** is the Civitai page).
   Use the graph button next to the Benchmark checkbox for a sortable avg-time
   line graph (movable/resizable window). Filter the names (case-insensitive).
-  Rating order uses `field_rating` from each sample folder’s `mfe_meta` stream,
-  hides folders that have no rating, and draws the number under each point.
-  Weight order mixes that rating with the average time: 100 means the checkpoint
+  Rating order prefers `field_rating` on each sample folder’s `mfe_meta`
+  stream. When that stream has no rating, it uses the half-star rating from
+  the Checkpoint tab. A 5-star catalog rating sorts and weighs the same as an
+  ADS rating of 10. Folders with neither rating are hidden, and the number
+  under each point is the rating that was used. Weight order mixes that
+  rating with the average time: 100 means the checkpoint
   is both the fastest and the highest rated, and a fast weak result or a slow
   top-rated one scores lower. The weight is drawn under each point.
   The name filter and the sort are remembered when the window is closed.
@@ -391,8 +397,8 @@ The repo ships the two node packs and that graph in
      **Test**. **Test** only checks that the server answers (latency and how
      many node classes it reported). It does not look at your graph.
    - **Library Manager:** prompts folder, and a Generation output root for each
-     style you use (Realistic, Hentai, 3D). Realistic defaults to the prompts
-     folder.
+     style you use (Realistic, Anime, 3D). The Anime tab writes to **Generation
+     output (Hentai)**. Realistic defaults to the prompts folder.
    - **Generation → Save Workflow.** That copies the open ComfyUI graph into
      the app. Use **Edit Workflow** later when you change the graph in ComfyUI,
      then save again.
@@ -444,7 +450,20 @@ matching workspace (wildcard editor, LoRA, or Checkpoint).
 
 Use the topbar **Civitai** button to search and download LoRAs and checkpoints,
 or switch to **Images** for the community gallery. A separate **Hugging Face**
-control opens Hub search/downloads.
+control opens Hub search/downloads. Hub results are cards: the repo name,
+stats, and **Download** / **Archive** sit together on the card. Clicking the
+repo name opens that Hub page in a side panel inside the Hugging Face window.
+The external-link icon still opens it in the system browser. Drag the divider
+to resize the panel, and use the collapse button to hide it. **Download**
+prefers a `.safetensors` weight when the repo has one, so a trainer leftover
+such as `optimizer.bin` is not the file that is saved. The saved name is the
+repo id with `/` replaced by `-`: `misapapa71/model-rinka-krea2` and
+`pytorch_lora_weights.safetensors` become
+`misapapa71-model-rinka-krea2.safetensors`. A finished download leaves Browse
+and appears on **Downloaded**, between Browse and Archive. **Show in search**
+puts that repo back in Browse and leaves the file on disk. The LoRA category
+on that download dialog is the last one you queued, the same memory Civitai
+downloads use.
 
 #### SFW vs NSFW sites
 
@@ -474,7 +493,17 @@ Also configure **LoRA folder**, **checkpoint folder**, and (for Images)
 - Prefer a separate window? Click **Detach** in the browser header (it reopens
   detached next time). **Attach** docks it back as a modal. Size, position,
   maximized state, and attach/detach preference are remembered. Closing the
-  main app also closes the Civitai window and quits.
+  Civitai window does not quit the app. Closing the main window with nothing
+  queued does: it closes the Civitai window and quits. If model downloads are
+  still queued, a dialog offers **Keep downloading (close UI)**, **Quit and
+  stop downloads**, or **Cancel**. Keep downloading closes the windows, leaves
+  a tray icon, and keeps the process running until you open the app from the
+  tray or choose **Quit (stop downloads)**. The queue finishing does not quit
+  by itself. **File → Close UI & keep downloading** (`Ctrl+Shift+W`) is the
+  same choice when a queue is active. Images or Videos **Download all**, with
+  no model queue, hides the main window and keeps that job running, without
+  that dialog. **Quit** stops transfers. A large partial file starts over on
+  the next launch.
 - Mode chips: **LoRA**, **Checkpoint**, **Images**, **Videos** (remembered per library).
 - Model tabs: **Browse**, **Queued**, **Downloaded**, **Maybe**, **Archive**,
   **Notify me**. Badges and status tags include **New**, **Installed** (local
@@ -645,6 +674,8 @@ The CodeMirror editor provides:
 
 - line numbers and active-line highlighting;
 - `Ctrl+F` search (`Esc` closes search);
+- right-click **Comment** / **Uncomment** puts or removes `# ` at the start of
+  each selected line (the current line when nothing is selected);
 - wildcard/variant/weight/multiselect highlighting for `.txt`;
 - native YAML and JSON highlighting;
 - issue-line highlighting and line/column jumps.
@@ -692,8 +723,9 @@ Always inspect impact previews. Both operations can affect many files.
 
 ## Undo, redo, and backups
 
-Every app-initiated edit, create, rename, delete, consolidation, absorption,
-missing-reference cleanup, and cycle fix becomes one history entry.
+Save, missing-reference cleanup, and cycle fix each become one history entry.
+Create, rename, delete, consolidate, and absorb do not stay undoable: they
+reopen the library and clear the undo stack, including the change just applied.
 
 - History is in memory, capped at 50 entries, and scoped to the open library
   session.

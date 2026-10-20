@@ -417,7 +417,7 @@ First public release.
 - Monte Carlo reach, visit, parent-share, and sibling-balance analysis,
   including glob fan-out.
 - Deterministic 69-file SFW sample library and diagnostic fixtures.
-- Windows NSIS, macOS DMG, and Linux AppImage packaging workflows.
+- Windows NSIS installer workflow. macOS and Linux are not published or tested.
 - User, syntax, troubleshooting, architecture, and development documentation.
 
 ### Security

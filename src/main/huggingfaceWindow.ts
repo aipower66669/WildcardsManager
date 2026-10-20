@@ -117,6 +117,7 @@ export function openHuggingFaceBrowserWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webviewTag: true,
     },
   });
   hfWindow = win;

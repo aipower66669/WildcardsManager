@@ -16,6 +16,7 @@ import {
   loadSettings,
 } from './settingsStore.js';
 import { appendDownloadLog, formatErrorDetail } from './downloadLog.js';
+import { rememberLoraDownloadCategory } from './loraDownloadCategoryService.js';
 import { atomicWriteFile } from './librarySidecarIo.js';
 
 export type HfQueueJobParams = {
@@ -239,6 +240,9 @@ async function pump(): Promise<void> {
 }
 
 export function enqueueHfDownload(params: HfQueueJobParams): HfDownloadQueueSnapshot {
+  if (params.type === 'LORA' && params.loraCategoryId) {
+    rememberLoraDownloadCategory(params.loraCategoryId);
+  }
   const job: Job = { id: randomUUID(), params: { ...params } };
   pending.push(job);
   persistQueueState();
