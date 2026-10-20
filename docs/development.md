@@ -183,16 +183,17 @@ WildcardsManager-<version>-<os>-<arch>.<ext>
 ```
 
 Local `npm run dist` / `dist:win` / `dist:mac` / `dist:linux` **auto-increment
-the patch** (`0.7.0` → `0.7.1`) before building so in-app **Check for update**
+the patch** (`0.8.0` → `0.8.1`) before building so in-app **Check for update**
 sees a newer installer, then **delete older** `WildcardsManager-*` artifacts in
 `release/` (keeps only the current version’s `.exe` / `.blockmap` / etc.). CI
 skips the bump (`GITHUB_ACTIONS` / `CI`) so tagged releases keep the version
-that matches the tag. To package without bumping locally:
-`SKIP_VERSION_BUMP=1 npm run dist:win`.
+that matches the tag. To package the current version without bumping:
+`npm run dist:nobump`.
 
 There is currently no configured custom icon, signing certificate, or macOS
-notarization. In-app updates launch a local installer from a configured
-`release/` folder (see Settings → App updates).
+notarization. In-app updates download from GitHub Releases when Settings →
+App updates has no folder. A configured `release/` folder still overrides
+that and launches the installer already on disk.
 
 ## CI and releases
 
@@ -219,8 +220,8 @@ Before tagging:
 5. create and push the tag:
 
    ```powershell
-   git tag v0.7.0
-   git push origin v0.7.0
+   git tag v0.8.0
+   git push origin v0.8.0
    ```
 
 `CHANGELOG.md` is the permanent version history and follows Keep a Changelog.

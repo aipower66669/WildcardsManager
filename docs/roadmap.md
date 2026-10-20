@@ -42,7 +42,9 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - **Prompts** workspace — folder CRUD, `!gen.txt` validation, collapsible
   samples (v0.6).
 - **Generation** tab — ComfyUI queue, Edit/Save Workflow, style profiles,
-  categorize into prompts (v0.6).
+  categorize into prompts (v0.6). v0.8 adds per-style Options (CLIP, VAE,
+  KSampler), a fixed seed that repeats on Once and Infinite, and an optional
+  New output subfolder.
 - **Civitai Images and Videos** browse/download/archive + background Download
   all (v0.5); feed frontiers / Browse catch-up (v0.6).
 - **Library Manager** with multiple libraries, per-style generation output
@@ -52,7 +54,9 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
   after you apply a proposal).
 - Checkpoint half-star ratings; blocked Civitai authors.
 - **Hugging Face Hub** browser and download queue (v0.5).
-- **In-app updates** from a local electron-builder `release/` folder (v0.5).
+- **In-app updates** from GitHub Releases by default, with **What's new**
+  release notes before install. A local electron-builder `release/` folder
+  still overrides that (folder support shipped in v0.5; GitHub in v0.8).
 
 ### Validation and diagnostics
 

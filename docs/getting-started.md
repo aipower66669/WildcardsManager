@@ -81,8 +81,9 @@ configured **images folder** (Settings) and an AppData download registry.
   browse/download. Set the matching folder in Settings first.
 - **Hugging Face** button for Hub search/downloads (token under Settings → AI
   when a repo is gated).
-- **Settings → General → App updates** to install a newer build from your local
-  `release/` folder without launching the installer by hand.
+- **Settings → General → App updates** checks GitHub Releases when the folder
+  is empty, shows **What's new** for that version, and downloads the installer.
+  A folder you set overrides GitHub and uses the installers in that folder.
 
 ### Generation
 
@@ -107,6 +108,10 @@ list of extra packs the sample graph needs.
    Library Manager: prompts folder and a Generation output folder per style.
 6. **Generation → Save Workflow** (this stores the graph the app will queue),
    then generate from **Use this prompt** or a prompt folder with `!gen.txt`.
+   Each style tab has **Generation** and **Options**. Options holds CLIP, VAE,
+   and KSampler steps, CFG, sampler, scheduler, and denoise. A fixed seed
+   repeats the same image on Once and Infinite. Folder-mode `/New` is optional
+   under **Settings → AI** and is off until you turn it on.
 
 ### Wildcard files (three columns)
 

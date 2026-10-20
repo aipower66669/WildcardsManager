@@ -17,6 +17,10 @@ inject values by class name:
   * LoraTrainingVAE            -> STRING / wildcard (VAELoader combo)
   * LoraTrainingWidth          -> INT
   * LoraTrainingHeight         -> INT
+  * LoraTrainingSteps          -> INT (KSampler steps)
+  * LoraTrainingCfg            -> FLOAT (KSampler cfg)
+  * LoraTrainingSampler        -> STRING / wildcard (KSampler sampler_name)
+  * LoraTrainingScheduler      -> STRING / wildcard (KSampler scheduler)
   * LoraTrainingSaveOutput     -> SaveImage-style sink for /history fetch
 """
 
@@ -626,6 +630,108 @@ class LoraTrainingHeight:
         return value
 
 
+class LoraTrainingSteps:
+    """Step count the app fills. Convert KSampler ``steps`` to an input and wire this in."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": (
+                    "INT",
+                    {"default": 20, "min": 1, "max": 10000, "step": 1},
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("INT",)
+    RETURN_NAMES = ("steps",)
+    FUNCTION = "emit"
+    CATEGORY = CATEGORY
+
+    def emit(self, value):
+        return (int(value),)
+
+    @classmethod
+    def IS_CHANGED(cls, value):
+        return value
+
+
+class LoraTrainingCfg:
+    """CFG the app fills. Convert KSampler ``cfg`` to an input and wire this in."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": (
+                    "FLOAT",
+                    {"default": 7.0, "min": 0.0, "max": 100.0, "step": 0.1},
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("FLOAT",)
+    RETURN_NAMES = ("cfg",)
+    FUNCTION = "emit"
+    CATEGORY = CATEGORY
+
+    def emit(self, value):
+        return (float(value),)
+
+    @classmethod
+    def IS_CHANGED(cls, value):
+        return value
+
+
+class LoraTrainingSampler:
+    """Sampler name the app fills. Convert KSampler ``sampler_name`` to an input."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "sampler_name": ("STRING", {"default": "", "multiline": False}),
+            }
+        }
+
+    RETURN_TYPES = (ANY,)
+    RETURN_NAMES = ("sampler_name",)
+    FUNCTION = "emit"
+    CATEGORY = CATEGORY
+
+    def emit(self, sampler_name=""):
+        return (sampler_name or "",)
+
+    @classmethod
+    def IS_CHANGED(cls, sampler_name=""):
+        return sampler_name or ""
+
+
+class LoraTrainingScheduler:
+    """Scheduler name the app fills. Convert KSampler ``scheduler`` to an input."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "scheduler": ("STRING", {"default": "", "multiline": False}),
+            }
+        }
+
+    RETURN_TYPES = (ANY,)
+    RETURN_NAMES = ("scheduler",)
+    FUNCTION = "emit"
+    CATEGORY = CATEGORY
+
+    def emit(self, scheduler=""):
+        return (scheduler or "",)
+
+    @classmethod
+    def IS_CHANGED(cls, scheduler=""):
+        return scheduler or ""
+
+
 class LoraTrainingSaveOutput:
     """Finished-image sink. Behaves like SaveImage so /history can fetch it.
 
@@ -706,6 +812,10 @@ NODE_CLASS_MAPPINGS = {
     "LoraTrainingVAE": LoraTrainingVAE,
     "LoraTrainingWidth": LoraTrainingWidth,
     "LoraTrainingHeight": LoraTrainingHeight,
+    "LoraTrainingSteps": LoraTrainingSteps,
+    "LoraTrainingCfg": LoraTrainingCfg,
+    "LoraTrainingSampler": LoraTrainingSampler,
+    "LoraTrainingScheduler": LoraTrainingScheduler,
     "LoraTrainingSaveOutput": LoraTrainingSaveOutput,
 }
 
@@ -724,5 +834,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LoraTrainingVAE": "LT · VAE",
     "LoraTrainingWidth": "LT · Width",
     "LoraTrainingHeight": "LT · Height",
+    "LoraTrainingSteps": "LT · Steps",
+    "LoraTrainingCfg": "LT · CFG",
+    "LoraTrainingSampler": "LT · Sampler",
+    "LoraTrainingScheduler": "LT · Scheduler",
     "LoraTrainingSaveOutput": "LT · Save Output",
 }

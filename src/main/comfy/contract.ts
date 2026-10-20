@@ -25,6 +25,11 @@ export type ContractRole =
   | 'vae'
   | 'width'
   | 'height'
+  | 'steps'
+  | 'cfg'
+  | 'samplerName'
+  | 'scheduler'
+  | 'denoise'
   | 'outputFolder'
   | 'outputFilename';
 
@@ -47,6 +52,11 @@ export const CONTRACT_CLASSES: Record<ContractRole, string> = {
   vae: 'LoraTrainingVAE',
   width: 'LoraTrainingWidth',
   height: 'LoraTrainingHeight',
+  steps: 'LoraTrainingSteps',
+  cfg: 'LoraTrainingCfg',
+  samplerName: 'LoraTrainingSampler',
+  scheduler: 'LoraTrainingScheduler',
+  denoise: 'LoraTrainingDenoise',
   outputFolder: 'LoraTrainingOutputFolder',
   outputFilename: 'LoraTrainingOutputFilename',
 };
@@ -63,6 +73,11 @@ export const TITLE_MARKERS: Record<ContractRole, string> = {
   vae: 'LT:VAE',
   width: 'LT:WIDTH',
   height: 'LT:HEIGHT',
+  steps: 'LT:STEPS',
+  cfg: 'LT:CFG',
+  samplerName: 'LT:SAMPLER',
+  scheduler: 'LT:SCHEDULER',
+  denoise: 'LT:DENOISE',
   outputFolder: 'LT:OUTFOLDER',
   outputFilename: 'LT:OUTFILE',
 };
@@ -90,6 +105,11 @@ const ALL_ROLES: ContractRole[] = [
   'vae',
   'width',
   'height',
+  'steps',
+  'cfg',
+  'samplerName',
+  'scheduler',
+  'denoise',
   'outputFolder',
   'outputFilename',
 ];
@@ -106,6 +126,11 @@ const ROLE_LABELS: Record<ContractRole, string> = {
   vae: 'VAE',
   width: 'Width',
   height: 'Height',
+  steps: 'Steps',
+  cfg: 'CFG',
+  samplerName: 'Sampler',
+  scheduler: 'Scheduler',
+  denoise: 'Denoise',
   outputFolder: 'Output folder',
   outputFilename: 'Output filename',
 };
@@ -121,6 +146,11 @@ const INPUT_KEYS: Record<Exclude<ContractRole, 'output'>, string[]> = {
   vae: ['vae_name'],
   width: ['value', 'width'],
   height: ['value', 'height'],
+  steps: ['value', 'steps'],
+  cfg: ['value', 'cfg'],
+  samplerName: ['sampler_name', 'value'],
+  scheduler: ['scheduler', 'value'],
+  denoise: ['value', 'denoise'],
   outputFolder: ['folder'],
   outputFilename: ['filename'],
 };
@@ -169,6 +199,8 @@ function pickInputKey(
 }
 
 function valueTypeFor(role: ContractRole): InputBinding['valueType'] {
+  if (role === 'steps') return 'integer';
+  if (role === 'cfg' || role === 'denoise') return 'number';
   if (role === 'seed' || role === 'width' || role === 'height') {
     return 'integer-string';
   }

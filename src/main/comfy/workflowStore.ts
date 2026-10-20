@@ -119,6 +119,12 @@ export function saveWorkflowProfile(
     ...(resolved.bindings.denoise
       ? { denoise: resolved.bindings.denoise }
       : {}),
+    ...(resolved.bindings.samplerName
+      ? { samplerName: resolved.bindings.samplerName }
+      : {}),
+    ...(resolved.bindings.scheduler
+      ? { scheduler: resolved.bindings.scheduler }
+      : {}),
     ...(resolved.bindings.outputFolder
       ? { outputFolder: resolved.bindings.outputFolder }
       : {}),

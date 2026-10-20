@@ -126,9 +126,15 @@ settings, not in the repository. A separate **checkpoint folder** setting is
 used for downloads and the Checkpoint files workspace. An **images folder** is
 required for Civitai community Images downloads.
 
-**Settings → General → App updates** can point at your electron-builder
-`release/` folder so you can check for a newer installer and install from inside
-the app (the app closes, the installer runs, leave **Run** checked to relaunch).
+**Settings → General → App updates** checks the public
+[GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases)
+when the folder is empty. **Check for update** looks for a newer installer.
+**What's new** opens that version's release notes so you can read them before
+installing. If the version is not on GitHub yet, the window uses
+`RELEASE_NOTES.md` from the update folder or the folder above it. **Install** downloads the installer, closes the app, and runs it
+(leave **Run** checked to relaunch). A folder you choose overrides GitHub and
+uses the installers already in that folder (`latest.yml` or
+`WildcardsManager-<version>-win-x64.exe`).
 
 ### LoRA and Checkpoint file managers
 
@@ -234,15 +240,29 @@ The **Generation** tab queues jobs against a running ComfyUI instance
 (configure host / Test / Check install under **Settings → AI**):
 
 - **Use this prompt** (typed, with the same `!gen.txt` multi-line rules) or a
-  selected prompt folder. With a folder selected, **Recursive** includes
-  sub-folders that have `!gen.txt`; off uses only that folder.
-- Style profiles (**Realistic** / **Hentai** / **3D**), checkpoint / CLIP / VAE,
-  size, seed, and extra prompts. Seed ≤ 0 (the dice button) rolls a new seed
-  on every run. **Randomize**, next to it, writes one random number into Seed
-  and keeps that number. Each style has its own Generation output root
-  in **Library Manager** (Realistic defaults to the Prompts folder). Folder mode
-  writes `{styleOutput}/{prompt folder}/New`; typed prompts write to the style
-  root.
+  selected prompt folder. **Recursive** sits on the Prompt folder line. With a
+  folder selected, on includes that folder and sub-folders that have
+  `!gen.txt`; off uses only that folder. **Select… [Randomize]** (no folder)
+  picks a folder from the seed.
+- Style profiles (**Realistic** / **Anime** / **3D**). Each profile has
+  **Generation** (prompt folder, checkpoint, seed, size, additional positive,
+  negative) and **Options** (CLIP, VAE, Steps, CFG, Sampler, Scheduler,
+  Denoise). Values are not shared across the three styles. Hover a label for
+  a short explanation. Additional Positive and Negative resize vertically, and
+  that height is remembered.
+- Seed **1 or higher** repeats the same image on **Once** and **Infinite**:
+  the same dropdown and the same Recursive setting pick the same folder and
+  the same line. Seed **0 or below** (the dice) rolls a new seed from the
+  clock on every image. The shuffle button writes one random number into Seed
+  and keeps that number. The crosshair on Last output copies only the seed.
+  An empty `!gen.txt` error names the folder; Infinite skips that image and
+  continues.
+- Each style has its own Generation output root in **Library Manager**
+  (Realistic defaults to the Prompts folder). Folder mode writes
+  `{styleOutput}/{prompt folder}`. **Settings → AI → Save folder-mode images
+  in a New subfolder** adds `/New` and is off until you turn it on. The app
+  does not create that folder; the ComfyUI save node does when it writes the
+  image. Typed prompts write to the style root.
 - **Benchmark** (checkbox next to Checkpoint) walks every `.safetensors` file in
   the library Checkpoint folder that is still ticked **Use in this library**.
   Set **Checkpoint Benchmark folder** in Library
@@ -270,7 +290,8 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   load that checkpoint in the dropdown.
 - **Edit Workflow** / **Save Workflow** for the Comfy graph. **Save Workflow**
   writes the graph the app queues. Until that file exists, Generation has
-  nothing to run.
+  nothing to run. The prompt toolbar, next to **Edit Workflow**, shows whether
+  that graph is ready or which nodes are missing.
 - **Last output** preview can be collapsed for long unattended runs. Under the
   image, **Category** is the prompt folder that produced it (parents as a
   breadcrumb — useful when Randomize picked a sub-folder), then **Positive**
@@ -327,7 +348,11 @@ The repo ships both pieces in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/):
    the workflow menu to open it. The LT nodes are already connected: Prompt →
    Dynamic Prompts → LoRA tag loader, Negative, Seed → sampler, Model → UNET
    loader, CLIP and VAE → their loaders, Width and Height → Empty Latent,
-   Output Folder and Output Filename → Save Image to Folder.
+   Output Folder and Output Filename → Save Image to Folder. Steps, CFG,
+   Sampler, Scheduler, and Denoise are optional: convert those KSampler
+   widgets to inputs and connect **LT · Steps**, **LT · CFG**, **LT · Sampler**,
+   **LT · Scheduler**, and **LT · Denoise** if you want the Options tab to
+   drive them.
 4. **Point the loaders at models you have.** The sample is a Krea 2 graph and
    ships with these filenames:
    - UNET `krea2_turbo_fp8_scaled.safetensors`
@@ -347,14 +372,17 @@ The repo ships both pieces in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/):
      the app. Use **Edit Workflow** later when you change the graph in ComfyUI,
      then save again.
 6. **Generate.** **Use this prompt**, or select a prompt folder that has
-   `!gen.txt`. Folder mode writes
-   `{style output}/{prompt folder}/New`. Typed prompts write to the style root.
+   `!gen.txt`. Folder mode writes `{style output}/{prompt folder}`, plus
+   `/New` only when that Settings → AI option is on. Typed prompts write to
+   the style root.
 
 Required nodes on any graph you save yourself: **LT · Prompt**, **LT · Seed**,
 and a save node the app can find (**LT · Save Output**, or a node whose class
 name contains `SaveImage`, which is what the sample uses). Optional LT nodes
 the app fills in when they are present: Negative, Model, CLIP, VAE, Width,
-Height, Output Folder, Output Filename. Wiring notes are in
+Height, Steps, CFG, Sampler, Scheduler, Denoise, Output Folder, Output
+Filename. A blank Sampler or Scheduler leaves the name already on that node.
+Wiring notes are in
 [`comfyui-lora-training/README.md`](../comfyui-lora-training/README.md).
 
 ### LM Studio prompt assist

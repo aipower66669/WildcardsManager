@@ -1,11 +1,11 @@
-/** Parse `1.2.3` / `v1.2.3` → tuple, or null. */
+/** Parse `1.2.3`, `v1.2`, or `v1.2.3` → tuple. A missing patch is 0. */
 export function parseSemver(value: string): [number, number, number] | null {
   const m = value
     .trim()
     .replace(/^v/i, '')
-    .match(/^(\d+)\.(\d+)\.(\d+)/);
+    .match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
   if (!m) return null;
-  return [Number(m[1]), Number(m[2]), Number(m[3])];
+  return [Number(m[1]), Number(m[2]), m[3] ? Number(m[3]) : 0];
 }
 
 /** Positive when `a` is newer than `b`. */

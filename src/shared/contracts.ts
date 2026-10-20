@@ -63,6 +63,8 @@ export const IPC = {
   uiClearUpdateReleaseFolder: 'wcm:ui:clearUpdateReleaseFolder',
   uiCheckForAppUpdate: 'wcm:ui:checkForAppUpdate',
   uiInstallAppUpdate: 'wcm:ui:installAppUpdate',
+  uiGetAppReleaseNotes: 'wcm:ui:getAppReleaseNotes',
+  uiAppUpdateDownloadProgress: 'wcm:ui:appUpdateDownloadProgress',
   uiGetLoraFolder: 'wcm:ui:getLoraFolder',
   uiPickLoraFolder: 'wcm:ui:pickLoraFolder',
   uiSetLoraFolder: 'wcm:ui:setLoraFolder',
@@ -1152,6 +1154,20 @@ export type GenerationStyleProfileDto = {
   seed: number;
   width: number;
   height: number;
+  /** KSampler step count. Applied when LT · Steps is in the workflow. */
+  steps: number;
+  /** KSampler CFG. Applied when LT · CFG is in the workflow. */
+  cfg: number;
+  /**
+   * KSampler sampler name. Empty keeps the name already on LT · Sampler.
+   */
+  samplerName: string;
+  /**
+   * KSampler scheduler name. Empty keeps the name already on LT · Scheduler.
+   */
+  scheduler: string;
+  /** KSampler denoise, 0..1. Applied when LT · Denoise is in the workflow. */
+  denoise: number;
   /** Appended to every positive prompt (comma-separated), e.g. style tags. */
   additionalPositivePrompt: string;
   negativePrompt: string;
@@ -1174,6 +1190,11 @@ export type GenerationFormStateDto = {
   seed: number;
   width: number;
   height: number;
+  steps: number;
+  cfg: number;
+  samplerName: string;
+  scheduler: string;
+  denoise: number;
   additionalPositivePrompt: string;
   negativePrompt: string;
   promptText: string;
@@ -1250,6 +1271,16 @@ export type GenerationStartRequestDto = {
   seed: number;
   width: number;
   height: number;
+  /** KSampler steps. Omitted when the workflow has no LT · Steps node. */
+  steps?: number;
+  /** KSampler CFG. */
+  cfg?: number;
+  /** KSampler sampler name. Empty means leave the LT node unchanged. */
+  samplerName?: string;
+  /** KSampler scheduler name. Empty means leave the LT node unchanged. */
+  scheduler?: string;
+  /** KSampler denoise, 0..1. */
+  denoise?: number;
   /** Appended after the main positive with `, ` when non-empty. */
   additionalPositivePrompt?: string;
   negativePrompt?: string;
@@ -1819,8 +1850,8 @@ export type UiSettingsDto = {
    */
   generationSaveInNewSubfolder: boolean;
   /**
-   * Folder of electron-builder installers (e.g. this repo’s `release/`).
-   * Used by Check for update / Install.
+   * Optional folder of electron-builder installers (e.g. this repo’s `release/`).
+   * Empty means Check for update uses the public GitHub Releases.
    */
   updateReleaseFolder: string | null;
   /** Running app version (`package.json` / electron-builder). */
@@ -1829,12 +1860,30 @@ export type UiSettingsDto = {
 
 export type AppUpdateCheckResultDto = {
   currentVersion: string;
+  /** `github` when no update folder is set. `folder` uses that folder instead. */
+  sourceKind: 'github' | 'folder';
   releaseFolder: string | null;
   available: boolean;
   latestVersion: string | null;
+  /** Set when the installer is already on disk. */
   installerPath: string | null;
+  /** Set when the installer still needs to be downloaded. */
+  downloadUrl: string | null;
   installerFileName: string | null;
   message: string;
+};
+
+export type AppUpdateDownloadProgressDto = {
+  fileName: string;
+  bytesDone: number;
+  bytesTotal: number;
+};
+
+export type AppReleaseNotesDto = {
+  version: string;
+  title: string;
+  markdown: string;
+  htmlUrl: string | null;
 };
 
 export type GraphLayoutStyle = 'default' | 'optimized' | 'compact';
@@ -3105,6 +3154,10 @@ export type WcmDesktopApi = {
     clearUpdateReleaseFolder(): Promise<void>;
     checkForAppUpdate(): Promise<AppUpdateCheckResultDto>;
     installAppUpdate(): Promise<AppUpdateCheckResultDto>;
+    getAppReleaseNotes(version: string): Promise<AppReleaseNotesDto>;
+    onAppUpdateDownloadProgress(
+      cb: (progress: AppUpdateDownloadProgressDto) => void,
+    ): () => void;
     getLoraFolder(): Promise<string | null>;
     pickLoraFolder(): Promise<string | null>;
     setLoraFolder(folder: string | null): Promise<string | null>;

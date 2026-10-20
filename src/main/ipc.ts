@@ -178,6 +178,7 @@ import {
 import { enterBackgroundDownloads } from './backgroundDownloads.js';
 import {
   checkForAppUpdate,
+  fetchAppReleaseNotes,
   installAppUpdate,
   pickUpdateReleaseFolder,
 } from './appUpdateService.js';
@@ -1164,6 +1165,13 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.uiCheckForAppUpdate, async () => checkForAppUpdate());
 
   ipcMain.handle(IPC.uiInstallAppUpdate, async () => installAppUpdate());
+
+  ipcMain.handle(IPC.uiGetAppReleaseNotes, async (_e, version: unknown) => {
+    if (typeof version !== 'string' || !version.trim()) {
+      throw new Error('Missing release version');
+    }
+    return fetchAppReleaseNotes(version.trim());
+  });
 
   ipcMain.handle(IPC.uiGetPromptSubstitutions, async () =>
     getPromptSubstitutions(),

@@ -40,7 +40,7 @@ what you are trying to do.
   examples for diagnostics.
 - [`screenshot.png`](screenshot.png) — README image; replace with a better
   capture without changing links.
-- [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) — current public release (v0.7)
+- [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) — current public release (v0.8)
   overview, installation, and known limitations.
 - [`../CHANGELOG.md`](../CHANGELOG.md) — version-by-version notable changes.
 - [`../LICENSE.md`](../LICENSE.md) — software and sample-library licenses.

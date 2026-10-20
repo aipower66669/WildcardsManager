@@ -32,6 +32,11 @@ only — do not change existing LT node class names, inputs, or behaviour.
 | `LoraTrainingVAE` | LT · VAE | VAE filename (wildcard → VAELoader combo) |
 | `LoraTrainingWidth` | LT · Width | Canvas / latent width |
 | `LoraTrainingHeight` | LT · Height | Canvas / latent height |
+| `LoraTrainingSteps` | LT · Steps | KSampler step count |
+| `LoraTrainingCfg` | LT · CFG | KSampler CFG |
+| `LoraTrainingSampler` | LT · Sampler | KSampler sampler name (wildcard → combo) |
+| `LoraTrainingScheduler` | LT · Scheduler | KSampler scheduler name (wildcard → combo) |
+| `LoraTrainingDenoise` | LT · Denoise | KSampler denoise 0..1 (same node as the upscale tool) |
 | `LoraTrainingSaveOutput` | LT · Save Output | SaveImage-style sink so the app can fetch from `/history` |
 
 ## Wiring tips (LoraTraining)
@@ -49,8 +54,9 @@ only — do not change existing LT node class names, inputs, or behaviour.
 2. **LT · Seed** → sampler seed.
 3. **LT · Model** (+ optional **LT · CLIP** / **LT · VAE**) → loaders (convert combo widgets to inputs).
 4. **LT · Width** / **LT · Height** → Empty Latent (or equivalent).
-5. **LT · Save Output** → final IMAGE so Generation can pull the result from history.
-6. In Wildcards Manager: **Settings → AI → ComfyUI**, then Generation → **Edit Workflow** → **Save Workflow**.
+5. **LT · Steps** / **LT · CFG** / **LT · Sampler** / **LT · Scheduler** / **LT · Denoise** → convert those KSampler widgets to inputs, then connect. Blank Sampler or Scheduler in the app keeps the name already on the node.
+6. **LT · Save Output** → final IMAGE so Generation can pull the result from history.
+7. In Wildcards Manager: **Settings → AI → ComfyUI**, then Generation → **Edit Workflow** → **Save Workflow**.
 
 ## Diversify (Context / Expression)
 

@@ -133,6 +133,11 @@ function emptyStyleProfile(): GenerationStyleProfileDto {
     seed: -1,
     width: 1024,
     height: 1024,
+    steps: 20,
+    cfg: 7,
+    samplerName: '',
+    scheduler: '',
+    denoise: 1,
     additionalPositivePrompt: '',
     negativePrompt: '',
     promptText: '',
@@ -241,6 +246,14 @@ export function GenerationWorkspace({
   const [benchmarkResultsOpen, setBenchmarkResultsOpen] = useState(false);
   const [clip, setClip] = useState('');
   const [vae, setVae] = useState('');
+  const [steps, setSteps] = useState(20);
+  const [cfg, setCfg] = useState(7);
+  const [samplerName, setSamplerName] = useState('');
+  const [scheduler, setScheduler] = useState('');
+  const [denoise, setDenoise] = useState(1);
+  const [formSection, setFormSection] = useState<'generation' | 'options'>(
+    'generation',
+  );
   const [seed, setSeed] = useState(-1);
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
@@ -313,6 +326,11 @@ export function GenerationWorkspace({
     seed: -1,
     width: 1024,
     height: 1024,
+    steps: 20,
+    cfg: 7,
+    samplerName: '',
+    scheduler: '',
+    denoise: 1,
     additionalPositivePrompt: '',
     negativePrompt: '',
     promptText: '',
@@ -417,7 +435,10 @@ export function GenerationWorkspace({
         const next = await window.wcm.comfy.getModelCatalog();
         setCatalog(next);
         catalogNeedsFillRef.current =
-          next.clips.length === 0 || next.vaes.length === 0;
+          next.clips.length === 0 ||
+          next.vaes.length === 0 ||
+          next.samplers.length === 0 ||
+          next.schedulers.length === 0;
       } catch {
         catalogNeedsFillRef.current = true;
       }
@@ -445,6 +466,11 @@ export function GenerationWorkspace({
         setBenchmark(form.benchmark === true);
         setClip(form.clip);
         setVae(form.vae);
+        setSteps(form.steps);
+        setCfg(form.cfg);
+        setSamplerName(form.samplerName);
+        setScheduler(form.scheduler);
+        setDenoise(form.denoise);
         setSeed(form.seed);
         setWidth(form.width);
         setHeight(form.height);
@@ -594,6 +620,11 @@ export function GenerationWorkspace({
         seed,
         width,
         height,
+        steps,
+        cfg,
+        samplerName,
+        scheduler,
+        denoise,
         additionalPositivePrompt: additionalPositive,
         negativePrompt: negative,
         promptText,
@@ -610,6 +641,11 @@ export function GenerationWorkspace({
       seed,
       width,
       height,
+      steps,
+      cfg,
+      samplerName,
+      scheduler,
+      denoise,
       additionalPositivePrompt: additionalPositive,
       negativePrompt: negative,
       promptText,
@@ -634,6 +670,11 @@ export function GenerationWorkspace({
     checkpoint,
     clip,
     vae,
+    steps,
+    cfg,
+    samplerName,
+    scheduler,
+    denoise,
     seed,
     width,
     height,
@@ -824,6 +865,11 @@ export function GenerationWorkspace({
       seed,
       width,
       height,
+      steps,
+      cfg,
+      samplerName,
+      scheduler,
+      denoise,
       additionalPositivePrompt: additionalPositive,
       negativePrompt: negative,
       promptText,
@@ -838,6 +884,11 @@ export function GenerationWorkspace({
     checkpoint,
     clip,
     vae,
+    steps,
+    cfg,
+    samplerName,
+    scheduler,
+    denoise,
     seed,
     width,
     height,
@@ -860,6 +911,11 @@ export function GenerationWorkspace({
       seed,
       width,
       height,
+      steps,
+      cfg,
+      samplerName,
+      scheduler,
+      denoise,
       additionalPositivePrompt: additionalPositive,
       negativePrompt: negative,
       promptText,
@@ -876,6 +932,11 @@ export function GenerationWorkspace({
     setCheckpoint(incoming.checkpoint);
     setClip(incoming.clip);
     setVae(incoming.vae);
+    setSteps(incoming.steps);
+    setCfg(incoming.cfg);
+    setSamplerName(incoming.samplerName);
+    setScheduler(incoming.scheduler);
+    setDenoise(incoming.denoise);
     setSeed(incoming.seed);
     setWidth(incoming.width);
     setHeight(incoming.height);
@@ -899,6 +960,11 @@ export function GenerationWorkspace({
       seed: incoming.seed,
       width: incoming.width,
       height: incoming.height,
+      steps: incoming.steps,
+      cfg: incoming.cfg,
+      samplerName: incoming.samplerName,
+      scheduler: incoming.scheduler,
+      denoise: incoming.denoise,
       additionalPositivePrompt: incoming.additionalPositivePrompt,
       negativePrompt: incoming.negativePrompt,
       promptText: incoming.promptText,
@@ -944,6 +1010,11 @@ export function GenerationWorkspace({
         checkpoint: benchmark ? checkpoint || '' : checkpoint,
         clip: clip || undefined,
         vae: vae || undefined,
+        steps,
+        cfg,
+        samplerName: samplerName.trim() || undefined,
+        scheduler: scheduler.trim() || undefined,
+        denoise,
         seed,
         width,
         height,
@@ -1119,7 +1190,7 @@ export function GenerationWorkspace({
               role="tab"
               aria-selected={profile === 'realistic'}
               className={profile === 'realistic' ? 'active' : undefined}
-              title="Photo-style settings. This tab keeps its own model, prompts, seed, and size."
+              title="Photo-style settings. Generation and Options on this tab stay separate from Anime and 3D."
               onClick={() => selectProfile('realistic')}
             >
               Realistic
@@ -1129,7 +1200,7 @@ export function GenerationWorkspace({
               role="tab"
               aria-selected={profile === 'hentai'}
               className={profile === 'hentai' ? 'active' : undefined}
-              title="Anime-style settings. This tab keeps its own model, prompts, seed, and size."
+              title="Anime-style settings. Generation and Options on this tab stay separate from Realistic and 3D."
               onClick={() => selectProfile('hentai')}
             >
               Anime
@@ -1139,13 +1210,42 @@ export function GenerationWorkspace({
               role="tab"
               aria-selected={profile === '3d'}
               className={profile === '3d' ? 'active' : undefined}
-              title="3D-style settings. This tab keeps its own model, prompts, seed, and size."
+              title="3D-style settings. Generation and Options on this tab stay separate from Realistic and Anime."
               onClick={() => selectProfile('3d')}
             >
               3D
             </button>
           </div>
 
+          <div
+            className="segmented generation-section-tabs"
+            role="tablist"
+            aria-label="Generation sections"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={formSection === 'generation'}
+              className={formSection === 'generation' ? 'active' : undefined}
+              title="Prompt folder, model, seed, size, and prompts for this style."
+              onClick={() => setFormSection('generation')}
+            >
+              Generation
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={formSection === 'options'}
+              className={formSection === 'options' ? 'active' : undefined}
+              title="CLIP, VAE, and KSampler settings for this style."
+              onClick={() => setFormSection('options')}
+            >
+              Options
+            </button>
+          </div>
+
+          {formSection === 'generation' ? (
+          <>
           <div className="generation-label-row">
             <label
               className="field-label"
@@ -1274,44 +1374,6 @@ export function GenerationWorkspace({
 
           <label
             className="field-label"
-            title="Optional text encoder. Leave blank to keep the CLIP already in the workflow."
-          >
-            CLIP (optional)
-          </label>
-          <select
-            className="text-input"
-            value={clip}
-            onChange={(e) => setClip(e.target.value)}
-          >
-            <option value="">—</option>
-            {withSavedChoice(catalog?.clips ?? [], clip).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-
-          <label
-            className="field-label"
-            title="Optional decoder that turns the result into an image. Leave blank to keep the VAE already in the workflow."
-          >
-            VAE (optional)
-          </label>
-          <select
-            className="text-input"
-            value={vae}
-            onChange={(e) => setVae(e.target.value)}
-          >
-            <option value="">—</option>
-            {withSavedChoice(catalog?.vaes ?? [], vae).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-
-          <label
-            className="field-label"
             title="Drives the folder, the prompt line, and wildcard picks. 1 or higher repeats that image. 0 or below rolls a new seed every run."
           >
             Seed (≤0 = random)
@@ -1412,6 +1474,152 @@ export function GenerationWorkspace({
             value={negative}
             onChange={(e) => setNegative(e.target.value)}
           />
+          </>
+          ) : (
+          <>
+          <p className="hint generation-options-hint">
+            Each style keeps its own values. Wire the matching LT nodes into
+            the workflow, then Save Workflow. A blank Sampler or Scheduler
+            keeps the name already on that node.
+          </p>
+          <label
+            className="field-label"
+            title="Optional text encoder. Leave blank to keep the CLIP already in the workflow."
+          >
+            CLIP (optional)
+          </label>
+          <select
+            className="text-input"
+            value={clip}
+            onChange={(e) => setClip(e.target.value)}
+          >
+            <option value="">—</option>
+            {withSavedChoice(catalog?.clips ?? [], clip).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+
+          <label
+            className="field-label"
+            title="Optional decoder that turns the result into an image. Leave blank to keep the VAE already in the workflow."
+          >
+            VAE (optional)
+          </label>
+          <select
+            className="text-input"
+            value={vae}
+            onChange={(e) => setVae(e.target.value)}
+          >
+            <option value="">—</option>
+            {withSavedChoice(catalog?.vaes ?? [], vae).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+
+          <label
+            className="field-label"
+            title="How many sampling steps to run. Sent to LT · Steps when that node is in the workflow."
+          >
+            Steps
+          </label>
+          <input
+            className="text-input"
+            type="number"
+            min={1}
+            step={1}
+            value={steps}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setSteps(Number.isFinite(n) && n >= 1 ? Math.round(n) : 20);
+            }}
+          />
+
+          <label
+            className="field-label"
+            title="How closely the image follows the prompt. Sent to LT · CFG when that node is in the workflow."
+          >
+            CFG
+          </label>
+          <input
+            className="text-input"
+            type="number"
+            min={0}
+            step={0.1}
+            value={cfg}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setCfg(Number.isFinite(n) && n >= 0 ? n : 7);
+            }}
+          />
+
+          <label
+            className="field-label"
+            title="Sampling algorithm. Leave blank to keep the name already on LT · Sampler."
+          >
+            Sampler
+          </label>
+          <select
+            className="text-input"
+            value={samplerName}
+            onChange={(e) => setSamplerName(e.target.value)}
+          >
+            <option value="">—</option>
+            {withSavedChoice(catalog?.samplers ?? [], samplerName).map(
+              (name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ),
+            )}
+          </select>
+
+          <label
+            className="field-label"
+            title="Noise schedule. Leave blank to keep the name already on LT · Scheduler."
+          >
+            Scheduler
+          </label>
+          <select
+            className="text-input"
+            value={scheduler}
+            onChange={(e) => setScheduler(e.target.value)}
+          >
+            <option value="">—</option>
+            {withSavedChoice(catalog?.schedulers ?? [], scheduler).map(
+              (name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ),
+            )}
+          </select>
+
+          <label
+            className="field-label"
+            title="How much of the starting noise to replace. 1 redraws the whole image. Sent to LT · Denoise."
+          >
+            Denoise
+          </label>
+          <input
+            className="text-input"
+            type="number"
+            min={0}
+            max={1}
+            step={0.01}
+            value={denoise}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setDenoise(
+                Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1,
+              );
+            }}
+          />
+          </>
+          )}
 
           <div className="generation-actions">
             <div className="generation-actions-start">

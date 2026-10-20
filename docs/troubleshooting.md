@@ -148,6 +148,9 @@ the end of the Civitai feed.
 1. Set **Settings → AI** ComfyUI host/port and use **Test** / **Check install**.
 2. Install [`ComfyUI-Workflow/comfyui-lora-training.zip`](../ComfyUI-Workflow/comfyui-lora-training.zip)
    into ComfyUI `custom_nodes/comfyui-lora-training/` and restart ComfyUI.
+   If Options (Steps, CFG, Sampler, Scheduler, Denoise) does nothing, the
+   saved graph does not have those LT nodes yet — add them, **Save Workflow**,
+   and restart ComfyUI after replacing the pack.
    Red nodes on the canvas are packs that are still missing — the sample graph
    also needs Dynamic Prompts, `comfyui_lora_tag_loader`,
    `CoreyCorza/comfyui-lora-loader`, `comfyui-krea2t-enhancer`, and
@@ -165,14 +168,15 @@ the end of the Civitai feed.
 
 ## In-app update finds nothing / Install does nothing
 
-1. **Settings → General → App updates** must point at a folder that contains
-   `latest.yml` and/or `WildcardsManager-<version>-win-x64.exe` (your
-   electron-builder `release/` output).
-2. The installer version must be **newer** than the running app (`Help` /
-   Settings shows the running version).
-3. **Install update** closes the app and launches the NSIS UI — leave **Run
-   Wildcards Manager** checked at the end. Unsigned SmartScreen prompts are
-   expected.
+1. With the update folder empty, **Check for update** uses the public GitHub
+   Releases page. A folder you set overrides that and must contain `latest.yml`
+   and/or `WildcardsManager-<version>-win-x64.exe`.
+2. The installer version must be **newer** than the running app (Settings shows
+   the running version). **What's new** opens that version's release notes
+   before you install.
+3. **Install update** downloads the GitHub installer when no folder is set,
+   then closes the app and launches the NSIS UI — leave **Run Wildcards
+   Manager** checked at the end. Unsigned SmartScreen prompts are expected.
 
 ## Archive / Maybe / Notify lists disappeared or look empty
 
@@ -332,8 +336,9 @@ generated and gitignored.
 
 Current packages are unsigned. SmartScreen/Gatekeeper warnings are expected for
 unsigned artifacts. Signing and notarization are roadmap items. In-app **App
-updates** only launches an installer you already placed in the configured
-folder — it does not download releases from GitHub automatically.
+updates** downloads the newer installer from GitHub Releases when the update
+folder is empty. A folder you set still launches the installer already in that
+folder.
 
 A version tag builds the Windows installer in GitHub Actions and attaches the
 `.exe` to that release. macOS and Linux packages are still built locally

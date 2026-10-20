@@ -1,6 +1,6 @@
 {
   "name": "wildcards-manager",
-  "version": "0.7.15",
+  "version": "0.8.1",
   "private": true,
   "description": "Desktop manager to visualize, validate, edit, refactor, and analyze Dynamic Prompts wildcard libraries",
   "author": "Wildcards Manager",
@@ -26,6 +26,7 @@
     "clean:old-releases": "node scripts/clean-old-releases.mjs",
     "build:win": "npm run build && electron-builder --win --publish never",
     "dist": "npm run bump:patch && npm run build && electron-builder --publish never && npm run clean:old-releases",
+    "dist:nobump": "npm run build:win && npm run clean:old-releases",
     "dist:win": "npm run bump:patch && npm run build:win && npm run clean:old-releases",
     "dist:mac": "npm run bump:patch && npm run build && electron-builder --mac --publish never && npm run clean:old-releases",
     "dist:linux": "npm run bump:patch && npm run build && electron-builder --linux --publish never && npm run clean:old-releases"
@@ -43,7 +44,9 @@
     "@lezer/highlight": "^1.2.3",
     "@lezer/lr": "^1.4.10",
     "@xyflow/react": "^12.6.4",
+    "dompurify": "^3.4.17",
     "lucide-react": "^0.511.0",
+    "marked": "^18.1.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "ws": "^8.21.1",

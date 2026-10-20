@@ -494,6 +494,11 @@ async function runJob(
     vae: request.vae,
     width: request.width,
     height: request.height,
+    steps: request.steps,
+    cfg: request.cfg,
+    denoise: request.denoise,
+    samplerName: request.samplerName?.trim() || undefined,
+    scheduler: request.scheduler?.trim() || undefined,
     outputFolder: ltOutputFolder,
     outputFilename: GENERATION_OUTPUT_FILENAME,
   });

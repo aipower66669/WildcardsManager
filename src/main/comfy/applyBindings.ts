@@ -21,6 +21,8 @@ export type GenerationValues = {
   steps?: number;
   cfg?: number;
   denoise?: number;
+  samplerName?: string;
+  scheduler?: string;
   width?: number;
   height?: number;
   /** Absolute path for LT · Output Folder. */
@@ -87,6 +89,8 @@ export function validateBindingsAgainstGraph(
   checkInput('steps', bindings.steps);
   checkInput('cfg', bindings.cfg);
   checkInput('denoise', bindings.denoise);
+  checkInput('samplerName', bindings.samplerName);
+  checkInput('scheduler', bindings.scheduler);
   checkInput('width', bindings.width);
   checkInput('height', bindings.height);
   checkInput('outputFolder', bindings.outputFolder);
@@ -147,6 +151,8 @@ export function applyBindings(
   apply(bindings.steps, values.steps);
   apply(bindings.cfg, values.cfg);
   apply(bindings.denoise, values.denoise);
+  apply(bindings.samplerName, values.samplerName);
+  apply(bindings.scheduler, values.scheduler);
   apply(bindings.outputFolder, values.outputFolder);
   apply(bindings.outputFilename, values.outputFilename);
 

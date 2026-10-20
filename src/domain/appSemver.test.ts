@@ -13,4 +13,9 @@ describe('compareSemver', () => {
   it('accepts a leading v', () => {
     expect(compareSemver('v0.4.1', '0.4.0')).toBeGreaterThan(0);
   });
+
+  it('treats a two-part version as patch 0', () => {
+    expect(compareSemver('0.7', '0.7.0')).toBe(0);
+    expect(compareSemver('v0.8', '0.7.15')).toBeGreaterThan(0);
+  });
 });

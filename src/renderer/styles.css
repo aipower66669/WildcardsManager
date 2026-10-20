@@ -670,8 +670,23 @@ button.status-bar-queue-btn:hover {
   flex: 1;
 }
 
-.generation-profile-tabs + .generation-label-row {
+.generation-section-tabs {
+  display: flex;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.generation-section-tabs button {
+  flex: 1;
+}
+
+.generation-section-tabs + .generation-label-row,
+.generation-options-hint {
   margin-top: 14px;
+}
+
+.generation-options-hint {
+  margin-bottom: 0;
 }
 
 .generation-actions {
@@ -5745,6 +5760,105 @@ label.field select {
   overflow-y: auto;
 }
 
+.modal-overlay.release-notes-overlay {
+  z-index: 80;
+}
+
+.release-notes-modal {
+  width: min(720px, 100%);
+}
+
+.release-notes-body {
+  min-height: 180px;
+}
+
+.release-notes-foot {
+  justify-content: space-between;
+}
+
+.release-notes-md {
+  color: #d5dbe6;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.release-notes-md h1,
+.release-notes-md h2,
+.release-notes-md h3 {
+  margin: 1.1em 0 0.4em;
+  color: #f2f5f8;
+  font-weight: 650;
+}
+
+.release-notes-md h1 {
+  font-size: 1.25rem;
+}
+
+.release-notes-md h2 {
+  font-size: 1.1rem;
+}
+
+.release-notes-md h3 {
+  font-size: 1rem;
+}
+
+.release-notes-md p,
+.release-notes-md ul,
+.release-notes-md ol,
+.release-notes-md pre,
+.release-notes-md table {
+  margin: 0.55em 0;
+}
+
+.release-notes-md ul,
+.release-notes-md ol {
+  padding-left: 1.3em;
+}
+
+.release-notes-md a {
+  color: #8eb6ff;
+}
+
+.release-notes-md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  background: #1a2030;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.release-notes-md pre {
+  overflow: auto;
+  padding: 10px 12px;
+  background: #0d1118;
+  border-radius: 8px;
+}
+
+.release-notes-md pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.release-notes-md table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.release-notes-md th,
+.release-notes-md td {
+  border: 1px solid #303744;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.release-notes-md blockquote {
+  margin: 0.6em 0;
+  padding-left: 10px;
+  border-left: 3px solid #3a4558;
+  color: #b7c0ce;
+}
+
 .modal-body.loading-row {
   display: flex;
   align-items: center;
@@ -6733,6 +6847,13 @@ button.danger:hover:not(:disabled) {
 .settings-modal .settings-btn:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+.settings-modal .settings-btn.settings-btn-text {
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  padding: 0 8px !important;
 }
 
 .settings-modal .settings-btn.danger-text {

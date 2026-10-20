@@ -34,6 +34,7 @@ import type {
   LmStudioConnectionTestDto,
 } from '../shared/contracts.js';
 import { modalOverlayDismiss } from './modalOverlayDismiss.js';
+import { ReleaseNotesModal } from './ReleaseNotesModal.js';
 
 function SettingsSection({
   title,
@@ -201,6 +202,8 @@ export function ApplicationSettingsModal({
     null,
   );
   const [updateBusy, setUpdateBusy] = useState(false);
+  const [downloadLabel, setDownloadLabel] = useState<string | null>(null);
+  const [notesVersion, setNotesVersion] = useState<string | null>(null);
   const [lmHost, setLmHost] = useState(DEFAULT_LM_STUDIO_CONNECTION.host);
   const [lmPort, setLmPort] = useState(DEFAULT_LM_STUDIO_CONNECTION.port);
   const [lmSecure, setLmSecure] = useState(DEFAULT_LM_STUDIO_CONNECTION.secure);
@@ -660,11 +663,31 @@ export function ApplicationSettingsModal({
     }
   };
 
+  useEffect(() => {
+    return window.wcm.ui.onAppUpdateDownloadProgress((progress) => {
+      if (progress.bytesTotal > 0) {
+        const pct = Math.min(
+          100,
+          Math.round((progress.bytesDone / progress.bytesTotal) * 100),
+        );
+        setDownloadLabel(`Downloading ${progress.fileName}… ${pct}%`);
+        return;
+      }
+      const mb = (progress.bytesDone / (1024 * 1024)).toFixed(1);
+      setDownloadLabel(`Downloading ${progress.fileName}… ${mb} MB`);
+    });
+  }, []);
+
   const checkForAppUpdate = async () => {
     setErr(null);
+    setDownloadLabel(null);
     setUpdateBusy(true);
     try {
-      setUpdateCheck(await window.wcm.ui.checkForAppUpdate());
+      const result = await window.wcm.ui.checkForAppUpdate();
+      setUpdateCheck(result);
+      if (result.available && result.latestVersion) {
+        setNotesVersion(result.latestVersion);
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -674,6 +697,7 @@ export function ApplicationSettingsModal({
 
   const installAppUpdate = async () => {
     setErr(null);
+    setDownloadLabel(null);
     setUpdateBusy(true);
     try {
       const result = await window.wcm.ui.installAppUpdate();
@@ -685,6 +709,7 @@ export function ApplicationSettingsModal({
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setUpdateBusy(false);
+      setDownloadLabel(null);
     }
   };
 
@@ -895,12 +920,12 @@ export function ApplicationSettingsModal({
 
                 <SettingsSection
                   title="App updates"
-                  help="Point this at the folder where electron-builder writes installers (this repo’s release/ folder, or a shared copy of it). Check for update reads latest.yml / WildcardsManager-*-win-x64.exe, then Install closes the app and runs the installer — leave “Run” ticked at the end to relaunch."
+                  help="Leave the folder empty to check GitHub Releases and download the installer from there. A folder overrides that and uses the installers already in it (latest.yml or WildcardsManager-*-win-x64.exe). What's new shows that version's release notes. Install closes the app and runs the installer — leave “Run” ticked at the end to relaunch."
                 >
                   <p className="hint">
                     Running version{appVersion ? `: ${appVersion}` : ''}
                     {updateCheck?.latestVersion
-                      ? ` · Folder latest: ${updateCheck.latestVersion}`
+                      ? ` · ${updateCheck.sourceKind === 'folder' ? 'Folder' : 'GitHub'} latest: ${updateCheck.latestVersion}`
                       : ''}
                   </p>
                   <div className="settings-folder-row">
@@ -912,7 +937,12 @@ export function ApplicationSettingsModal({
                         <code>{updateReleaseFolder}</code>
                       </p>
                     ) : (
-                      <p className="settings-path empty">No update folder set</p>
+                      <p
+                        className="settings-path"
+                        title="https://github.com/aipower66669/WildcardsManager/releases"
+                      >
+                        <code>GitHub Releases</code>
+                      </p>
                     )}
                     <div className="settings-actions">
                       <button
@@ -921,7 +951,7 @@ export function ApplicationSettingsModal({
                         title={
                           updateReleaseFolder
                             ? 'Change folder…'
-                            : 'Choose folder…'
+                            : 'Use a local folder instead of GitHub…'
                         }
                         aria-label={
                           updateReleaseFolder
@@ -936,7 +966,7 @@ export function ApplicationSettingsModal({
                         <button
                           type="button"
                           className="settings-btn icon-only danger-text"
-                          title="Clear folder"
+                          title="Clear folder and use GitHub Releases"
                           aria-label="Clear update folder"
                           onClick={() => void clearUpdateReleaseFolder()}
                         >
@@ -948,13 +978,31 @@ export function ApplicationSettingsModal({
                         className="settings-btn icon-only"
                         title="Check for update"
                         aria-label="Check for update"
-                        disabled={!updateReleaseFolder || updateBusy}
+                        disabled={updateBusy}
                         onClick={() => void checkForAppUpdate()}
                       >
                         <RefreshCw
                           size={14}
                           className={updateBusy ? 'spin' : undefined}
                         />
+                      </button>
+                      <button
+                        type="button"
+                        className="settings-btn settings-btn-text"
+                        title={
+                          updateCheck?.available
+                            ? `Release notes for ${updateCheck.latestVersion}`
+                            : 'What’s new (check for an update first)'
+                        }
+                        aria-label="What's new"
+                        disabled={!updateCheck?.available || !updateCheck.latestVersion || updateBusy}
+                        onClick={() => {
+                          if (updateCheck?.latestVersion) {
+                            setNotesVersion(updateCheck.latestVersion);
+                          }
+                        }}
+                      >
+                        What's new
                       </button>
                       <button
                         type="button"
@@ -965,17 +1013,16 @@ export function ApplicationSettingsModal({
                             : 'Install update (check first)'
                         }
                         aria-label="Install update"
-                        disabled={
-                          !updateCheck?.available ||
-                          updateBusy ||
-                          !updateReleaseFolder
-                        }
+                        disabled={!updateCheck?.available || updateBusy}
                         onClick={() => void installAppUpdate()}
                       >
                         <Download size={14} />
                       </button>
                     </div>
                   </div>
+                  {downloadLabel ? (
+                    <p className="hint settings-inline-notice">{downloadLabel}</p>
+                  ) : null}
                   {updateCheck?.message ? (
                     <p
                       className={
@@ -1668,6 +1715,12 @@ export function ApplicationSettingsModal({
           </button>
         </footer>
       </div>
+      {notesVersion ? (
+        <ReleaseNotesModal
+          version={notesVersion}
+          onClose={() => setNotesVersion(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -106,7 +106,7 @@ Shipped today:
 - LoRA and Checkpoint file managers (list, filters, identity, embedded page,
   LoRA reverse-refs and training-step series; symlink-aware folder walk);
 - Global search across wildcards and model folders; Prompts workspace; Generation
-  tab (ComfyUI + LT node pack);
+  tab (ComfyUI + LT node pack, per-style KSampler options, reproducible seeds);
 - Civitai Images / Videos Download all with feed frontiers and Browse catch-up;
 - Library Manager (multiple libraries, path migration), LoRA training-series
   previews, LM Studio prompt assist, checkpoint ratings, blocked authors;

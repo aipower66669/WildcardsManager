@@ -1,14 +1,48 @@
-# Wildcards Manager v0.7
+# Wildcards Manager v0.8
 
-Package version: **0.7.0**  
-Release date: **October 15, 2026**
+Package version: **0.8.0**  
+Release date: **October 20, 2026**
 
-v0.7 is the first public release. It documents the full desktop app — wildcard
-graph, model libraries, Civitai, generation — and fixes the test failures that
-showed up on GitHub Actions.
+v0.8 is a Generation release. A fixed seed now repeats the same image on Once
+and Infinite, each style has its own Options (CLIP, VAE, and KSampler), and
+the New output subfolder is optional.
 
 The [user guide](docs/user-guide.md) is the complete reference. This note is the
 map.
+
+## What’s new in v0.8
+
+- **Same seed, same image.** Once and Infinite use one pick. The seed chooses
+  the prompt folder (when the dropdown is Select… [Randomize], or Recursive is
+  on) and the `!gen.txt` line. The Last output crosshair copies only the seed.
+- **Seed 0 or below** rolls from the clock on every image, so a failed Infinite
+  run does not repeat the same seed. The dice sets −1. The shuffle button
+  writes one fixed random number.
+- **Empty `!gen.txt`** names the folder. Infinite skips that image and
+  continues.
+- **Generation and Options** sit under Realistic, Anime, and 3D. Options holds
+  CLIP, VAE, Steps, CFG, Sampler, Scheduler, and Denoise. Each style keeps its
+  own values.
+- New LT nodes: **LT · Steps**, **LT · CFG**, **LT · Sampler**,
+  **LT · Scheduler**. **LT · Denoise** fills KSampler denoise. Replace
+  `custom_nodes/comfyui-lora-training`, restart ComfyUI, wire those inputs,
+  then **Save Workflow**. A blank Sampler or Scheduler leaves the name already
+  on the node.
+- **Settings → AI → Save folder-mode images in a New subfolder** is off by
+  default. Folder mode writes `{style output}/{prompt folder}`, plus `/New`
+  only when that option is on. The ComfyUI save node creates the folder.
+- Labels and the Once / Infinite / Cancel buttons have tooltips. Recursive
+  sits on the Prompt folder line. Workflow status sits next to Edit Workflow.
+
+## Upgrading from v0.7
+
+Libraries and sidecars do not need a migration. Generation settings you already
+saved stay on Realistic, Anime, and 3D. New sampler fields start at 20 steps,
+CFG 7, and denoise 1 until you set them.
+
+Replace the ComfyUI `comfyui-lora-training` folder with
+`ComfyUI-Workflow/comfyui-lora-training.zip` and restart ComfyUI before using
+the KSampler nodes. The sample graph does not wire those five inputs yet.
 
 ## What the app is
 
@@ -82,11 +116,15 @@ are in [`ComfyUI-Workflow/`](ComfyUI-Workflow/):
 
 Step-by-step: [user guide](docs/user-guide.md#install-the-nodes-and-the-sample-graph).
 
-- Typed prompt or prompt-folder `!gen.txt` (optional recursive sub-folders).
-- Style profiles with separate output folders.
+- Typed prompt or prompt-folder `!gen.txt`. Recursive includes sub-folders.
+  A fixed seed repeats the folder and the line.
+- Style profiles (Realistic, Anime, 3D), each with Generation and Options.
 - **Benchmark** walks checkpoint files and records timings.
-- **Edit Workflow** / **Save Workflow**.
+- **Edit Workflow** / **Save Workflow**. The toolbar shows when the graph is
+  ready.
 - **Categorize** appends a prompt into a folder’s `!gen.txt`.
+- **Substitutions** replace prompt text for a checkpoint name before wildcards
+  expand. Rules stay in that library’s `library.json`.
 
 **LM Studio** (local server) can propose edits to the open wildcard file.
 Nothing is saved until you apply the proposal.
@@ -100,7 +138,7 @@ file to keep it off the “never used” list.
 ## Installation
 
 Download an installer from the
-[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.7.0)
+[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.8.0)
 when one is attached, or build it yourself. Installers are unsigned.
 
 From source (Node.js 22.12+):
@@ -112,17 +150,18 @@ npm ci
 npm run dev
 ```
 
-Pushing a version tag (`v0.7.0`) runs the checks, builds
+Pushing a version tag (`v0.8.0`) runs the checks, builds
 `WildcardsManager-<version>-win-x64.exe`, and attaches it to that GitHub
-Release. `npm run dist` still bumps the patch and builds a local installer
-into `release/` for in-app updates. In-app update does not download from
-GitHub.
+Release. Settings → App updates checks that release when the update folder
+is empty, opens **What's new** with these notes, then downloads and installs.
+`npm run dist` still bumps the patch and builds a local installer into
+`release/`. A folder set under App updates uses that folder instead of GitHub.
 
 ## Upgrading from v0.6
 
-Libraries and sidecars do not need a manual migration for this release. If you
-moved model or wildcard folders onto another drive, use Library Manager →
-**Migrate library paths…** instead of editing paths by hand in every field.
+If you skipped v0.7, libraries and sidecars still do not need a manual
+migration. If you moved model or wildcard folders onto another drive, use
+Library Manager → **Migrate library paths…** instead of editing paths by hand.
 
 Install `ComfyUI-Workflow/comfyui-lora-training.zip` into ComfyUI
 `custom_nodes/` if Generation reports missing LT nodes, then load
@@ -137,8 +176,8 @@ Install `ComfyUI-Workflow/comfyui-lora-training.zip` into ComfyUI
 - No folder-level refactor, split/merge, bulk cleanup, or single library-health
   report yet.
 - Generation is a queue plus a saved workflow, not a ComfyUI replacement.
-- In-app update only runs an installer you already built into the configured
-  folder.
+- In-app update installs the GitHub Release for this operating system, or the
+  installer in a folder you set under App updates.
 - Installers are unsigned.
 
 ## Licensing

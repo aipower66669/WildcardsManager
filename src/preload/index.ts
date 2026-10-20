@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC,
+  type AppUpdateDownloadProgressDto,
   type CivitaiCatalogSyncProgressDto,
   type CivitaiDownloadProgressDto,
   type CivitaiFocusModelDto,
@@ -184,6 +185,17 @@ const api: WcmDesktopApi = {
       ipcRenderer.invoke(IPC.uiClearUpdateReleaseFolder),
     checkForAppUpdate: () => ipcRenderer.invoke(IPC.uiCheckForAppUpdate),
     installAppUpdate: () => ipcRenderer.invoke(IPC.uiInstallAppUpdate),
+    getAppReleaseNotes: (version) =>
+      ipcRenderer.invoke(IPC.uiGetAppReleaseNotes, version),
+    onAppUpdateDownloadProgress: (cb) => {
+      const handler = (
+        _event: unknown,
+        progress: AppUpdateDownloadProgressDto,
+      ) => cb(progress);
+      ipcRenderer.on(IPC.uiAppUpdateDownloadProgress, handler);
+      return () =>
+        ipcRenderer.removeListener(IPC.uiAppUpdateDownloadProgress, handler);
+    },
     getLoraFolder: () => ipcRenderer.invoke(IPC.uiGetLoraFolder),
     pickLoraFolder: () => ipcRenderer.invoke(IPC.uiPickLoraFolder),
     setLoraFolder: (folder) =>

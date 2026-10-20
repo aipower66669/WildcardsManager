@@ -66,6 +66,11 @@ describe('generationFormStore', () => {
       seed: 42,
       width: 1200,
       height: 1600,
+      steps: 20,
+      cfg: 7,
+      samplerName: undefined,
+      scheduler: undefined,
+      denoise: 1,
       additionalPositivePrompt: 'photo',
       negativePrompt: 'bad',
       benchmark: false,
@@ -149,6 +154,11 @@ describe('generationFormStore', () => {
           seed: 42,
           width: 1200,
           height: 1600,
+          steps: 20,
+          cfg: 7,
+          samplerName: 'euler',
+          scheduler: 'normal',
+          denoise: 1,
           additionalPositivePrompt: 'photo',
           negativePrompt: 'cartoon',
           promptText: '',
@@ -163,6 +173,11 @@ describe('generationFormStore', () => {
           seed: 7,
           width: 768,
           height: 768,
+          steps: 8,
+          cfg: 1,
+          samplerName: 'exp_heun_2_x0',
+          scheduler: 'sgm_uniform',
+          denoise: 1,
           additionalPositivePrompt: '__style-hentai__',
           negativePrompt: 'photo',
           promptText: 'typed',
@@ -177,6 +192,11 @@ describe('generationFormStore', () => {
           seed: -1,
           width: 1024,
           height: 1024,
+          steps: 20,
+          cfg: 7,
+          samplerName: '',
+          scheduler: '',
+          denoise: 1,
           additionalPositivePrompt: '',
           negativePrompt: '',
           promptText: '',
@@ -193,6 +213,11 @@ describe('generationFormStore', () => {
     expect(hentai.relativeFolder).toBe('Hentai');
     expect(hentai.seed).toBe(7);
     expect(hentai.width).toBe(768);
+    expect(hentai.steps).toBe(8);
+    expect(hentai.cfg).toBe(1);
+    expect(hentai.samplerName).toBe('exp_heun_2_x0');
+    expect(hentai.scheduler).toBe('sgm_uniform');
+    expect(hentai.denoise).toBe(1);
     expect(hentai.additionalPositivePrompt).toBe('__style-hentai__');
     expect(hentai.negativePrompt).toBe('photo');
 
@@ -207,6 +232,9 @@ describe('generationFormStore', () => {
       '__style-hentai__',
     );
     expect(switched.profiles.hentai.clip).toBe('hentai-clip.safetensors');
+    expect(switched.profiles.hentai.steps).toBe(8);
+    expect(switched.steps).toBe(20);
+    expect(switched.samplerName).toBe('euler');
   });
 
   it('keeps an existing form on Realistic', () => {

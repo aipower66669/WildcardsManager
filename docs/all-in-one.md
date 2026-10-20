@@ -19,7 +19,7 @@ The documents through Roadmap are unchanged copies. **FAQ** is a copy of `docs/F
 | Architecture | `docs/architecture.md` | Process boundaries, data flow, and storage |
 | Development | `docs/development.md` | Source layout, tests, and releases |
 | Roadmap | `docs/roadmap.md` | Shipped work and later plans |
-| FAQ | `docs/FAQ.md` | 100 common questions and answers |
+| FAQ | `docs/FAQ.md` | Common questions and answers |
 | Information for LLM models | this file only | Compact rules for an assistant |
 
 ---
@@ -68,7 +68,7 @@ what you are trying to do.
   examples for diagnostics.
 - [`screenshot.png`](screenshot.png) — README image; replace with a better
   capture without changing links.
-- [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) — current public release (v0.7)
+- [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) — current public release (v0.8)
   overview, installation, and known limitations.
 - [`../CHANGELOG.md`](../CHANGELOG.md) — version-by-version notable changes.
 - [`../LICENSE.md`](../LICENSE.md) — software and sample-library licenses.
@@ -192,7 +192,7 @@ Shipped today:
 - LoRA and Checkpoint file managers (list, filters, identity, embedded page,
   LoRA reverse-refs and training-step series; symlink-aware folder walk);
 - Global search across wildcards and model folders; Prompts workspace; Generation
-  tab (ComfyUI + LT node pack);
+  tab (ComfyUI + LT node pack, per-style KSampler options, reproducible seeds);
 - Civitai Images / Videos Download all with feed frontiers and Browse catch-up;
 - Library Manager (multiple libraries, path migration), LoRA training-series
   previews, LM Studio prompt assist, checkpoint ratings, blocked authors;
@@ -309,8 +309,9 @@ configured **images folder** (Settings) and an AppData download registry.
   browse/download. Set the matching folder in Settings first.
 - **Hugging Face** button for Hub search/downloads (token under Settings → AI
   when a repo is gated).
-- **Settings → General → App updates** to install a newer build from your local
-  `release/` folder without launching the installer by hand.
+- **Settings → General → App updates** checks GitHub Releases when the folder
+  is empty, shows **What's new** for that version, and downloads the installer.
+  A folder you set overrides GitHub and uses the installers in that folder.
 
 ### Generation
 
@@ -335,6 +336,10 @@ list of extra packs the sample graph needs.
    Library Manager: prompts folder and a Generation output folder per style.
 6. **Generation → Save Workflow** (this stores the graph the app will queue),
    then generate from **Use this prompt** or a prompt folder with `!gen.txt`.
+   Each style tab has **Generation** and **Options**. Options holds CLIP, VAE,
+   and KSampler steps, CFG, sampler, scheduler, and denoise. A fixed seed
+   repeats the same image on Once and Infinite. Folder-mode `/New` is optional
+   under **Settings → AI** and is off until you turn it on.
 
 ### Wildcard files (three columns)
 
@@ -610,9 +615,15 @@ settings, not in the repository. A separate **checkpoint folder** setting is
 used for downloads and the Checkpoint files workspace. An **images folder** is
 required for Civitai community Images downloads.
 
-**Settings → General → App updates** can point at your electron-builder
-`release/` folder so you can check for a newer installer and install from inside
-the app (the app closes, the installer runs, leave **Run** checked to relaunch).
+**Settings → General → App updates** checks the public
+[GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases)
+when the folder is empty. **Check for update** looks for a newer installer.
+**What's new** opens that version's release notes so you can read them before
+installing. If the version is not on GitHub yet, the window uses
+`RELEASE_NOTES.md` from the update folder or the folder above it. **Install** downloads the installer, closes the app, and runs it
+(leave **Run** checked to relaunch). A folder you choose overrides GitHub and
+uses the installers already in that folder (`latest.yml` or
+`WildcardsManager-<version>-win-x64.exe`).
 
 ### LoRA and Checkpoint file managers
 
@@ -718,15 +729,29 @@ The **Generation** tab queues jobs against a running ComfyUI instance
 (configure host / Test / Check install under **Settings → AI**):
 
 - **Use this prompt** (typed, with the same `!gen.txt` multi-line rules) or a
-  selected prompt folder. With a folder selected, **Recursive** includes
-  sub-folders that have `!gen.txt`; off uses only that folder.
-- Style profiles (**Realistic** / **Hentai** / **3D**), checkpoint / CLIP / VAE,
-  size, seed, and extra prompts. Seed ≤ 0 (the dice button) rolls a new seed
-  on every run. **Randomize**, next to it, writes one random number into Seed
-  and keeps that number. Each style has its own Generation output root
-  in **Library Manager** (Realistic defaults to the Prompts folder). Folder mode
-  writes `{styleOutput}/{prompt folder}/New`; typed prompts write to the style
-  root.
+  selected prompt folder. **Recursive** sits on the Prompt folder line. With a
+  folder selected, on includes that folder and sub-folders that have
+  `!gen.txt`; off uses only that folder. **Select… [Randomize]** (no folder)
+  picks a folder from the seed.
+- Style profiles (**Realistic** / **Anime** / **3D**). Each profile has
+  **Generation** (prompt folder, checkpoint, seed, size, additional positive,
+  negative) and **Options** (CLIP, VAE, Steps, CFG, Sampler, Scheduler,
+  Denoise). Values are not shared across the three styles. Hover a label for
+  a short explanation. Additional Positive and Negative resize vertically, and
+  that height is remembered.
+- Seed **1 or higher** repeats the same image on **Once** and **Infinite**:
+  the same dropdown and the same Recursive setting pick the same folder and
+  the same line. Seed **0 or below** (the dice) rolls a new seed from the
+  clock on every image. The shuffle button writes one random number into Seed
+  and keeps that number. The crosshair on Last output copies only the seed.
+  An empty `!gen.txt` error names the folder; Infinite skips that image and
+  continues.
+- Each style has its own Generation output root in **Library Manager**
+  (Realistic defaults to the Prompts folder). Folder mode writes
+  `{styleOutput}/{prompt folder}`. **Settings → AI → Save folder-mode images
+  in a New subfolder** adds `/New` and is off until you turn it on. The app
+  does not create that folder; the ComfyUI save node does when it writes the
+  image. Typed prompts write to the style root.
 - **Benchmark** (checkbox next to Checkpoint) walks every `.safetensors` file in
   the library Checkpoint folder that is still ticked **Use in this library**.
   Set **Checkpoint Benchmark folder** in Library
@@ -754,7 +779,8 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   load that checkpoint in the dropdown.
 - **Edit Workflow** / **Save Workflow** for the Comfy graph. **Save Workflow**
   writes the graph the app queues. Until that file exists, Generation has
-  nothing to run.
+  nothing to run. The prompt toolbar, next to **Edit Workflow**, shows whether
+  that graph is ready or which nodes are missing.
 - **Last output** preview can be collapsed for long unattended runs. Under the
   image, **Category** is the prompt folder that produced it (parents as a
   breadcrumb — useful when Randomize picked a sub-folder), then **Positive**
@@ -811,7 +837,11 @@ The repo ships both pieces in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/):
    the workflow menu to open it. The LT nodes are already connected: Prompt →
    Dynamic Prompts → LoRA tag loader, Negative, Seed → sampler, Model → UNET
    loader, CLIP and VAE → their loaders, Width and Height → Empty Latent,
-   Output Folder and Output Filename → Save Image to Folder.
+   Output Folder and Output Filename → Save Image to Folder. Steps, CFG,
+   Sampler, Scheduler, and Denoise are optional: convert those KSampler
+   widgets to inputs and connect **LT · Steps**, **LT · CFG**, **LT · Sampler**,
+   **LT · Scheduler**, and **LT · Denoise** if you want the Options tab to
+   drive them.
 4. **Point the loaders at models you have.** The sample is a Krea 2 graph and
    ships with these filenames:
    - UNET `krea2_turbo_fp8_scaled.safetensors`
@@ -831,14 +861,17 @@ The repo ships both pieces in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/):
      the app. Use **Edit Workflow** later when you change the graph in ComfyUI,
      then save again.
 6. **Generate.** **Use this prompt**, or select a prompt folder that has
-   `!gen.txt`. Folder mode writes
-   `{style output}/{prompt folder}/New`. Typed prompts write to the style root.
+   `!gen.txt`. Folder mode writes `{style output}/{prompt folder}`, plus
+   `/New` only when that Settings → AI option is on. Typed prompts write to
+   the style root.
 
 Required nodes on any graph you save yourself: **LT · Prompt**, **LT · Seed**,
 and a save node the app can find (**LT · Save Output**, or a node whose class
 name contains `SaveImage`, which is what the sample uses). Optional LT nodes
 the app fills in when they are present: Negative, Model, CLIP, VAE, Width,
-Height, Output Folder, Output Filename. Wiring notes are in
+Height, Steps, CFG, Sampler, Scheduler, Denoise, Output Folder, Output
+Filename. A blank Sampler or Scheduler leaves the name already on that node.
+Wiring notes are in
 [`comfyui-lora-training/README.md`](../comfyui-lora-training/README.md).
 
 ### LM Studio prompt assist
@@ -1565,6 +1598,9 @@ the end of the Civitai feed.
 1. Set **Settings → AI** ComfyUI host/port and use **Test** / **Check install**.
 2. Install [`ComfyUI-Workflow/comfyui-lora-training.zip`](../ComfyUI-Workflow/comfyui-lora-training.zip)
    into ComfyUI `custom_nodes/comfyui-lora-training/` and restart ComfyUI.
+   If Options (Steps, CFG, Sampler, Scheduler, Denoise) does nothing, the
+   saved graph does not have those LT nodes yet — add them, **Save Workflow**,
+   and restart ComfyUI after replacing the pack.
    Red nodes on the canvas are packs that are still missing — the sample graph
    also needs Dynamic Prompts, `comfyui_lora_tag_loader`,
    `CoreyCorza/comfyui-lora-loader`, `comfyui-krea2t-enhancer`, and
@@ -1582,14 +1618,15 @@ the end of the Civitai feed.
 
 ## In-app update finds nothing / Install does nothing
 
-1. **Settings → General → App updates** must point at a folder that contains
-   `latest.yml` and/or `WildcardsManager-<version>-win-x64.exe` (your
-   electron-builder `release/` output).
-2. The installer version must be **newer** than the running app (`Help` /
-   Settings shows the running version).
-3. **Install update** closes the app and launches the NSIS UI — leave **Run
-   Wildcards Manager** checked at the end. Unsigned SmartScreen prompts are
-   expected.
+1. With the update folder empty, **Check for update** uses the public GitHub
+   Releases page. A folder you set overrides that and must contain `latest.yml`
+   and/or `WildcardsManager-<version>-win-x64.exe`.
+2. The installer version must be **newer** than the running app (Settings shows
+   the running version). **What's new** opens that version's release notes
+   before you install.
+3. **Install update** downloads the GitHub installer when no folder is set,
+   then closes the app and launches the NSIS UI — leave **Run Wildcards
+   Manager** checked at the end. Unsigned SmartScreen prompts are expected.
 
 ## Archive / Maybe / Notify lists disappeared or look empty
 
@@ -1749,8 +1786,9 @@ generated and gitignored.
 
 Current packages are unsigned. SmartScreen/Gatekeeper warnings are expected for
 unsigned artifacts. Signing and notarization are roadmap items. In-app **App
-updates** only launches an installer you already placed in the configured
-folder — it does not download releases from GitHub automatically.
+updates** downloads the newer installer from GitHub Releases when the update
+folder is empty. A folder you set still launches the installer already in that
+folder.
 
 A version tag builds the Windows installer in GitHub Actions and attaches the
 `.exe` to that release. macOS and Linux packages are still built locally
@@ -2222,16 +2260,17 @@ WildcardsManager-<version>-<os>-<arch>.<ext>
 ```
 
 Local `npm run dist` / `dist:win` / `dist:mac` / `dist:linux` **auto-increment
-the patch** (`0.7.0` → `0.7.1`) before building so in-app **Check for update**
+the patch** (`0.8.0` → `0.8.1`) before building so in-app **Check for update**
 sees a newer installer, then **delete older** `WildcardsManager-*` artifacts in
 `release/` (keeps only the current version’s `.exe` / `.blockmap` / etc.). CI
 skips the bump (`GITHUB_ACTIONS` / `CI`) so tagged releases keep the version
-that matches the tag. To package without bumping locally:
-`SKIP_VERSION_BUMP=1 npm run dist:win`.
+that matches the tag. To package the current version without bumping:
+`npm run dist:nobump`.
 
 There is currently no configured custom icon, signing certificate, or macOS
-notarization. In-app updates launch a local installer from a configured
-`release/` folder (see Settings → App updates).
+notarization. In-app updates download from GitHub Releases when Settings →
+App updates has no folder. A configured `release/` folder still overrides
+that and launches the installer already on disk.
 
 ## CI and releases
 
@@ -2258,8 +2297,8 @@ Before tagging:
 5. create and push the tag:
 
    ```powershell
-   git tag v0.7.0
-   git push origin v0.7.0
+   git tag v0.8.0
+   git push origin v0.8.0
    ```
 
 `CHANGELOG.md` is the permanent version history and follows Keep a Changelog.
@@ -2332,7 +2371,9 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - **Prompts** workspace — folder CRUD, `!gen.txt` validation, collapsible
   samples (v0.6).
 - **Generation** tab — ComfyUI queue, Edit/Save Workflow, style profiles,
-  categorize into prompts (v0.6).
+  categorize into prompts (v0.6). v0.8 adds per-style Options (CLIP, VAE,
+  KSampler), a fixed seed that repeats on Once and Infinite, and an optional
+  New output subfolder.
 - **Civitai Images and Videos** browse/download/archive + background Download
   all (v0.5); feed frontiers / Browse catch-up (v0.6).
 - **Library Manager** with multiple libraries, per-style generation output
@@ -2342,7 +2383,9 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
   after you apply a proposal).
 - Checkpoint half-star ratings; blocked Civitai authors.
 - **Hugging Face Hub** browser and download queue (v0.5).
-- **In-app updates** from a local electron-builder `release/` folder (v0.5).
+- **In-app updates** from GitHub Releases by default, with **What's new**
+  release notes before install. A local electron-builder `release/` folder
+  still overrides that (folder support shipped in v0.5; GitHub in v0.8).
 
 ### Validation and diagnostics
 
@@ -2509,7 +2552,6 @@ Future write features should preserve the current rules:
 7. graph/list refresh and revalidation after mutation;
 8. ambiguous patterns reported, never guessed.
 
-
 ---
 
 <!-- source: docs/FAQ.md -->
@@ -2531,6 +2573,8 @@ No. Generation sends a job to ComfyUI. The Windows installer does not install Co
 ### 3. Which installers exist?
 
 Tagged releases build a Windows x64 NSIS `.exe`, macOS `.dmg` files for Intel and Apple silicon, and a Linux x64 `.AppImage`. Release builds are unsigned, so Windows SmartScreen or macOS Gatekeeper may warn on first launch.
+
+With no folder under **Settings → General → App updates**, **Check for update** uses the public [GitHub Releases](https://github.com/aipower66669/WildcardsManager/releases). When a newer installer is there, **What's new** opens that version's release notes, and **Install** downloads it, closes the app, and runs the installer. A folder you set yourself overrides GitHub and uses the installers in that folder.
 
 ### 4. How do I run it from source?
 
@@ -2576,7 +2620,7 @@ Realistic falls back to the Prompts folder. Hentai and 3D do not. Set those root
 
 ### 14. Where do folder-mode images go?
 
-`{style output}/{prompt folder}/New`. Typed **Use this prompt** jobs write at the style root, not under a prompt-folder `New` directory.
+`{style output}/{prompt folder}`. **Settings → AI → Save folder-mode images in a New subfolder** adds `/New` (off until you turn it on and save). The app does not create that folder; the ComfyUI save node does when it writes the image. Typed **Use this prompt** jobs write at the style root.
 
 ### 15. What does Migrate library paths do?
 
@@ -2776,165 +2820,177 @@ ComfyUI is running (or a launch shortcut is set under **Settings → AI**). **Te
 
 ### 62. Which nodes must the graph contain?
 
-**LT · Prompt**, **LT · Seed**, and a save node the app can find (**LT · Save Output**, or a class name containing `SaveImage`). When present, the app also fills Negative, Model, CLIP, VAE, Width, Height, Output Folder, and Output Filename. The sample graph in `ComfyUI-Workflow/` is a Krea 2 graph and expects extra packs: ComfyUI Dynamic Prompts, a LoRA tag loader, Corza’s LoRA loader, the Krea 2 enhancer, and a `SaveImageToFolder` node that is not inside the LT zip. Install `comfyui-lora-training` so the folder is `custom_nodes/comfyui-lora-training/` and contains `__init__.py`. Restart ComfyUI after adding nodes.
+**LT · Prompt**, **LT · Seed**, and a save node the app can find (**LT · Save Output**, or a class name containing `SaveImage`). When present, the app also fills Negative, Model, CLIP, VAE, Width, Height, Steps, CFG, Sampler, Scheduler, Denoise, Output Folder, and Output Filename. A blank Sampler or Scheduler leaves the name already on that node. The sample graph in `ComfyUI-Workflow/` is a Krea 2 graph and expects extra packs: ComfyUI Dynamic Prompts, a LoRA tag loader, Corza’s LoRA loader, the Krea 2 enhancer, and a `SaveImageToFolder` node that is not inside the LT zip. Install `comfyui-lora-training` so the folder is `custom_nodes/comfyui-lora-training/` and contains `__init__.py`. Restart ComfyUI after replacing the pack so the new KSampler nodes appear.
 
 ### 63. What do Edit Workflow and Save Workflow do?
 
-**Edit Workflow** opens the graph in ComfyUI so you can change it. **Save Workflow** stores the API graph and the LiteGraph UI JSON in `%AppData%/Roaming/wildcards-manager/comfy-workflow.json`. Until that file exists, Generation has nothing to queue. Save again after you change the graph.
+**Edit Workflow** opens the graph in ComfyUI so you can change it. **Save Workflow** stores the API graph and the LiteGraph UI JSON in `%AppData%/Roaming/wildcards-manager/comfy-workflow.json`. Until that file exists, Generation has nothing to queue. Save again after you change the graph. The prompt toolbar shows whether the saved graph is ready, including missing nodes.
 
 ### 64. What is Use this prompt versus a prompt folder?
 
-**Use this prompt** queues the text in the box, with the same multi-line `!gen.txt` rules. A prompt folder queues a line chosen from that folder’s `!gen.txt`. **Recursive** also includes sub-folders that have their own `!gen.txt`. Off means only the selected folder. With a fixed seed, the folder shuffle is deterministic. Seed 0 or below keeps the shuffle varying.
+**Use this prompt** queues the text in the box, with the same multi-line `!gen.txt` rules, and writes to the style output root. A prompt folder queues one line from a `!gen.txt`. **Select… [Randomize]** (no folder) picks a folder from the seed. **Recursive**, on the Prompt folder line, includes that folder and sub-folders that have `!gen.txt`. Off uses only the selected folder. The same seed, the same dropdown, and the same Recursive setting pick the same folder and the same line. Seed 0 or below rolls a new seed from the clock on every image. A fixed seed (1 or higher) repeats that image. An empty `!gen.txt` error names the folder. Infinite skips that image and continues.
 
 ### 65. What do Once and Infinite do?
 
-**Once** queues a single image, then stops. **Infinite** keeps queuing until you cancel. On a Benchmark run the meaning of Infinite is narrower: it continues until every included checkpoint has 10 images, or you cancel. Benchmark **Once** writes one image per included checkpoint.
+**Once** queues a single image, then stops. **Infinite** keeps queuing until you cancel. They use the same pick: a fixed seed repeats the same image, and seed 0 or below rolls a new seed each image. An empty prompt file does not stop Infinite. On a Benchmark run, Infinite continues until every included checkpoint has 10 images, or you cancel. Benchmark **Once** writes one image for the next checkpoint that still needs one. **Cancel** stops the run and interrupts the image in progress.
 
 ### 66. What is the difference between the dice and Randomize?
 
-The dice sets Seed to −1. Any seed ≤ 0, or a non-numeric seed, rolls a new seed on every run. **Randomize** writes one random integer of at least 1 into the field and leaves it there, so later runs reuse that seed until you change it.
+The dice sets Seed to −1. Any seed of 0 or below, or a non-numeric seed, rolls a new seed from the clock on every run. The shuffle button writes one random integer of at least 1 into the field and leaves it there, so later runs reuse that seed until you change it. Both buttons are icons; hover them for the tooltip. The crosshair on Last output copies only that image’s seed. It does not change the prompt folder or Recursive.
 
-### 67. What are prompt substitutions?
+### 67. What is on Generation versus Options?
+
+Under each style tab (**Realistic**, **Anime**, **3D**), **Generation** holds the prompt folder, checkpoint, seed, size, and prompts. **Options** holds CLIP, VAE, and the KSampler fields: Steps, CFG, Sampler, Scheduler, and Denoise. Each style keeps its own values. Steps, CFG, and Denoise apply when **LT · Steps**, **LT · CFG**, and **LT · Denoise** are in the saved workflow. Sampler and Scheduler apply only when you pick a name; blank keeps the name already on **LT · Sampler** or **LT · Scheduler**. Defaults for a new style are 20 steps, CFG 7, and denoise 1. Hover a label for a short explanation. Additional Positive and Negative resize vertically, and that height is remembered.
+
+### 68. Why did reusing a seed not match the Infinite image?
+
+It matches when the prompt-folder dropdown, Recursive, checkpoint, and wildcard files are the same as during that run. The crosshair sets only the seed. A fixed seed picks the folder by itself when the dropdown is **Select… [Randomize]** or Recursive is on. If the dropdown is a specific folder and Recursive is off, the seed does not change the folder.
+
+### 69. Where do I turn the New subfolder on?
+
+**Settings → AI → Save folder-mode images in a New subfolder.** Save that page. The next image uses the new path. It is off until you turn it on. Cancel before the image is saved does not leave an empty New folder, because the app does not create the directory.
+
+### 70. What are prompt substitutions?
 
 Per-library find/replace rules applied to the selected prompt before wildcards expand. A rule runs when the checkpoint **file name** contains the keyword, case-insensitive. Parent folders do not count. The extension is ignored. **Find** is exact and case-sensitive. **Replace** may be empty, which deletes the found text. Every occurrence is replaced. Rules run top to bottom, so later rules see earlier replacements. Up to 200 rules are kept; the keyword is limited to 200 characters and the find/replace strings to 2,000. Incomplete rows (no keyword or empty find) are dropped. The list is `promptSubstitutions` in that library’s `library.json`.
 
-### 68. Which prompt text is substituted?
+### 71. Which prompt text is substituted?
 
 The line from **Use this prompt**, or the line picked from the prompt folder. The extra positive prompt is left as typed. The negative prompt is not run through these rules. Benchmark jobs substitute using the checkpoint being timed, not only the checkpoint selected in the dropdown.
 
-### 69. Why substitute before expansion?
+### 72. Why substitute before expansion?
 
 So a generic wildcard such as `__loraname__` can become `__loraname-KromaVersion__` and that new wildcard then expands. Substituting after expansion would only edit finished text and would not switch wildcard files.
 
-### 70. Do I have to press Save in the substitutions window?
+### 73. Do I have to press Save in the substitutions window?
 
 Yes. The rows in the dialog are a draft until Save. A failed load disables Save so an empty dialog cannot wipe rules that are already on disk. The window position and size are remembered in AppData (`promptSubstitutionsWindow`), separate from the rules.
 
-### 71. What does `[TESTING]` do?
+### 74. What does `[TESTING]` do?
 
 On a `!gen.txt` line, that prefix forces Generation to pick that line. The tag is stripped before substitution and expansion. Use it to debug one line without commenting out the others. Remove it when you want normal random or weighted picks again.
 
-### 72. What do `[xN]`, `[W=N]`, and `[WEIGHT=N]` do?
+### 75. What do `[xN]`, `[W=N]`, and `[WEIGHT=N]` do?
 
 They mark a prompt line with an integer weight. Decode repeats that line N times so it is chosen more often, then strips the tag. This is separate from `{5::option}` weights inside a wildcard file.
 
-### 73. What does Categorize do on Generation?
+### 76. What does Categorize do on Generation?
 
 It appends the current prompt into a prompt folder’s `!gen.txt` so a line you typed can become part of the folder deck. That is different from LoRA download categories, which append a `<lora:…>` snippet to a wildcard file.
 
-### 74. What does the Last output panel show?
+### 77. What does the Last output panel show?
 
 The latest image, the prompt-folder category as a breadcrumb (useful when a sub-folder was picked), and the positive and negative text stored in the image metadata (`parameters` or `comment`). The folder icon reveals the file. The trash icon deletes it. Collapsing the panel is remembered and leaves more room during long runs. The Prompts tab can show the same last output without leaving the editor.
 
-### 75. What is Checkpoint Benchmark?
+### 78. What is Checkpoint Benchmark?
 
 A Generation checkbox that walks every `.safetensors` in the checkpoint folder that is still ticked **Use in this library**. Set **Checkpoint Benchmark folder** first. Each image goes to `{benchmarkRoot}/{file stem}/`. Duplicate stems share a folder. Infinite fills each stem to 10 images. Timings are the sampler’s own steps from the first step through the last, so model load and the file save are not included. A run that never reports that full range is thrown away and tried again. Deleting a sample removes that timing and leaves a free slot for the next run. Stats are `{benchmarkRoot}/benchmark-stats.json`. The same samples show on **Checkpoint files → Benchmark**.
 
-### 76. How do I read the benchmark chart?
+### 79. How do I read the benchmark chart?
 
 Open it from the graph button next to the Benchmark checkbox. Every saved timing is drawn. The blue average and the min–max bar use the 5 fastest runs only. Filter names without caring about case. **Rating** order uses `field_rating` in each sample folder’s `mfe_meta` and hides folders with no rating. **Weight** mixes that rating with average time: 100 means fastest and highest rated; a fast low-rated result or a slow top-rated one scores lower. The name filter and the sort are remembered. Hover a point for the name. Click a point to load that checkpoint in the dropdown. The window is movable and resizable.
 
-### 77. Can Generation start ComfyUI for me?
+### 80. Can Generation start ComfyUI for me?
 
 If **Settings → AI** has a launch shortcut and the server is offline, the app can start it. You still install ComfyUI and the custom nodes yourself. Host, port, and TLS live in that same settings page, not on the Generation tab.
 
 ## Prompts and coverage
 
-### 78. What belongs in the Prompts folder?
+### 81. What belongs in the Prompts folder?
 
 Folders of `!gen.txt` files plus optional sample images. Right-click a folder to rename, delete (the system confirms), or add a sub-folder. **+** beside the root creates a top-level folder. **Validate** checks every gen file for missing or invalid wildcards. The editor is the same wildcard editor as the graph.
 
-### 79. What is Prompt Coverage?
+### 82. What is Prompt Coverage?
 
 A background simulation over every decoded line of every `!gen.txt`. Each line is expanded with the same Monte Carlo walk as Analyze simulation, using that iteration count and seed. The report groups wildcard files as never, rare, normal, or hot, and shows which prompt folders drive them. A worker thread keeps the UI responsive. Closing the dialog does not throw away a finished report. The toolbar shows percent while it runs. Results are `prompt-coverage.json` in the sibling `.wcm` folder. **Ignore** hides a tool file or a rare file from Never Used; those ignores survive later runs. You can also ignore from a wildcard’s toolbar or context menu.
 
-### 80. Why did Samples not load?
+### 83. Why did Samples not load?
 
 The Samples panel can be collapsed, and that choice is remembered. While it is collapsed, selecting a folder does not scan for images. Expand it to load samples. **Last output** on that same panel shows the live Generation preview instead.
 
 ## LM Studio
 
-### 81. What does LM Studio assist do?
+### 84. What does LM Studio assist do?
 
 On a wildcard’s details pane, **Prompt** talks to a local OpenAI-compatible LM Studio server. Set host, model, and an optional API key under **Settings → AI → LM Studio**, then Test. Presets and a free-text instruction propose a new file body. Saved prompts are your instruction library. Nothing is written until you apply the proposal into the open editor.
 
-### 82. Does assist see unsaved edits?
+### 85. Does assist see unsaved edits?
 
 Yes. It reads the editor draft, not a separate copy on disk. Apply writes into that buffer; you still **Save** the file when you want it on disk.
 
 ## Civitai models
 
-### 83. Which Civitai site should I pick?
+### 86. Which Civitai site should I pick?
 
 **Settings → Civitai → Site**. `civitai.com` is the SFW-oriented catalog. `civitai.red` is the NSFW catalog. The choice selects the API and the account for **models**. Images and Videos have their own **SFW only / SFW + NSFW / NSFW only** filter. Create the API key on the same site you selected.
 
-### 84. Do I need an API key to browse?
+### 87. Do I need an API key to browse?
 
 No. Search and browse work without a key. Many model downloads do require one, because the creator requires a logged-in user. Those fail with `401 Unauthorized`. Paste the key under **Settings → Civitai → API key**.
 
-### 85. What are the model tabs?
+### 88. What are the model tabs?
 
 **Browse**, **Queued**, **Downloaded**, **Maybe**, **Archive**, and **Notify me**. Mode chips are **LoRA**, **Checkpoint**, **Images**, and **Videos**, remembered per library. Cards can show **New**, **Installed**, **Archived**, or **Possible match**.
 
-### 86. What does Archive do?
+### 89. What does Archive do?
 
 It hides that model from Browse. Open **Archive** to unarchive or to download something you skipped. **Archive shown** archives the cards currently on screen, not the rest of the catalog. Archive is per library.
 
-### 87. What is Maybe?
+### 90. What is Maybe?
 
 A holding list for models you might want later, separate from Archive and from Notify. It is stored in that library’s `library.json`.
 
-### 88. What is Notify me?
+### 91. What is Notify me?
 
 For early-access models. They leave Browse and sit on **Notify me** with a countdown that refreshes about once a minute. **Check availability** updates them. When early access ends they can show as available so you can download, then **Remove**. Models that unlock can also stay findable from Browse until you dismiss them.
 
-### 89. What does the download queue do?
+### 92. What does the download queue do?
 
 **Queued** lists waiting jobs and ignores Browse category filters, so the grid matches the badge. A transient network failure pauses the queue (about 60 seconds, then auto-retry, or Resume yourself) instead of deleting it. You can pause, resume, cancel, and reorder. The download console at the bottom of the browser is a filterable log of API waits, retries, and transfers.
 
-### 90. Do downloads keep going if I leave the browser?
+### 93. Do downloads keep going if I leave the browser?
 
 Yes. The queue runs in the main process. Switching from Images back to LoRA, or closing the Civitai panel, does not cancel model or **Download all** jobs. If you close the main window while model downloads are still queued, the app can stay running in the background until that queue is idle. Quitting the app stops it.
 
-### 91. What is a LoRA download category?
+### 94. What is a LoRA download category?
 
 A named destination: a LoRA subfolder, a wildcard file, and default weights. Manage them from the Wildcard or LoRA tabs, from **Set as Category** / **Edit as Category** on a wildcard, or from **Manage…** in the download dialog. The last category is remembered. Confirming a download appends a snippet to that wildcard (undoable) and does not copy it to the clipboard. Checkpoints use a folder picker only; they do not append a wildcard line.
 
-### 92. What does the appended snippet look like?
+### 95. What does the appended snippet look like?
 
 A comment with the Civitai model URL, optional extra comment lines, then `<lora:filename:{weights}>`, then trigger words. Several triggers become a multi-select such as `{1-2$$trigger1 | trigger2}`. One trigger stays plain. Triggers come from Civitai when the model has them. **Extra prompt** is text after the triggers.
 
-### 93. What does Shift+click Download do?
+### 96. What does Shift+click Download do?
 
 It skips the dialog and queues with the same defaults as opening the dialog and confirming immediately: preferred non-early-access file, last category, default weights, no extra comment or prompt.
 
-### 94. Can I detach the Civitai window?
+### 97. Can I detach the Civitai window?
 
 Yes. **Detach** opens a separate window and the app reopens it detached next time. **Attach** docks it back into the main window. Size, position, maximized state, and that preference are remembered. Quitting the app closes the Civitai window too.
 
-### 95. How do browse filters work?
+### 98. How do browse filters work?
 
 Category tags (Character, Style, Concept, and the rest), architecture (SD 1.5, SDXL, Flux, Krea 2, WAN/Video, Other), hide installed, only new, and only possible matches are remembered per library. Card width is remembered. Covers are cached as cropped thumbs; new downloads can also keep a full-size file under `!Thumbnails/`.
 
-### 96. What does catalog sync do?
+### 99. What does catalog sync do?
 
 The app keeps a local slice of the Civitai catalog so Browse can filter without hitting the API for every card. You can sync, cancel a sync, and set an auto-sync interval. Hash and preview warming run in the background and report progress. Sync does not download model weights.
 
 ## Images, videos, and Hugging Face
 
-### 97. How do community image downloads work?
+### 100. How do community image downloads work?
 
 Set **Images folder** first. Sorts are **Newest**, **Most Reactions**, **Most Comments**, and **Most Collected**. Each sort is a Civitai ranking, not a local reorder. Files land in `<imagesFolder>/<base model>/`. **Date modified** is set to the creator’s upload time. Already-downloaded ids are stored in AppData. Changing the images folder does not reset that registry, so the app still knows which ids it has saved. Sub-tabs are Browse, Downloaded, and Archive. Filters are remembered per library.
 
-### 98. What is Download all?
+### 101. What is Download all?
 
 It walks the current Images or Videos feed, skips archived and already downloaded cards, archives after a successful save, and keeps going if you leave that mode. When a feed is exhausted or already caught up, a summary shows how far the walk went, then the job pauses about 5 minutes and moves to the next sort. Per-feed tip watermarks remember how far Newest, and ranked sorts after a full exhaust, have been covered, so the next run pulls the new tip instead of months of known pages. If Browse catch-up stops too early, **Continue to end** ignores the tip for that walk. Ranked sorts do not stop after a few known tip pages unless that feed was once walked all the way to the end of the API.
 
-### 99. How do Videos differ from Images?
+### 102. How do Videos differ from Images?
 
 Same browse, sort, content filter, and Download all behavior, with a **Videos folder** and a separate download registry. Blocking a creator hides that person’s model cards and their media cards. Blocks are per library, under Settings → Civitai.
 
-### 100. How do I use Hugging Face, and what should I not expect the app to do?
+### 103. How do I use Hugging Face, and what should I not expect the app to do?
 
 The **Hugging Face** button searches the Hub, with filters remembered per library. A token under **Settings → AI** is for gated repos. Downloads use their own queue (pause, resume, cancel) next to Civitai model downloads. Archived Hub models are per library.
 
@@ -2960,7 +3016,7 @@ This section is for an assistant reading the bundle. Prefer these rules when a u
 | What | Where |
 | --- | --- |
 | Folder pointers, UI prefs, API key, HF token, window geometry, `promptSubstitutionsWindow`, benchmark chart filter/sort, hardware-acceleration flag | `%AppData%/Roaming/wildcards-manager/settings.json` (platform app-data + `wildcards-manager`) |
-| Generation form: prompt text, seed, checkpoint, CLIP, VAE, size, style, prompt source | `generation-form.json` in that same folder |
+| Generation form: prompt text, seed, checkpoint, CLIP, VAE, size, steps, CFG, sampler, scheduler, denoise, style, prompt source. Prompt-box heights and the New-subfolder checkbox are app settings, not this file | `generation-form.json` in that same folder |
 | Comfy host/port and launch shortcut | `comfy-settings.json` there |
 | Saved Comfy API graph + LiteGraph UI | `comfy-workflow.json` there |
 | LM Studio host/model and saved assist instructions | `lm-studio-settings.json` and `lm-studio-prompt-library.json` there |
@@ -2977,6 +3033,12 @@ This section is for an assistant reading the bundle. Prefer these rules when a u
 
 Both `userData` and `sessionData` are pinned to that folder, so the few UI toggles kept in `localStorage` (collapsed panels and similar) travel with the shared profile.
 
+## App updates
+
+Settings → General → App updates. An empty folder (the default) checks `https://github.com/aipower66669/WildcardsManager/releases` through the GitHub API (`/releases/latest`) and downloads the installer for this computer. A saved folder overrides that and uses `latest.yml` or `WildcardsManager-<version>-*.exe|dmg|AppImage` in the folder. Clearing the folder returns to GitHub. An existing folder is left as it is.
+
+What's new opens a window with that version's GitHub release notes (the release body, otherwise `RELEASE_NOTES.md` on the tag) rendered as markdown. If that version is not published yet, the window uses `RELEASE_NOTES.md` in the update folder or the folder above it. Install confirms, downloads when the source is GitHub, launches the installer, and quits. Leave Run checked. Two-part tags such as `v0.7` compare as `0.7.0`.
+
 ## Workspace
 
 Tabs, in product language: Wildcard files, LoRA files, Checkpoint files, Prompts, Generation, Search. Civitai and Hugging Face are browsers opened from the toolbar (Civitai can be a modal or a detached window).
@@ -2985,7 +3047,7 @@ Library Manager fields: wildcards root, LoRA folder, checkpoint folder, LoRA tra
 
 Realistic output empty → use the Prompts folder. Hentai and 3D have no fallback.
 
-Generation output paths: folder mode `{styleOutput}/{promptFolder}/New`; typed prompt → style output root.
+Generation output paths: folder mode `{styleOutput}/{promptFolder}`. Append `/New` only when Settings → AI **Save folder-mode images in a New subfolder** is saved on (default off). The app does not mkdir that folder. Typed prompt → style output root.
 
 ## Substitutions (exact)
 
@@ -3003,15 +3065,17 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 
 ## Seeds
 
-- UI seed ≤ 0 or not a finite number → `resolveGenerationSeed` rolls a new uint32 every run. The dice button sets −1.
-- Randomize writes one integer in `1 .. 0xfffffffe` and leaves it. Later runs keep it.
-- Fixed seed also reseeds the prompt-folder deck. Seed ≤ 0 leaves that shuffle on `Math.random`.
+- UI seed ≤ 0 or not a finite number → `resolveGenerationSeed` rolls `(Date.now() + counter) >>> 0` every image. The dice button sets −1.
+- The shuffle button writes one integer in `1 .. 0xfffffffe` and leaves it. Later runs keep it.
+- A fixed seed repeats the same image on Once and Infinite. Folder pick is `pickFolderBySeed`: sort the candidate folders, then mulberry32(seed). No folder deck. Empty dropdown = every `!gen.txt` folder. Recursive = the selected folder and descendants. A specific folder with Recursive off uses only that folder.
+- The Last output crosshair writes only the seed. It does not change the dropdown or Recursive.
+- Empty `!gen.txt` errors are prefixed with the folder. Infinite records the seed, skips, and continues.
 
 ## `!gen.txt` line tags
 
 - `[TESTING]` forces that line, then is stripped before substitution and expansion.
 - `[xN]`, `[W=N]`, `[WEIGHT=N]` with integer N duplicate the line N times for weighted picking, then the tag is stripped.
-- Recursive off: only the selected folder’s `!gen.txt`. Recursive on: sub-folders that have `!gen.txt` too.
+- Recursive sits on the Prompt folder label. Off: only the selected folder’s `!gen.txt`. On: that folder and sub-folders that have `!gen.txt`.
 
 ## Generation modes and benchmark
 
@@ -3021,7 +3085,9 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 - A saved timing is sampler steps from the first reported step through the last. Model load and file save are outside that range. If the run never reports the full range, the image is deleted and the slot is retried.
 - Chart: all saved timings are drawn. Average and min–max use the 5 fastest only. Rating sort reads `field_rating` from `mfe_meta` in the sample folder and hides folders with no rating. Weight sort mixes that rating with average time (100 = fastest and highest rated). Name filter is case-insensitive. Filter and sort persist.
 - Deleting a benchmark image drops that timing and opens a slot.
-- Required graph nodes: LT · Prompt, LT · Seed, and a save node (`LT · Save Output` or class name containing `SaveImage`). Optional fills: Negative, Model, CLIP, VAE, Width, Height, Output Folder, Output Filename.
+- Each style tab has Generation and Options. Options: CLIP, VAE, steps (default 20), cfg (default 7), sampler name, scheduler, denoise (default 1). Empty sampler or scheduler is not applied. Steps, cfg, and denoise are applied when those LT nodes are bound.
+- Required graph nodes: LT · Prompt, LT · Seed, and a save node (`LT · Save Output` or class name containing `SaveImage`). Optional fills: Negative, Model, CLIP, VAE, Width, Height, Steps, CFG, Sampler, Scheduler, Denoise, Output Folder, Output Filename.
+- Workflow-ready status is next to Edit Workflow, not in the Generation fields.
 - Sample graph file: `ComfyUI-Workflow/WildcardManager-ComfyUI-Generation-Workflow.json`. Node pack zip: `ComfyUI-Workflow/comfyui-lora-training.zip` → `custom_nodes/comfyui-lora-training/`. The sample also needs ComfyUI Dynamic Prompts, a LoRA tag loader, Corza LoRA loader, Krea 2 enhancer, and a `SaveImageToFolder`-class node that is not in the LT zip.
 - Comfy connection UI is Settings → AI, not the Generation tab. The app can launch Comfy from the configured shortcut when the server is down.
 

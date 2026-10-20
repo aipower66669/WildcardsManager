@@ -7,11 +7,21 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-20
+
 ### Added
 
-- Generation **Randomize** (next to the seed dice) writes one random number
+- Generation is split into **Generation** and **Options** under each style tab
+  (Realistic, Anime, 3D). Options holds CLIP, VAE, and the KSampler fields
+  Steps, CFG, Sampler, Scheduler, and Denoise. Each style keeps its own
+  values.
+- LT nodes **LT · Steps**, **LT · CFG**, **LT · Sampler**, and
+  **LT · Scheduler**. **LT · Denoise** fills KSampler denoise. Blank Sampler
+  or Scheduler leaves the name already on that node.
+- Field labels and Once / Infinite / Cancel have tooltips.
+- Generation **shuffle** (next to the seed dice) writes one random number
   into Seed and keeps it. The dice button still sets −1, which rolls a new
-  seed on every run.
+  seed from the clock on every image.
 - Generation **Substitutions** opens as a movable, resizable window (size
   remembered). It stores per-library prompt
   replacements. When the checkpoint file name contains a keyword, Find text in
@@ -25,6 +35,10 @@ and uses [Semantic Versioning](https://semver.org/).
   library’s `library.json`.
 - Version tags build the Windows NSIS installer in GitHub Actions and attach
   the `.exe` (plus blockmap and `latest.yml`) to the GitHub Release.
+- **App updates** check GitHub Releases when the update folder is empty,
+  download the installer for this computer, and open **What's new** with that
+  version's release notes before install. A folder you set still overrides
+  GitHub.
 - **Generation install guide.** `ComfyUI-Workflow/` ships the
   `comfyui-lora-training` node zip and a ComfyUI graph
   (`WildcardManager-ComfyUI-Generation-Workflow.json`). The user guide explains
@@ -56,6 +70,28 @@ and uses [Semantic Versioning](https://semver.org/).
 - **Expand** on Prompts expands the selected `!gen.txt`. On Generation it
   expands the prompt **Once** would queue for the current seed and prompt
   source.
+- An empty `!gen.txt` error names the folder. Infinite skips that image,
+  shows the seed, and continues.
+- Seed 0 or below no longer repeats the same rolled seed after a failed
+  image. Each roll uses the clock.
+
+### Changed
+
+- A fixed seed repeats the same image on **Once** and **Infinite**. The
+  folder (when the dropdown is **Select… [Randomize]** or **Recursive** is
+  on) and the `!gen.txt` line both come from that seed. There is no shared
+  folder deck.
+- **Recursive** sits on the Prompt folder line. The workflow-ready line sits
+  next to **Edit Workflow**, not in the Generation fields.
+- **Once** and **Infinite** stay on the left. **Cancel** stays on the right.
+- Additional Positive and Negative resize vertically only, and that height is
+  remembered.
+- Folder-mode images write to `{style output}/{prompt folder}`.
+  **Settings → AI → Save folder-mode images in a New subfolder** adds `/New`
+  and is off by default. The app does not create the folder; the ComfyUI save
+  node does. Typed prompts still write to the style root.
+- The Last output crosshair sets only the seed. It does not change the prompt
+  folder or Recursive.
 
 ## [0.7.0] - 2026-10-15
 
@@ -390,7 +426,8 @@ First public release.
 - Mutations validate supported extensions and use atomic replacement.
 - Ambiguous glob references are reported rather than silently rewritten.
 
-[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/aipower66669/WildcardsManager/releases/tag/v0.7.0
 [0.6.0]: https://github.com/aipower66669/WildcardsManager/releases/tag/v0.6.0
 [0.5.0]: https://github.com/aipower66669/WildcardsManager/releases/tag/v0.5.0

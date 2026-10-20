@@ -40,6 +40,11 @@ function emptyStyleProfile(): GenerationStyleProfileDto {
     seed: -1,
     width: 1024,
     height: 1024,
+    steps: 20,
+    cfg: 7,
+    samplerName: '',
+    scheduler: '',
+    denoise: 1,
     additionalPositivePrompt: '',
     negativePrompt: '',
     promptText: '',
@@ -62,6 +67,11 @@ const DEFAULT_FORM: GenerationFormStateDto = {
   seed: -1,
   width: 1024,
   height: 1024,
+  steps: 20,
+  cfg: 7,
+  samplerName: '',
+  scheduler: '',
+  denoise: 1,
   additionalPositivePrompt: '',
   negativePrompt: '',
   promptText: '',
@@ -93,6 +103,16 @@ function asFiniteNumber(value: unknown, fallback: number): number {
 function asPositiveInt(value: unknown, fallback: number): number {
   const n = asFiniteNumber(value, fallback);
   return Math.max(1, Math.round(n));
+}
+
+function asCfg(value: unknown, fallback: number): number {
+  const n = asFiniteNumber(value, fallback);
+  return Math.min(100, Math.max(0, n));
+}
+
+function asDenoise(value: unknown, fallback: number): number {
+  const n = asFiniteNumber(value, fallback);
+  return Math.min(1, Math.max(0, n));
 }
 
 function asProfileId(value: unknown): GenerationStyleProfileIdDto | null {
@@ -132,6 +152,19 @@ function readStyleProfile(
     height: has('height')
       ? asPositiveInt(row.height, fallback.height)
       : fallback.height,
+    steps: has('steps')
+      ? asPositiveInt(row.steps, fallback.steps)
+      : fallback.steps,
+    cfg: has('cfg') ? asCfg(row.cfg, fallback.cfg) : fallback.cfg,
+    samplerName: has('samplerName')
+      ? asString(row.samplerName)
+      : fallback.samplerName,
+    scheduler: has('scheduler')
+      ? asString(row.scheduler)
+      : fallback.scheduler,
+    denoise: has('denoise')
+      ? asDenoise(row.denoise, fallback.denoise)
+      : fallback.denoise,
     additionalPositivePrompt: has('additionalPositivePrompt')
       ? asString(row.additionalPositivePrompt)
       : fallback.additionalPositivePrompt,
@@ -220,6 +253,11 @@ function withActiveProfile(
     | 'seed'
     | 'width'
     | 'height'
+    | 'steps'
+    | 'cfg'
+    | 'samplerName'
+    | 'scheduler'
+    | 'denoise'
     | 'additionalPositivePrompt'
     | 'negativePrompt'
     | 'promptText'
@@ -237,6 +275,11 @@ function withActiveProfile(
     seed: active.seed,
     width: active.width,
     height: active.height,
+    steps: active.steps,
+    cfg: active.cfg,
+    samplerName: active.samplerName,
+    scheduler: active.scheduler,
+    denoise: active.denoise,
     additionalPositivePrompt: active.additionalPositivePrompt,
     negativePrompt: active.negativePrompt,
     promptText: active.promptText,
@@ -443,6 +486,11 @@ export function generationRequestFromForm(
     seed: form.seed,
     width: form.width,
     height: form.height,
+    steps: form.steps,
+    cfg: form.cfg,
+    samplerName: form.samplerName.trim() || undefined,
+    scheduler: form.scheduler.trim() || undefined,
+    denoise: form.denoise,
     additionalPositivePrompt: form.additionalPositivePrompt || undefined,
     negativePrompt: form.negativePrompt || undefined,
     benchmark: form.benchmark === true,
@@ -515,6 +563,19 @@ export function saveGenerationForm(
     }
     if (patch.height !== undefined) {
       target.height = asPositiveInt(patch.height, target.height);
+    }
+    if (patch.steps !== undefined) {
+      target.steps = asPositiveInt(patch.steps, target.steps);
+    }
+    if (patch.cfg !== undefined) target.cfg = asCfg(patch.cfg, target.cfg);
+    if (patch.samplerName !== undefined) {
+      target.samplerName = asString(patch.samplerName);
+    }
+    if (patch.scheduler !== undefined) {
+      target.scheduler = asString(patch.scheduler);
+    }
+    if (patch.denoise !== undefined) {
+      target.denoise = asDenoise(patch.denoise, target.denoise);
     }
     if (patch.additionalPositivePrompt !== undefined) {
       target.additionalPositivePrompt = asString(patch.additionalPositivePrompt);
