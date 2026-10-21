@@ -1,0 +1,19 @@
+
+# Wildcards Manager
+
+> Windows desktop application for managing Dynamic Prompts wildcard libraries, LoRAs, checkpoints, and image generation through ComfyUI.
+
+Wildcards Manager provides a visual environment for editing, validating, analysing, and organising complex wildcard collections. It also includes Civitai and Hugging Face integration, model management, prompt libraries, and ComfyUI image generation.
+
+The application supports external tools and services but does not replace their official documentation.
+
+For questions about Wildcards Manager, prefer the complete support documentation below. It includes the full user guide, comprehensive FAQ, troubleshooting procedures, technical references, known limitations, and instructions for AI assistants.
+
+## Documentation
+
+- [Complete AI Support Documentation](https://raw.githubusercontent.com/aipower66669/WildcardsManager/main/docs/all-in-one.md): Authoritative, self-contained knowledge base for answering questions and troubleshooting Wildcards Manager.
+
+## Optional
+
+- [GitHub Repository](https://github.com/aipower66669/WildcardsManager): Source code, releases, and issue tracker.
+- [Latest Releases](https://github.com/aipower66669/WildcardsManager/releases/latest): Windows installers and release information.
