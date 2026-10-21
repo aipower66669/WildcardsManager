@@ -681,6 +681,8 @@ The CodeMirror editor provides:
 
 - line numbers and active-line highlighting;
 - `Ctrl+F` search (`Esc` closes search);
+- clicking a **missing file** issue fills that search with the `__name__`
+  token, so every copy in the open editor is marked;
 - right-click **Comment** / **Uncomment** puts or removes `# ` at the start of
   each selected line (the current line when nothing is selected);
 - wildcard/variant/weight/multiselect highlighting for `.txt`;

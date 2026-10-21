@@ -25,7 +25,8 @@ import {
 import { remapPromptFolderPath } from '../domain/promptFolderNames';
 import type { ParsedCivitaiModelPageUrl } from '../domain/civitaiSnippet.js';
 import type { GenPromptValidationFileDto, PromptTreeDto } from '../shared/contracts';
-import { WildcardEditor } from './WildcardEditor';
+import { missingFileSearchQuery } from '../domain/missingFileSearch';
+import { WildcardEditor, type WildcardEditorHandle } from './WildcardEditor';
 import { PanelSplitter, type PanelSplitterHandlers } from './PanelSplitter';
 import {
   openPromptFolderContextMenu,
@@ -163,6 +164,7 @@ export function PromptsWorkspace({
   const [generationStarting, setGenerationStarting] = useState(false);
   const [genExists, setGenExists] = useState(false);
   const [editorText, setEditorText] = useState('');
+  const genEditorRef = useRef<WildcardEditorHandle | null>(null);
   if (genTextRef) {
     genTextRef.current = {
       relativeFolder: selectedFolder,
@@ -803,10 +805,16 @@ export function PromptsWorkspace({
         {selectedFolder ? (
           genExists || editorText.length > 0 ? (
             <WildcardEditor
+              ref={genEditorRef}
               className="prompts-gen-editor"
               value={editorText}
               fileExt=".txt"
               wildcardKeys={wildcardKeys}
+              issues={
+                selectedFolder
+                  ? issuesByFolder.get(selectedFolder)?.issues
+                  : undefined
+              }
               onOpenWildcard={onOpenWildcard}
               onCreateWildcard={onCreateWildcard}
               onRenameLora={onRenameLora}
@@ -841,8 +849,20 @@ export function PromptsWorkspace({
         )}
         {selectedFolder && issuesByFolder.get(selectedFolder)?.issues.length ? (
           <ul className="prompts-gen-issues">
-            {issuesByFolder.get(selectedFolder)!.issues.map((issue, index) => (
-              <li key={`${issue.code}-${issue.line ?? ''}-${index}`}>
+            {issuesByFolder.get(selectedFolder)!.issues.map((issue, index) => {
+              const search = missingFileSearchQuery(issue);
+              return (
+              <li
+                key={`${issue.code}-${issue.line ?? ''}-${index}`}
+                className={search ? 'is-searchable' : undefined}
+                title={search ? `Search for ${search}` : undefined}
+                onClick={() => {
+                  if (issue.line) {
+                    genEditorRef.current?.jumpToLine(issue.line, issue.column);
+                  }
+                  if (search) genEditorRef.current?.findText(search);
+                }}
+              >
                 <p className={issue.severity === 'warning' ? 'warn-text' : 'error-text'}>
                   <strong>{issue.code.replaceAll('_', ' ')}</strong>
                   {' — '}
@@ -850,7 +870,8 @@ export function PromptsWorkspace({
                   {issue.line ? ` · line ${issue.line}` : ''}
                 </p>
               </li>
-            ))}
+              );
+            })}
           </ul>
         ) : null}
       </section>

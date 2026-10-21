@@ -611,6 +611,10 @@ button.status-bar-queue-btn:hover {
   padding: 3px 0;
 }
 
+.prompts-gen-issues li.is-searchable {
+  cursor: pointer;
+}
+
 .prompts-gen-issues .error-text,
 .prompts-gen-issues .warn-text {
   margin: 0;

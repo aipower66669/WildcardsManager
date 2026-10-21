@@ -79,6 +79,7 @@ import {
   DEFAULT_CIVITAI_ORIGIN,
 } from '../domain/civitaiSnippet';
 import { siblingBalanceScores } from '../domain/simulateBalance';
+import { missingFileSearchQuery } from '../domain/missingFileSearch';
 import { mergeLibraryTextBuffers } from '../domain/libraryTextMerge';
 import {
   applyLoraWildcardBufferOp,
@@ -840,6 +841,8 @@ export function App() {
     column?: number;
     /** Prefer jumping once this node (or its file key) is selected. */
     nodeId?: string;
+    /** Fill the editor search box so every copy of this token is marked. */
+    search?: string;
   } | null>(null);
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [renameLoraTarget, setRenameLoraTarget] = useState<string | null>(null);
@@ -2442,6 +2445,7 @@ export function App() {
     if (!nodeMatches) return;
     const timer = window.setTimeout(() => {
       editorRef.current?.jumpToLine(pending.line, pending.column);
+      if (pending.search) editorRef.current?.findText(pending.search);
       pendingJumpRef.current = null;
     }, 40);
     return () => window.clearTimeout(timer);
@@ -3496,6 +3500,7 @@ export function App() {
 
       const line = issue.line;
       const column = issue.column;
+      const search = missingFileSearchQuery(issue) ?? undefined;
 
       const jumpNow = (targetNodeId?: string) => {
         if (line == null) return;
@@ -3508,10 +3513,12 @@ export function App() {
           line,
           column,
           nodeId: targetNodeId,
+          search,
         };
         if (alreadyOnTarget && fileContent) {
           window.setTimeout(() => {
             editorRef.current?.jumpToLine(line, column);
+            if (search) editorRef.current?.findText(search);
             pendingJumpRef.current = null;
           }, 0);
         }
@@ -5116,6 +5123,7 @@ export function App() {
                         readOnly={false}
                         fileExt={selectedFileEntry?.ext ?? '.txt'}
                         wildcardKeys={wildcardKeys}
+                        issues={displayedNodeIssues}
                         onOpenWildcard={(name) => void openWildcardFromEditor(name)}
                         onCreateWildcard={openCreateMissing}
                         onRenameLora={(name) => setRenameLoraTarget(name)}

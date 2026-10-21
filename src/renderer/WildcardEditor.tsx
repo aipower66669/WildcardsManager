@@ -8,6 +8,7 @@ import {
 } from 'react';
 import {
   Decoration,
+  type DecorationSet,
   EditorView,
   placeholder,
   crosshairCursor,
@@ -37,7 +38,13 @@ import {
   syntaxHighlighting,
 } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
-import { openSearchPanel, searchKeymap } from '@codemirror/search';
+import {
+  findNext,
+  openSearchPanel,
+  SearchQuery,
+  searchKeymap,
+  setSearchQuery,
+} from '@codemirror/search';
 import {
   defaultKeymap,
   history,
@@ -115,6 +122,8 @@ function applyExternalDocText(view: EditorView, text: string): void {
 
 export type WildcardEditorHandle = {
   jumpToLine: (line: number, column?: number) => void;
+  /** Open the editor search panel and highlight every match. */
+  findText: (query: string) => void;
   focus: () => void;
   getValue: () => string;
   /** Replace the document from outside (e.g. after a library rewrite), even if focused. */
@@ -148,6 +157,13 @@ type Props = {
   wildcardKeys?: string[];
   /** Shown while the document is empty. */
   placeholderText?: string;
+  /**
+   * Issues to mark in the text. Omit this and set `validatePrompt` to check
+   * the buffer as a Generation prompt.
+   */
+  issues?: EditorIssueMark[];
+  /** Debounced check of this buffer as a prompt (`!gen.txt` rules). */
+  validatePrompt?: boolean;
   /** Open / focus a resolved `__wildcard__` reference under the cursor. */
   onOpenWildcard?: (name: string) => void;
   /** Create a missing `__wildcard__` file from the name under the cursor. */
@@ -279,6 +295,32 @@ const editorSetup: Extension = [
   ]),
 ];
 
+export type EditorIssueMark = {
+  line?: number;
+  column?: number;
+  severity?: 'error' | 'warning' | 'info';
+  snippet?: string;
+  message?: string;
+};
+
+/** How many characters to underline, starting at a 1-based column. */
+export function issueSpanLength(
+  lineText: string,
+  column: number,
+  snippet?: string,
+): number {
+  const rest = lineText.slice(Math.max(0, column - 1));
+  if (!rest) return 0;
+  if (snippet && rest.startsWith(snippet)) return snippet.length;
+  if (rest.startsWith('__')) {
+    const close = rest.indexOf('__', 2);
+    return close >= 0 ? close + 2 : rest.length;
+  }
+  const lora = /^<lora:[^>\n]*>/i.exec(rest);
+  if (lora) return lora[0].length;
+  return 1;
+}
+
 const setHighlightLine = StateEffect.define<number | null>();
 
 const highlightLineField = StateField.define<{ line: number | null }>({
@@ -302,6 +344,62 @@ const highlightLineField = StateField.define<{ line: number | null }>({
         ]);
       };
     }),
+});
+
+const setIssueMarks = StateEffect.define<EditorIssueMark[]>();
+
+function issueMarkDecorations(
+  state: EditorState,
+  marks: EditorIssueMark[],
+): DecorationSet {
+  const doc = state.doc;
+  const ranges = [];
+  const lineSeverity = new Map<number, 'error' | 'warning'>();
+  for (const mark of marks) {
+    if (mark.severity === 'info') continue;
+    const lineNo = mark.line;
+    if (lineNo == null || lineNo < 1 || lineNo > doc.lines) continue;
+    const severity = mark.severity === 'warning' ? 'warning' : 'error';
+    const prev = lineSeverity.get(lineNo);
+    if (prev !== 'error') lineSeverity.set(lineNo, severity);
+    if (mark.column == null || mark.column < 1) continue;
+    const line = doc.line(lineNo);
+    const length = issueSpanLength(line.text, mark.column, mark.snippet);
+    if (length < 1) continue;
+    const from = Math.min(line.to, line.from + mark.column - 1);
+    const to = Math.min(line.to, from + length);
+    if (to <= from) continue;
+    ranges.push(
+      Decoration.mark({
+        class: `cm-issue-span cm-issue-span-${severity}`,
+        attributes: mark.message ? { title: mark.message } : undefined,
+      }).range(from, to),
+    );
+  }
+  for (const [lineNo, severity] of lineSeverity) {
+    const line = doc.line(lineNo);
+    ranges.push(
+      Decoration.line({
+        class: `cm-issue-line cm-issue-line-${severity}`,
+      }).range(line.from),
+    );
+  }
+  return Decoration.set(ranges, true);
+}
+
+const issueMarkField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(value, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setIssueMarks)) {
+        return issueMarkDecorations(tr.state, effect.value);
+      }
+    }
+    return value.map(tr.changes);
+  },
+  provide: (field) => EditorView.decorations.from(field),
 });
 
 function languageForExt(ext?: string): Extension {
@@ -434,8 +532,19 @@ const editorTheme = EditorView.theme(
       backgroundColor: '#8a6a12',
       outline: '1px solid #ffd666',
     },
-    '.cm-issue-line': {
-      backgroundColor: 'rgba(180, 60, 70, 0.22)',
+    '.cm-issue-line, .cm-issue-line-error': {
+      backgroundColor: 'rgba(180, 60, 70, 0.28)',
+    },
+    '.cm-issue-line-warning': {
+      backgroundColor: 'rgba(180, 140, 40, 0.22)',
+    },
+    '.cm-issue-span-error': {
+      textDecoration: 'underline wavy #ff6b6b',
+      textUnderlineOffset: '3px',
+    },
+    '.cm-issue-span-warning': {
+      textDecoration: 'underline wavy #e6b450',
+      textUnderlineOffset: '3px',
     },
     '&.cm-focused': {
       outline: 'none',
@@ -494,6 +603,8 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
       fileExt,
       wildcardKeys = [],
       placeholderText,
+      issues,
+      validatePrompt = false,
       onOpenWildcard,
       onCreateWildcard,
       onRenameLora,
@@ -518,6 +629,7 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
     const [contextMenu, setContextMenu] = useState<EditorContextMenu | null>(
       null,
     );
+    const [liveIssues, setLiveIssues] = useState<EditorIssueMark[]>([]);
     const readOnlyRef = useRef(readOnly);
     readOnlyRef.current = readOnly;
 
@@ -545,6 +657,21 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
           viewRef.current?.dispatch({ effects: setHighlightLine.of(null) });
           highlightTimer.current = null;
         }, 2500);
+      },
+      findText(query: string) {
+        const view = viewRef.current;
+        const text = query.trim();
+        if (!view || !text) return;
+        openSearchPanel(view);
+        view.dispatch({
+          effects: setSearchQuery.of(
+            new SearchQuery({ search: text, literal: true }),
+          ),
+        });
+        findNext(view);
+        view.dom
+          .querySelector<HTMLInputElement>('.cm-search input[name="search"]')
+          ?.focus();
       },
       focus() {
         viewRef.current?.focus();
@@ -737,6 +864,7 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
             }),
           ),
           highlightLineField,
+          issueMarkField,
           editorTheme,
           keymap.of([
             // Prefer accepting an open completion over indent (indentWithTab
@@ -780,6 +908,46 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
       if (!view) return;
       applyExternalDocText(view, value);
     }, [value]);
+
+    useEffect(() => {
+      if (issues || !validatePrompt) return;
+      const ext = (fileExt ?? '.txt').toLowerCase();
+      if (ext !== '.txt' || !value.trim()) {
+        setLiveIssues([]);
+        return;
+      }
+      let cancelled = false;
+      const timer = window.setTimeout(() => {
+        void window.wcm.prompts
+          .validateText(value)
+          .then((row) => {
+            if (!cancelled) setLiveIssues(row.issues);
+          })
+          .catch(() => {
+            if (!cancelled) setLiveIssues([]);
+          });
+      }, 400);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
+    }, [issues, validatePrompt, fileExt, value]);
+
+    const drawnIssues = issues ?? liveIssues;
+    const issueKey = drawnIssues
+      .map(
+        (mark) =>
+          `${mark.line ?? ''}:${mark.column ?? ''}:${mark.severity ?? ''}:${mark.snippet ?? ''}:${mark.message ?? ''}`,
+      )
+      .join('\n');
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({ effects: setIssueMarks.of(drawnIssues) });
+      // issueKey is the value identity; drawnIssues is read from this render.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [issueKey]);
 
     useEffect(() => {
       const view = viewRef.current;

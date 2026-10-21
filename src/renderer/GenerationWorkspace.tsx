@@ -39,6 +39,7 @@ import type {
   PromptTreeDto,
 } from '../shared/contracts';
 import { appendGenPromptIfMissing } from '../domain/genPrompts.js';
+import { missingFileSearchQuery } from '../domain/missingFileSearch';
 import { randomFixedGenerationSeed } from '../domain/generationPromptPick.js';
 import { PanelSplitter, type PanelSplitterHandlers } from './PanelSplitter';
 import { loadWorkflowIntoComfyEditor } from './comfyWorkflowEditor';
@@ -1507,6 +1508,7 @@ export function GenerationWorkspace({
               value={additionalPositive}
               fileExt=".txt"
               wildcardKeys={wildcardKeys}
+              validatePrompt
               placeholderText={
                 profile === 'hentai'
                   ? 'e.g. __style-hentai__'
@@ -1541,6 +1543,7 @@ export function GenerationWorkspace({
               value={negative}
               fileExt=".txt"
               wildcardKeys={wildcardKeys}
+              validatePrompt
               onOpenWildcard={onOpenWildcard}
               onCreateWildcard={onCreateWildcard}
               onRenameLora={onRenameLora}
@@ -1950,6 +1953,7 @@ export function GenerationWorkspace({
                 value={promptText}
                 fileExt=".txt"
                 wildcardKeys={wildcardKeys}
+                issues={promptIssues}
                 onOpenWildcard={onOpenWildcard}
                 onCreateWildcard={onCreateWildcard}
                 onRenameLora={onRenameLora}
@@ -1962,9 +1966,13 @@ export function GenerationWorkspace({
               />
               {promptIssues.length > 0 ? (
                 <ul className="prompts-gen-issues">
-                  {promptIssues.map((issue, index) => (
+                  {promptIssues.map((issue, index) => {
+                    const search = missingFileSearchQuery(issue);
+                    return (
                     <li
                       key={`${issue.code}-${issue.line ?? ''}-${index}`}
+                      className={search ? 'is-searchable' : undefined}
+                      title={search ? `Search for ${search}` : undefined}
                       onClick={() => {
                         if (issue.line) {
                           promptEditorRef.current?.jumpToLine(
@@ -1972,6 +1980,7 @@ export function GenerationWorkspace({
                             issue.column,
                           );
                         }
+                        if (search) promptEditorRef.current?.findText(search);
                       }}
                     >
                       <p
@@ -1985,7 +1994,8 @@ export function GenerationWorkspace({
                         {issue.line ? ` · line ${issue.line}` : ''}
                       </p>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               ) : null}
               {promptSource === 'folder' ? (

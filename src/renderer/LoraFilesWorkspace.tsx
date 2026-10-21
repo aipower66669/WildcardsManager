@@ -197,6 +197,7 @@ export function LoraFilesWorkspace({
   const [editorPath, setEditorPath] = useState<string | null>(null);
   const [editorText, setEditorText] = useState('');
   const [editorDirty, setEditorDirty] = useState(false);
+  const [editorIssues, setEditorIssues] = useState<IssueDto[]>([]);
   const [contextMenu, setContextMenu] =
     useState<ModelFileContextMenuState | null>(null);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
@@ -1095,6 +1096,7 @@ export function LoraFilesWorkspace({
                 </div>
                 <WildcardEditor
                   value={editorText}
+                  issues={editorIssues}
                   fileExt={
                     editorPath.match(/\.(ya?ml|json|txt)$/i)?.[0]?.toLowerCase()
                   }

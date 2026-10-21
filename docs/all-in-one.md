@@ -1215,6 +1215,8 @@ The CodeMirror editor provides:
 
 - line numbers and active-line highlighting;
 - `Ctrl+F` search (`Esc` closes search);
+- clicking a **missing file** issue fills that search with the `__name__`
+  token, so every copy in the open editor is marked;
 - right-click **Comment** / **Uncomment** puts or removes `# ` at the start of
   each selected line (the current line when nothing is selected);
 - wildcard/variant/weight/multiselect highlighting for `.txt`;
@@ -3542,6 +3544,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 
 - Editor disk write is Save only.
 - Editor context menu **Comment** inserts `# ` at column 0 of each line in the selection (or the caret line). **Uncomment** removes one leading `#` and the single space after it, after any leading spaces. A trimmed line that starts with `#` is a comment.
+- Clicking a `missing_file` issue opens the editor search filled with that `__name__` token. Search marks every match. `Esc` closes the panel.
 - Rename rewrites exact refs case-insensitively and does not rewrite globs.
 - Delete strips exact inbound refs; globs remain as warnings.
 - Consolidate: single-line non-glob forwarder → point callers at the target, delete the forwarder.
