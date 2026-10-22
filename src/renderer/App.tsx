@@ -4181,9 +4181,7 @@ export function App() {
             title={
               coverageRunning
                 ? `Coverage running — ${coverageProgress?.percent?.toFixed(0) ?? 0}%`
-                : workspaceTab === 'generation'
-                  ? 'Coverage — simulate all !gen.txt prompts and measure wildcard usage'
-                  : 'Coverage — opens Generation and measures wildcard usage from every !gen.txt'
+                : `Coverage — ${simSettings.iterations.toLocaleString()} generations, one random prompt folder each walk`
             }
           >
             {coverageRunning ? (
@@ -5788,6 +5786,7 @@ export function App() {
           progress={coverageProgress}
           report={coverageReport}
           starting={coverageStarting}
+          walks={simSettings.iterations}
           onClose={() => setCoverageOpen(false)}
           onStart={() => void startCoverage()}
           onCancel={cancelCoverage}

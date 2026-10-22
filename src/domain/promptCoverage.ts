@@ -1,10 +1,11 @@
 /**
- * Exhaustive prompt-library coverage: every decoded !gen.txt line × N Monte Carlo
- * walks, then never-used / hot buckets against the wildcard file universe.
+ * Prompt-library coverage: N simulated generations (random folder, then a
+ * random decoded line), each followed by one wildcard Monte Carlo walk.
+ * Never-used / hot buckets are scored against the wildcard file universe.
  */
 
 import { createVisitWalker } from './expand.js';
-import { stripTestingGenTag } from './genPrompts.js';
+import { createMulberry32, stripTestingGenTag } from './genPrompts.js';
 import { extractRefsFromText } from './parseRefs.js';
 import { buildLibraryIndex, resolveWildcard } from './resolveWildcard.js';
 import type { Issue, LibraryFile } from './types.js';
@@ -48,7 +49,8 @@ export type PromptCoverageReport = {
   seed: number;
   iterations: number;
   totalWalks: number;
-  selection: 'allGenLines';
+  /** `randomGeneration` picks a folder, then a decoded line. `allGenLines` is a pre-0.8.10 report. */
+  selection: PromptCoverageSelection;
   promptsRoot?: string;
   summary: {
     genFolders: number;
@@ -101,6 +103,8 @@ export type PromptCoverageRun = {
 
 const COVERAGE_ROOT = '__wcm_coverage__';
 
+export type PromptCoverageSelection = 'allGenLines' | 'randomGeneration';
+
 function percentile(sortedAsc: number[], p: number): number {
   if (sortedAsc.length === 0) return 0;
   const idx = Math.min(
@@ -139,7 +143,10 @@ export function collectDirectGenRefs(
 }
 
 /**
- * Create a chunkable coverage run. Walks every gen line × `iterations`.
+ * Create a chunkable coverage run.
+ * Each walk picks a folder uniformly, then a decoded line in that folder
+ * (weight copies stay, so a heavier line is more likely inside its folder),
+ * then one wildcard walk. `iterations` is the walk count.
  */
 export function createPromptCoverageRun(
   input: PromptCoverageInput,
@@ -160,14 +167,10 @@ export function createPromptCoverageRun(
     }))
     .filter((f) => f.lines.length > 0);
 
-  const flat: Array<{ relativeFolder: string; line: string }> = [];
-  for (const file of genFiles) {
-    for (const line of file.lines) {
-      flat.push({ relativeFolder: file.relativeFolder, line });
-    }
-  }
+  genFiles.sort((a, b) => a.relativeFolder.localeCompare(b.relativeFolder));
+  const lineCount = genFiles.reduce((n, file) => n + file.lines.length, 0);
 
-  const totalWalks = flat.length * iterations;
+  const totalWalks = lineCount === 0 ? 0 : iterations;
   const libraryKeys = input.libraryFiles.map((f) => f.key);
   const libraryKeySet = new Set(libraryKeys);
 
@@ -179,6 +182,8 @@ export function createPromptCoverageRun(
 
   const edgeKey = (parent: string, child: string) => `${parent}\0${child}`;
   const directRefs = collectDirectGenRefs(genFiles, input.libraryFiles);
+  const pickRng = createMulberry32(seed);
+  const folderWalkCounts = new Map<string, number>();
 
   const walker = createVisitWalker(
     input.libraryFiles,
@@ -189,7 +194,7 @@ export function createPromptCoverageRun(
   let walkIndex = 0;
   let finished = totalWalks === 0;
   let cancelled = false;
-  let currentFolder = flat[0]?.relativeFolder ?? '';
+  let currentFolder = genFiles[0]?.relativeFolder ?? '';
 
   return {
     total: totalWalks,
@@ -217,9 +222,15 @@ export function createPromptCoverageRun(
           finished = true;
           return false;
         }
-        const lineIndex = Math.floor(walkIndex / iterations);
-        const entry = flat[lineIndex]!;
-        currentFolder = entry.relativeFolder;
+        const folder =
+          genFiles[Math.floor(pickRng() * genFiles.length)]!;
+        const line =
+          folder.lines[Math.floor(pickRng() * folder.lines.length)]!;
+        currentFolder = folder.relativeFolder;
+        folderWalkCounts.set(
+          folder.relativeFolder,
+          (folderWalkCounts.get(folder.relativeFolder) ?? 0) + 1,
+        );
         const touched = new Set<string>();
         walker.setOnVisit((key, fromKey) => {
           visits.set(key, (visits.get(key) ?? 0) + 1);
@@ -229,7 +240,7 @@ export function createPromptCoverageRun(
             edgeVisits.set(ek, (edgeVisits.get(ek) ?? 0) + 1);
           }
         });
-        walker.walkLine(entry.line, COVERAGE_ROOT);
+        walker.walkLine(line, COVERAGE_ROOT);
         for (const key of touched) {
           hits.set(key, (hits.get(key) ?? 0) + 1);
           let folderMap = byFolderHits.get(key);
@@ -238,13 +249,13 @@ export function createPromptCoverageRun(
             byFolderHits.set(key, folderMap);
           }
           folderMap.set(
-            entry.relativeFolder,
-            (folderMap.get(entry.relativeFolder) ?? 0) + 1,
+            folder.relativeFolder,
+            (folderMap.get(folder.relativeFolder) ?? 0) + 1,
           );
-          let walkMap = folderWalkHits.get(entry.relativeFolder);
+          let walkMap = folderWalkHits.get(folder.relativeFolder);
           if (!walkMap) {
             walkMap = new Map();
-            folderWalkHits.set(entry.relativeFolder, walkMap);
+            folderWalkHits.set(folder.relativeFolder, walkMap);
           }
           walkMap.set(key, (walkMap.get(key) ?? 0) + 1);
         }
@@ -358,7 +369,7 @@ export function createPromptCoverageRun(
         return {
           relativeFolder: file.relativeFolder,
           lineCount: file.lines.length,
-          walksFromFolder: file.lines.length * iterations,
+          walksFromFolder: folderWalkCounts.get(file.relativeFolder) ?? 0,
           topKeys,
         };
       });
@@ -379,11 +390,11 @@ export function createPromptCoverageRun(
         seed,
         iterations,
         totalWalks,
-        selection: 'allGenLines',
+        selection: 'randomGeneration',
         ...(input.promptsRoot ? { promptsRoot: input.promptsRoot } : {}),
         summary: {
           genFolders: genFiles.length,
-          genLines: flat.length,
+          genLines: lineCount,
           libraryFiles: libraryKeys.length,
           reachedFiles,
           neverReachedFiles: neverReached.length,

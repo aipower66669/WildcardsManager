@@ -215,12 +215,18 @@ The **Prompts** tab manages prompt folders under the configured prompts root
   can debug one line without commenting out the others. Prefix with `[xN]`,
   `[W=N]`, or `[WEIGHT=N]` (integer N) to weigh that prompt — decode expands it
   into N copies so it is relatively more likely to be picked (tag stripped).
-- **Coverage** (toolbar) switches to **Generation** and runs a background
-  simulation over **every** decoded prompt line in every `!gen.txt`: each line
-  is expanded with the usual Monte Carlo wildcard walk (`iterations` times,
-  same seed setting as Analyze
-  simulation). It reports which wildcard **files** are never reached, which are
-  hot / over-used, and which prompt folders drive them. The run uses a worker
+- **Coverage** (toolbar) switches to **Generation** and runs one simulated
+  generation per **Iterations** value (settings gear → **Simulation**, from 1
+  to 1,000,000, default 10,000). Each walk picks a prompt folder at random
+  (every folder with a `!gen.txt` is equally likely), then a random decoded
+  line in that folder, then one Monte Carlo wildcard walk. A heavier line
+  (`[xN]` / `[W=N]`) is more likely inside its own folder. A folder with more
+  prompts does not receive more walks. The seed is the same Simulation seed.
+  Tabs
+  are **Never**, **Ignored**, **Rare**, **Hot**, **All**,
+  and **By prompt**. **Rare** is the low-reach quartile (below the 25th
+  percentile of files that were hit at least once). Each tab lists every
+  matching wildcard. The run uses a worker
   thread so the UI stays responsive; close the dialog anytime — the toolbar
   shows live percent until it finishes. Results persist as
   `prompt-coverage.json` in the wildcards sibling `.wcm` sidecar. Use
@@ -261,6 +267,10 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   a short explanation. Additional Positive and Negative use the same prompt
   editor as **Use this prompt** (wildcard highlighting and `__` completion).
   They resize vertically, and that height is remembered.
+- **Width** and **Height** have three buttons. **Swap** exchanges them.
+  **Decrease** and **Increase** step to the nearest smaller or larger common
+  size with a close aspect ratio. Both sides of a stepped size are a multiple
+  of 16. The tooltip shows the size the button will write.
 - Seed **1 or higher** repeats the same image on **Once** and **Infinite**:
   the same dropdown and the same Recursive setting pick the same folder and
   the same line. Seed **0 or below** (the dice) rolls a new seed from the

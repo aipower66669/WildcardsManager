@@ -20,7 +20,7 @@ import type {
 import { modalOverlayDismiss } from './modalOverlayDismiss';
 import { usePersistedFloatingModal } from './usePersistedFloatingModal';
 
-type TabId = 'never' | 'ignored' | 'hot' | 'all' | 'byPrompt';
+type TabId = 'never' | 'ignored' | 'rare' | 'hot' | 'all' | 'byPrompt';
 
 type Props = {
   progress: PromptCoverageProgressDto | null;
@@ -31,6 +31,8 @@ type Props = {
   onReportUpdated?: (report: PromptCoverageReportDto) => void;
   onOpenWildcard?: (key: string) => void;
   onSelectPromptFolder?: (relativeFolder: string) => void;
+  /** Generations this run will take. Application settings → Simulation. */
+  walks?: number;
   starting?: boolean;
 };
 
@@ -72,6 +74,7 @@ export function PromptCoverageModal({
   onReportUpdated,
   onOpenWildcard,
   onSelectPromptFolder,
+  walks = 10_000,
   starting = false,
 }: Props) {
   const running = progress?.status === 'running' || starting;
@@ -133,6 +136,8 @@ export function PromptCoverageModal({
       );
     } else if (tab === 'ignored') {
       rows = rows.filter((w) => ignoredSet.has(w.key));
+    } else if (tab === 'rare') {
+      rows = rows.filter((w) => w.bucket === 'rare');
     } else if (tab === 'hot') {
       rows = rows.filter((w) => w.bucket === 'hot');
     }
@@ -142,6 +147,13 @@ export function PromptCoverageModal({
         (a, b) =>
           b.reachRate - a.reachRate ||
           b.visits - a.visits ||
+          a.key.localeCompare(b.key),
+      );
+    } else if (tab === 'rare') {
+      rows = [...rows].sort(
+        (a, b) =>
+          a.reachRate - b.reachRate ||
+          a.visits - b.visits ||
           a.key.localeCompare(b.key),
       );
     } else if (tab === 'ignored') {
@@ -237,6 +249,11 @@ export function PromptCoverageModal({
           <h2 id="prompt-coverage-title">
             <PieChart size={18} /> Prompt coverage
           </h2>
+          <p className="prompt-coverage-head-meta">
+            {report && !running
+              ? `seed ${report.seed} · ${new Date(report.generatedAt).toLocaleString()}`
+              : null}
+          </p>
           <div className="row-actions">
             <button
               type="button"
@@ -308,6 +325,7 @@ export function PromptCoverageModal({
                 <button
                   type="button"
                   className="primary"
+                  title={`${walks.toLocaleString()} generations. Change Iterations under the settings gear → Simulation (1–1,000,000).`}
                   onClick={() => {
                     setError(null);
                     onStart();
@@ -345,62 +363,48 @@ export function PromptCoverageModal({
 
               {report ? (
                 <>
-                  <div className="prompt-coverage-summary">
-                    <span>
+                  <div className="prompt-coverage-tabs">
+                    <div className="prompt-coverage-tab-list">
+                      {(
+                        [
+                          ['never', `Never (${report.summary.neverReachedFiles})`],
+                          [
+                            'ignored',
+                            `Ignored (${
+                              report.summary.ignoredNeverFiles ??
+                              report.ignoredKeys?.length ??
+                              0
+                            })`,
+                          ],
+                          [
+                            'rare',
+                            `Rare (${
+                              report.summary.rareFiles ??
+                              report.wildcards.filter((w) => w.bucket === 'rare')
+                                .length
+                            })`,
+                          ],
+                          ['hot', `Hot (${report.summary.hotFiles})`],
+                          ['all', `All (${report.summary.libraryFiles})`],
+                          ['byPrompt', `By prompt (${report.summary.genFolders})`],
+                        ] as const
+                      ).map(([id, label]) => (
+                        <button
+                          key={id}
+                          type="button"
+                          className={tab === id ? 'active' : ''}
+                          onClick={() => setTab(id)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="prompt-coverage-tab-meta">
                       {report.summary.reachedFiles.toLocaleString()} /{' '}
                       {report.summary.libraryFiles.toLocaleString()} reached
-                    </span>
-                    <span>
-                      {report.summary.neverReachedFiles.toLocaleString()} never
-                    </span>
-                    {(report.summary.ignoredNeverFiles ??
-                      report.ignoredKeys?.length ??
-                      0) > 0 ? (
-                      <span>
-                        {(
-                          report.summary.ignoredNeverFiles ??
-                          report.ignoredKeys.length
-                        ).toLocaleString()}{' '}
-                        ignored
-                      </span>
-                    ) : null}
-                    <span>{report.summary.hotFiles.toLocaleString()} hot</span>
-                    <span>
-                      {report.summary.genLines.toLocaleString()} lines ×{' '}
-                      {report.iterations.toLocaleString()}
-                    </span>
-                    <span className="hint">
-                      seed {report.seed} ·{' '}
-                      {new Date(report.generatedAt).toLocaleString()}
-                    </span>
-                  </div>
-
-                  <div className="prompt-coverage-tabs">
-                    {(
-                      [
-                        ['never', `Never (${report.summary.neverReachedFiles})`],
-                        [
-                          'ignored',
-                          `Ignored (${
-                            report.summary.ignoredNeverFiles ??
-                            report.ignoredKeys?.length ??
-                            0
-                          })`,
-                        ],
-                        ['hot', `Hot (${report.summary.hotFiles})`],
-                        ['all', `All (${report.summary.libraryFiles})`],
-                        ['byPrompt', `By prompt (${report.summary.genFolders})`],
-                      ] as const
-                    ).map(([id, label]) => (
-                      <button
-                        key={id}
-                        type="button"
-                        className={tab === id ? 'active' : ''}
-                        onClick={() => setTab(id)}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                      {' · '}
+                      {report.totalWalks.toLocaleString()} walks
+                    </p>
                   </div>
 
                   {tab !== 'byPrompt' ? (
@@ -428,7 +432,7 @@ export function PromptCoverageModal({
                             </tr>
                           </thead>
                           <tbody>
-                            {filtered.slice(0, 500).map((row) => (
+                            {filtered.map((row) => (
                               <tr key={row.key}>
                                 <td>
                                   <button
@@ -502,13 +506,6 @@ export function PromptCoverageModal({
                             ))}
                           </tbody>
                         </table>
-                        {filtered.length > 500 ? (
-                          <p className="hint">
-                            Showing first 500 of{' '}
-                            {filtered.length.toLocaleString()}. Refine the filter
-                            to narrow results.
-                          </p>
-                        ) : null}
                         {filtered.length === 0 ? (
                           <p className="hint">No rows match.</p>
                         ) : null}
@@ -562,9 +559,8 @@ export function PromptCoverageModal({
                 </>
               ) : (
                 <p className="hint">
-                  Coverage walks every decoded prompt in every `!gen.txt`
-                  (`iterations` Monte Carlo expansions per line) and reports which
-                  wildcard files are never reached or over-used. Results are saved
+                  Each generation picks a prompt folder at random, then a decoded
+                  line in that folder, then one wildcard walk. Results are saved
                   to the wildcards sidecar as `prompt-coverage.json`.
                 </p>
               )}

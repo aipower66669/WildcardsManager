@@ -854,7 +854,7 @@ export function ApplicationSettingsModal({
 
                 <SettingsSection
                   title="Simulation"
-                  help="Settings are remembered across sessions. The Simulate button runs immediately with these values against the currently selected root. More iterations give steadier percentages (10,000 is a good default)."
+                  help="Settings are remembered across sessions. Simulate and Coverage both use this iteration count and seed. Simulate walks the selected wildcard. Coverage runs that many generations, picking a prompt folder at random each time. More iterations give steadier percentages (10,000 is a good default)."
                 >
                   <div className="sim-fields">
                     <label className="inline-field">

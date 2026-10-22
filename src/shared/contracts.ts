@@ -922,7 +922,8 @@ export type PromptCoverageReportDto = {
   seed: number;
   iterations: number;
   totalWalks: number;
-  selection: 'allGenLines';
+  /** `randomGeneration` picks a folder, then a decoded line. Older reports say `allGenLines`. */
+  selection: 'allGenLines' | 'randomGeneration';
   promptsRoot?: string;
   summary: {
     genFolders: number;

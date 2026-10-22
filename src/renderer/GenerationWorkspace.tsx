@@ -8,6 +8,9 @@ import {
   type MutableRefObject,
 } from 'react';
 import {
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowUp,
   LineChart,
   Crosshair,
   Dices,
@@ -41,6 +44,10 @@ import type {
 import { appendGenPromptIfMissing } from '../domain/genPrompts.js';
 import { missingFileSearchQuery } from '../domain/missingFileSearch';
 import { randomFixedGenerationSeed } from '../domain/generationPromptPick.js';
+import {
+  stepGenerationResolution,
+  swapGenerationSize,
+} from '../domain/generationResolution';
 import { PanelSplitter, type PanelSplitterHandlers } from './PanelSplitter';
 import { loadWorkflowIntoComfyEditor } from './comfyWorkflowEditor';
 import { comfyHttpBase } from '../shared/comfy';
@@ -352,6 +359,14 @@ export function GenerationWorkspace({
   const usableCheckpoints = useMemo(
     () => safetensorCheckpoints.filter((file) => file.enabled !== false),
     [safetensorCheckpoints],
+  );
+  const smallerSize = useMemo(
+    () => stepGenerationResolution(width, height, 'down'),
+    [width, height],
+  );
+  const largerSize = useMemo(
+    () => stepGenerationResolution(width, height, 'up'),
+    [width, height],
   );
 
   useEffect(() => {
@@ -1486,6 +1501,66 @@ export function GenerationWorkspace({
                 onChange={(e) => setHeight(Number(e.target.value) || 1024)}
               />
             </label>
+            <div className="generation-size-actions">
+              <span className="generation-action-tip" title="Swap width and height">
+                <button
+                  type="button"
+                  className="generation-action-btn"
+                  aria-label="Swap width and height"
+                  onClick={() => {
+                    const next = swapGenerationSize(width, height);
+                    setWidth(next.width);
+                    setHeight(next.height);
+                  }}
+                >
+                  <ArrowLeftRight size={14} />
+                </button>
+              </span>
+              <span
+                className="generation-action-tip"
+                title={
+                  smallerSize
+                    ? `Decrease resolution to ${smallerSize.width}×${smallerSize.height}`
+                    : 'No smaller common resolution'
+                }
+              >
+                <button
+                  type="button"
+                  className="generation-action-btn"
+                  aria-label="Decrease resolution"
+                  disabled={!smallerSize}
+                  onClick={() => {
+                    if (!smallerSize) return;
+                    setWidth(smallerSize.width);
+                    setHeight(smallerSize.height);
+                  }}
+                >
+                  <ArrowDown size={14} />
+                </button>
+              </span>
+              <span
+                className="generation-action-tip"
+                title={
+                  largerSize
+                    ? `Increase resolution to ${largerSize.width}×${largerSize.height}`
+                    : 'No larger common resolution'
+                }
+              >
+                <button
+                  type="button"
+                  className="generation-action-btn"
+                  aria-label="Increase resolution"
+                  disabled={!largerSize}
+                  onClick={() => {
+                    if (!largerSize) return;
+                    setWidth(largerSize.width);
+                    setHeight(largerSize.height);
+                  }}
+                >
+                  <ArrowUp size={14} />
+                </button>
+              </span>
+            </div>
           </div>
 
           <label

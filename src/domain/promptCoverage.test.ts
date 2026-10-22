@@ -37,8 +37,8 @@ describe('promptCoverage', () => {
       ],
     });
 
-    expect(report.selection).toBe('allGenLines');
-    expect(report.totalWalks).toBe(80); // 2 lines × 40
+    expect(report.selection).toBe('randomGeneration');
+    expect(report.totalWalks).toBe(40);
     expect(report.summary.genLines).toBe(2);
     expect(report.summary.libraryFiles).toBe(3);
 
@@ -78,7 +78,7 @@ describe('promptCoverage', () => {
       seed: 3,
       genFiles: [{ relativeFolder: 'f', lines: ['__x__', '__x__'] }],
     });
-    expect(run.total).toBe(200);
+    expect(run.total).toBe(100);
     run.runChunk(10);
     expect(run.done).toBe(10);
     run.runChunk(5, () => true);
@@ -122,6 +122,58 @@ describe('promptCoverage', () => {
       'normal',
     );
     expect(refreshed.report.neverReached).not.toContain('unused');
+  });
+
+  it('gives each folder about the same number of walks', () => {
+    const fatLines = Array.from({ length: 40 }, (_, i) => `__fat${i}__`);
+    const report = runPromptCoverageSync({
+      libraryId: 'test',
+      libraryFiles: [
+        ...fatLines.map((line) => file(line.slice(2, -2), 'x')),
+        file('thin', 'x'),
+      ],
+      iterations: 4_000,
+      seed: 11,
+      genFiles: [
+        { relativeFolder: 'fat', lines: fatLines },
+        { relativeFolder: 'thin', lines: ['__thin__'] },
+      ],
+    });
+    const walks = new Map(
+      report.genFolders.map((folder) => [
+        folder.relativeFolder,
+        folder.walksFromFolder,
+      ]),
+    );
+    expect(walks.get('fat')! + walks.get('thin')!).toBe(4_000);
+    expect(walks.get('fat')!).toBeGreaterThan(1_600);
+    expect(walks.get('thin')!).toBeGreaterThan(1_600);
+    expect(report.wildcards.find((w) => w.key === 'thin')?.hits).toBeGreaterThan(
+      0,
+    );
+    for (let i = 0; i < fatLines.length; i += 1) {
+      expect(
+        report.wildcards.find((w) => w.key === `fat${i}`)?.hits ?? 0,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps weight copies more likely inside one folder', () => {
+    const report = runPromptCoverageSync({
+      libraryId: 'test',
+      libraryFiles: [file('often', 'a'), file('seldom', 'b')],
+      iterations: 4_000,
+      seed: 12,
+      genFiles: [
+        {
+          relativeFolder: 'weighted',
+          lines: ['__often__', '__often__', '__often__', '__seldom__'],
+        },
+      ],
+    });
+    const often = report.wildcards.find((w) => w.key === 'often')?.hits ?? 0;
+    const seldom = report.wildcards.find((w) => w.key === 'seldom')?.hits ?? 0;
+    expect(often).toBeGreaterThan(seldom * 2);
   });
 
   it('hides ignored keys from actionable Never counts', () => {

@@ -118,7 +118,7 @@ function toReportDto(
     seed: withIgnore.seed,
     iterations: withIgnore.iterations,
     totalWalks: withIgnore.totalWalks,
-    selection: 'allGenLines',
+    selection: withIgnore.selection,
     promptsRoot: withIgnore.promptsRoot,
     summary: {
       ...withIgnore.summary,
@@ -209,7 +209,7 @@ function domainReportAsDto(
     seed: withIgnore.seed,
     iterations: withIgnore.iterations,
     totalWalks: withIgnore.totalWalks,
-    selection: 'allGenLines',
+    selection: withIgnore.selection,
     promptsRoot: withIgnore.promptsRoot,
     summary: {
       ...withIgnore.summary,
@@ -388,11 +388,14 @@ export function startPromptCoverage(
   }
 
   const settings = loadSettings();
+  const configured =
+    typeof settings.simulationIterations === 'number' &&
+    Number.isFinite(settings.simulationIterations)
+      ? settings.simulationIterations
+      : 10_000;
   const iterations = Math.max(
     1,
-    Math.floor(
-      request.iterations ?? settings.simulationIterations ?? 10_000,
-    ),
+    Math.min(1_000_000, Math.floor(request.iterations ?? configured)),
   );
   const seed =
     request.seed !== undefined
@@ -403,7 +406,7 @@ export function startPromptCoverage(
   activeGeneration = gen;
   runStartedAt = Date.now();
   resetEtaSmoothing();
-  const total = lineCount * iterations;
+  const total = iterations;
 
   emitProgress({
     status: 'running',

@@ -54,6 +54,60 @@ if (!parentPort) {
 const CHUNK = 200;
 let cancelRequested = false;
 
+/** Let the worker event loop deliver a cancel message between chunks. */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
+async function executeRun(input: PromptCoverageInput): Promise<void> {
+  const run = createPromptCoverageRun(input);
+  if (run.total === 0) {
+    const report = run.buildReport('done');
+    const out: PromptCoverageWorkerDoneMessage = { type: 'done', report };
+    parentPort!.postMessage(out);
+    return;
+  }
+
+  let lastEmit = 0;
+  const emitProgress = (force: boolean) => {
+    const now = Date.now();
+    if (!force && now - lastEmit < 200) return;
+    lastEmit = now;
+    // walksPerSec is filled by the main process from elapsed/done.
+    const out: PromptCoverageWorkerProgressMessage = {
+      type: 'progress',
+      done: run.done,
+      total: run.total,
+      currentFolder: run.currentFolder,
+      walksPerSec: 0,
+    };
+    parentPort!.postMessage(out);
+  };
+
+  emitProgress(true);
+  while (run.runChunk(CHUNK, () => cancelRequested)) {
+    emitProgress(false);
+    await yieldToEventLoop();
+  }
+  emitProgress(true);
+
+  if (run.cancelled || cancelRequested) {
+    const report = run.buildReport('cancelled');
+    const out: PromptCoverageWorkerCancelledMessage = {
+      type: 'cancelled',
+      report,
+    };
+    parentPort!.postMessage(out);
+    return;
+  }
+
+  const report = run.buildReport('done');
+  const out: PromptCoverageWorkerDoneMessage = { type: 'done', report };
+  parentPort!.postMessage(out);
+}
+
 parentPort.on('message', (msg: PromptCoverageWorkerIn) => {
   if (msg.type === 'cancel') {
     cancelRequested = true;
@@ -62,56 +116,11 @@ parentPort.on('message', (msg: PromptCoverageWorkerIn) => {
   if (msg.type !== 'run') return;
 
   cancelRequested = false;
-  try {
-    const run = createPromptCoverageRun(msg.input);
-    if (run.total === 0) {
-      const report = run.buildReport('done');
-      const out: PromptCoverageWorkerDoneMessage = { type: 'done', report };
-      parentPort!.postMessage(out);
-      return;
-    }
-
-    let lastEmit = 0;
-
-    const emitProgress = (force: boolean) => {
-      const now = Date.now();
-      if (!force && now - lastEmit < 200) return;
-      lastEmit = now;
-      // walksPerSec is filled by the main process from elapsed/done.
-      const out: PromptCoverageWorkerProgressMessage = {
-        type: 'progress',
-        done: run.done,
-        total: run.total,
-        currentFolder: run.currentFolder,
-        walksPerSec: 0,
-      };
-      parentPort!.postMessage(out);
-    };
-
-    emitProgress(true);
-    while (run.runChunk(CHUNK, () => cancelRequested)) {
-      emitProgress(false);
-    }
-    emitProgress(true);
-
-    if (run.cancelled || cancelRequested) {
-      const report = run.buildReport('cancelled');
-      const out: PromptCoverageWorkerCancelledMessage = {
-        type: 'cancelled',
-        report,
-      };
-      parentPort!.postMessage(out);
-      return;
-    }
-
-    const report = run.buildReport('done');
-    const out: PromptCoverageWorkerDoneMessage = { type: 'done', report };
-    parentPort!.postMessage(out);
-  } catch (error) {
+  void executeRun(msg.input).catch((error: unknown) => {
     const out: PromptCoverageWorkerErrorMessage = {
       type: 'error',
       error: error instanceof Error ? error.message : String(error),
     };
     parentPort!.postMessage(out);
-  }
+  });
 });

@@ -210,7 +210,7 @@ under Electron's per-user `userData/backups/` directory and survive restarts.
 
 - **Wildcard files:** with a text or structured file selected, expand that file.
 - **Prompts:** expand the selected folder’s `!gen.txt`. Every decoded line is a
-  prompt (the same lines Coverage walks), including unsaved editor text.
+  prompt (Coverage samples from these lines), including unsaved editor text.
 - **Generation:** expand the single prompt **Once** would queue. The dialog
   uses the Generation seed, **Use this prompt** or **Use selected prompt
   folder** (including Randomize and Recursive), applies this library’s
@@ -243,7 +243,7 @@ seed. The defaults (10,000 runs, seed 1) are persisted. **Simulate** overlays:
 - parent-relative selection share;
 - a red-to-green sibling-balance color.
 
-Simulation accepts 1–1,000,000 iterations. It follows the same expansion rules
+Simulation accepts 1–1,000,000 iterations (default 10,000). Coverage runs that many generations, one random prompt folder per walk. Simulation follows the same expansion rules
 for text and structured scalar/list values and stops safely at recursion.
 
 ## Build locally
