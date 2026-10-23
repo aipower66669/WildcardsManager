@@ -146,10 +146,11 @@ Use the main-window tabs **LoRA files** and **Checkpoint files** (alongside
 
 - **Left:** searchable model list with filters and a rescan control.
 - **Middle:** identity for the selected file — relative path, AutoV2 hash, size,
-  Civitai link when matched, folder preview (same-stem `.jpg` / `.png`), and
+  source link when known (Civitai match, or the Hugging Face repo a download
+  came from), folder preview (same-stem `.jpg` / `.png`), and
   Civitai cover (from catalog / preview cache). Hover titles for short help.
-- **Right:** embedded Civitai model page when a page URL is known (same
-  `persist:civitai-preview` session as the Browse preview webview).
+- **Right:** embedded model page when a page URL is known (Civitai uses the
+  Browse preview session; a Hugging Face download uses the Hub page).
 
 Folder indexing **follows directory symlinks and Windows junctions**, so models
 stored on another drive but linked under the configured root appear in the list.
@@ -238,14 +239,16 @@ The **Prompts** tab manages prompt folders under the configured prompts root
   prompts). Use Last output while editing prompts during a run without leaving
   this tab. Collapse the panel (toolbar icon) for more editor room — while
   collapsed, selecting a folder does **not** scan for samples.
-- The `!gen.txt` title bar has three square buttons on the right: **Once**
-  (lightning, blue), **Infinite** (infinity, the same dark button as
-  Generation), and **Cancel** (square, red). Hover each one for the tooltip.
+- The `!gen.txt` title bar, on the same line as the run buttons, shows the
+  Generation style (camera / sparkles / box for **Realistic** / **Anime** /
+  **3D**), checkpoint, seed (with the dice and shuffle buttons), and width ×
+  height. Those controls are the Generation form: a change on either tab
+  updates the other. **Once** (lightning, blue), **Infinite** (infinity), and
+  **Cancel** (square, red) sit at the right. Hover each one for the tooltip.
   **Once** and **Infinite** save the editor, point Generation at this folder,
-  and queue that `!gen.txt` with the current Generation style, checkpoint,
-  seed, and Recursive setting. **Cancel** stops the run and interrupts the
-  image in progress. Style, checkpoint, seed, and Recursive stay on the
-  **Generation** tab.
+  and queue that `!gen.txt` with the style, checkpoint, seed, size, and
+  Recursive setting shown here. **Cancel** stops the run and interrupts the
+  image in progress.
 
 ### Generation workspace
 
@@ -461,8 +464,10 @@ matching workspace (wildcard editor, LoRA, or Checkpoint).
 Use the topbar **Civitai** button to search and download LoRAs and checkpoints,
 or switch to **Images** for the community gallery. A separate **Hugging Face**
 control opens Hub search/downloads. Hub results are cards: the repo name,
-stats, and **Download** / **Archive** sit together on the card. Clicking the
-repo name opens that Hub page in a side panel inside the Hugging Face window.
+stats, and **Download** / **Archive** sit together on the card. When the repo
+includes a sample image, that image is the card cover, cropped to a
+portrait 2:3 frame. Clicking the repo name opens that Hub page in a side
+panel inside the Hugging Face window.
 The external-link icon still opens it in the system browser. Drag the divider
 to resize the panel, and use the collapse button to hide it. **Download**
 prefers a `.safetensors` weight when the repo has one, so a trainer leftover
@@ -471,9 +476,14 @@ repo id with `/` replaced by `-`: `misapapa71/model-rinka-krea2` and
 `pytorch_lora_weights.safetensors` become
 `misapapa71-model-rinka-krea2.safetensors`. A finished download leaves Browse
 and appears on **Downloaded**, between Browse and Archive. **Show in search**
-puts that repo back in Browse and leaves the file on disk. The LoRA category
-on that download dialog is the last one you queued, the same memory Civitai
-downloads use.
+puts that repo back in Browse and leaves the file on disk. The download
+dialog uses the same LoRA layout as Civitai: category (last one you queued,
+shared with Civitai), extra categories, weights, **Extra comment**, and
+**Extra prompt**. A LoRA snippet is the Hub URL, then the extra comment, then
+`<lora:filename:weights>` with the extra prompt on that line. That same Hub
+URL is saved on the downloaded LoRA or checkpoint, so its page URL and the
+side page open the repo it came from. Checkpoints use the same
+category-folder picker.
 
 #### SFW vs NSFW sites
 

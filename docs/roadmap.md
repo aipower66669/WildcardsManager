@@ -44,7 +44,11 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - **Generation** tab — ComfyUI queue, Edit/Save Workflow, style profiles,
   categorize into prompts (v0.6). v0.8 adds per-style Options (CLIP, VAE,
   KSampler), a fixed seed that repeats on Once and Infinite, and an optional
-  New output subfolder.
+  New output subfolder. v0.9 puts style, checkpoint, seed, and size on the
+  Prompts title bar (synced with Generation), steps width and height to
+  common sizes whose sides are multiples of 16, and samples prompt coverage
+  the way a real run does (folder-uniform walks, Rare tab, Simulation
+  iteration count).
 - **Civitai Images and Videos** browse/download/archive + background Download
   all (v0.5); feed frontiers / Browse catch-up (v0.6).
 - **Library Manager** with multiple libraries, per-style generation output
@@ -53,7 +57,10 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - **LM Studio** prompt assist on the wildcard editor (local server; writes only
   after you apply a proposal).
 - Checkpoint half-star ratings; blocked Civitai authors.
-- **Hugging Face Hub** browser and download queue (v0.5).
+- **Hugging Face Hub** browser and download queue (v0.5). v0.9 matches the
+  Civitai download dialog (category, extra categories, weights, extra comment,
+  extra prompt), stores the Hub page on the downloaded file, and shows a
+  portrait sample image on the card when the repo has one.
 - **In-app updates** from GitHub Releases by default, with **What's new**
   release notes before install. A local electron-builder `release/` folder
   still overrides that, including **What's new**, which then reads

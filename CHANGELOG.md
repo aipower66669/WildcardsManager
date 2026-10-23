@@ -7,6 +7,63 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-24
+
+### Added
+
+- The Prompts `!gen.txt` title bar edits the Generation style (Realistic,
+  Anime, 3D), checkpoint, seed, and width × height. A change on either tab
+  updates the other. Switching style does not change the open prompt file.
+  **Once**, **Infinite**, and **Cancel** stay on the right and queue that
+  folder with those values.
+- Generation **Swap**, **Decrease**, and **Increase** sit beside Width and
+  Height. Swap exchanges the two numbers. The step buttons move to a nearby
+  common size with a close aspect ratio. Both sides of a stepped size are
+  multiples of 16. The tooltip shows the size the button will write.
+- Prompt coverage has a **Rare** tab (files hit at least once whose reach is
+  below the 25th percentile of that group). Every tab lists every matching
+  wildcard.
+- Clicking a **missing file** issue fills the editor search with that
+  `__name__`, so every copy in the open file is marked.
+- Right-click **Comment** / **Uncomment** puts or removes `# ` at the start
+  of each selected line.
+- Additional Positive and Negative use the same wildcard editor as **Use this
+  prompt** (highlighting and `__` completion).
+- The Hugging Face download dialog uses the same LoRA layout as Civitai:
+  category, extra categories, weights, extra comment, and extra prompt.
+  Checkpoints use the category-folder picker.
+- A Hugging Face download stores the Hub page on the LoRA or checkpoint
+  (`models.json` link, origin `huggingface`), so the page URL and the side
+  page open that repo. The wildcard comment still gets the same URL.
+- Hugging Face cards show a sample image when the repo has one (the model-card
+  thumbnail, otherwise the best cover or showcase file). The cover is a
+  portrait 2:3 crop. Clicking the image opens the Hub page.
+- Benchmark rating order uses the Checkpoint-tab catalog rating when the
+  sample folder has no ADS `field_rating`. A 5-star catalog rating weighs the
+  same as an ADS rating of 10.
+
+### Changed
+
+- Prompt coverage samples the library the way **Once** and **Infinite** do.
+  Each walk picks a prompt folder at random (every folder with a `!gen.txt`
+  is equally likely), then a decoded line in that folder, then one wildcard
+  walk. A heavier line (`[xN]` / `[W=N]`) is more likely inside its own
+  folder. A folder with more prompts does not receive more walks. The walk
+  count and seed are **Settings → Simulation** (Iterations 1–1,000,000,
+  default 10,000). The count hint is the **Run coverage** tooltip. The seed
+  and time sit in the dialog title. The tab line shows how many library files
+  were reached and how many walks ran.
+- Hugging Face download prefers a `.safetensors` weight when the repo has
+  one. The saved name is the repo id with `/` replaced by `-`. A finished
+  download leaves Browse and appears on **Downloaded**.
+
+### Fixed
+
+- **Cancel** on a coverage run stops the worker. It previously finished the
+  whole simulation before it noticed the cancel.
+- The ComfyUI custom save node writes the sampling parameters back into the
+  image metadata after the KSampler inputs were wired.
+
 ## [0.8.0] - 2026-10-20
 
 ### Added
@@ -426,7 +483,8 @@ First public release.
 - Mutations validate supported extensions and use atomic replacement.
 - Ambiguous glob references are reported rather than silently rewritten.
 
-[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/aipower66669/WildcardsManager/releases/tag/v0.7.0
 [0.6.0]: https://github.com/aipower66669/WildcardsManager/releases/tag/v0.6.0

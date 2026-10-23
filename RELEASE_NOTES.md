@@ -1,48 +1,58 @@
-# Wildcards Manager v0.8
+# Wildcards Manager v0.9
 
-Package version: **0.8.0**  
-Release date: **October 20, 2026**
+Package version: **0.9.0**  
+Release date: **October 24, 2026**
 
-v0.8 is a Generation release. A fixed seed now repeats the same image on Once
-and Infinite, each style has its own Options (CLIP, VAE, and KSampler), and
-the New output subfolder is optional.
+v0.9 is a Prompts and Hugging Face release. The Prompts title bar drives the
+same Generation style, checkpoint, seed, and size as the Generation tab.
+Coverage samples prompt folders the way a real run does. Hugging Face
+downloads use the Civitai dialog and keep the Hub page on the file.
 
 The [user guide](docs/user-guide.md) is the complete reference. This note is the
 map.
 
-## What’s new in v0.8
+## What’s new in v0.9
 
-- **Same seed, same image.** Once and Infinite use one pick. The seed chooses
-  the prompt folder (when the dropdown is Select… [Randomize], or Recursive is
-  on) and the `!gen.txt` line. The Last output crosshair copies only the seed.
-- **Seed 0 or below** rolls from the clock on every image, so a failed Infinite
-  run does not repeat the same seed. The dice sets −1. The shuffle button
-  writes one fixed random number.
-- **Empty `!gen.txt`** names the folder. Infinite skips that image and
-  continues.
-- **Generation and Options** sit under Realistic, Anime, and 3D. Options holds
-  CLIP, VAE, Steps, CFG, Sampler, Scheduler, and Denoise. Each style keeps its
-  own values.
-- New LT nodes: **LT · Steps**, **LT · CFG**, **LT · Sampler**,
-  **LT · Scheduler**. **LT · Denoise** fills KSampler denoise. Replace
-  `custom_nodes/comfyui-lora-training`, restart ComfyUI, wire those inputs,
-  then **Save Workflow**. A blank Sampler or Scheduler leaves the name already
-  on the node.
-- **Settings → AI → Save folder-mode images in a New subfolder** is off by
-  default. Folder mode writes `{style output}/{prompt folder}`, plus `/New`
-  only when that option is on. The ComfyUI save node creates the folder.
-- Labels and the Once / Infinite / Cancel buttons have tooltips. Recursive
-  sits on the Prompt folder line. Workflow status sits next to Edit Workflow.
+- **Prompts title bar.** On the same line as Once, Infinite, and Cancel:
+  Realistic / Anime / 3D (icons), checkpoint, seed (dice and shuffle), and
+  width × height. A change on Prompts or Generation updates the other.
+  Switching style does not change the open `!gen.txt`. Once and Infinite
+  queue that folder with the values shown there.
+- **Width and Height.** Swap exchanges the two numbers. Decrease and Increase
+  step to a nearby common size with a close aspect ratio. Both sides of a
+  stepped size are multiples of 16. The tooltip shows the size the button
+  will write.
+- **Coverage matches a real run.** Each walk picks a prompt folder at random
+  (every `!gen.txt` folder is equally likely), then a decoded line in that
+  folder, then one wildcard walk. The count is Settings → Simulation →
+  Iterations (1–1,000,000, default 10,000), with the Simulation seed. A
+  **Rare** tab sits between Ignored and Hot. Each tab lists every match.
+  Cancel stops the run.
+- **Missing-file search.** Clicking a “missing wildcard file” issue fills the
+  editor search with that wildcard.
+- **Comment / Uncomment.** The editor context menu puts or removes `# ` on
+  the selected lines.
+- **Hugging Face download dialog** matches Civitai: category, extra
+  categories, weights, extra comment, and extra prompt. The Hub URL is saved
+  on the downloaded LoRA or checkpoint, so its page URL opens that repo.
+  Cards show a sample image when the repo has one, cropped to a portrait 2:3
+  frame.
+- **Benchmark rating** uses the Checkpoint-tab catalog rating when a sample
+  folder has no ADS rating. Five stars weigh the same as an ADS rating of 10.
 
-## Upgrading from v0.7
+## Upgrading from v0.8
 
 Libraries and sidecars do not need a migration. Generation settings you already
-saved stay on Realistic, Anime, and 3D. New sampler fields start at 20 steps,
-CFG 7, and denoise 1 until you set them.
+saved stay on Realistic, Anime, and 3D.
 
-Replace the ComfyUI `comfyui-lora-training` folder with
-`ComfyUI-Workflow/comfyui-lora-training.zip` and restart ComfyUI before using
-the KSampler nodes. The sample graph does not wire those five inputs yet.
+Re-run Coverage to replace a report that walked every decoded line. A Hugging
+Face file already on disk keeps its previous page link until you download it
+again.
+
+If Generation still reports missing KSampler nodes, replace
+`custom_nodes/comfyui-lora-training` with
+`ComfyUI-Workflow/comfyui-lora-training.zip`, restart ComfyUI, and **Save
+Workflow**.
 
 ## What the app is
 
@@ -63,7 +73,7 @@ Noncommercial only. See [LICENSE.md](LICENSE.md).
 | **Wildcard files** | Graph, filters, diagnostics, editor, refactors, expansion, simulation |
 | **LoRA files** | Installed LoRAs, Civitai match, wildcard callers, training-step series |
 | **Checkpoint files** | Installed checkpoints, hash, rating, benchmark samples, Civitai page |
-| **Prompts** | `!gen.txt` folders, validation, coverage, samples |
+| **Prompts** | `!gen.txt` folders, validation, coverage, samples, and the Generation controls for the open folder |
 | **Generation** | ComfyUI queue from a typed prompt or a prompt folder |
 | **Search** | Wildcard names/content and LoRA / checkpoint filenames |
 
@@ -94,8 +104,10 @@ the model roots (`!.wcm/`, `!Thumbnails/`).
   catch-up. Each needs its own folder in Settings.
 - **Blocked authors** hide a creator’s cards for that library.
 - Early-access models sit on **Notify me** until you check that they unlocked.
-- Hugging Face Hub search and download queue. Gated repos need a token under
-  Settings → AI.
+- Hugging Face Hub search and download queue. The download dialog matches
+  Civitai, including extra comment and extra prompt. The Hub page is stored
+  on the downloaded file. Cards show a sample image when the repo has one.
+  Gated repos need a token under Settings → AI.
 
 Browse works without an API key. Many model downloads do not.
 
@@ -125,7 +137,10 @@ Step-by-step: [user guide](docs/user-guide.md#install-the-nodes-and-the-sample-g
 - Typed prompt or prompt-folder `!gen.txt`. Recursive includes sub-folders.
   A fixed seed repeats the folder and the line.
 - Style profiles (Realistic, Anime, 3D), each with Generation and Options.
-- **Benchmark** walks checkpoint files and records timings.
+  The Prompts title bar edits the same style, checkpoint, seed, and size.
+- Width and Height can swap or step to a common 16-aligned size.
+- **Benchmark** walks checkpoint files and records timings. Rating order can
+  use the catalog stars when a sample folder has no ADS rating.
 - **Edit Workflow** / **Save Workflow**. The toolbar stays quiet when the
   graph is ready and names missing nodes when it is not.
 - **Categorize** appends a prompt into a folder’s `!gen.txt`.
@@ -137,14 +152,16 @@ Nothing is saved until you apply the proposal.
 
 ## Prompts coverage
 
-**Coverage** expands every decoded `!gen.txt` line and reports wildcards that
-are never reached or over-used. Results stay in the library sidecar. Ignore a
-file to keep it off the “never used” list.
+**Coverage** runs one simulated generation per Simulation iteration (default
+10,000, up to 1,000,000). Each walk picks a prompt folder at random, then a
+decoded line in that folder, then one wildcard walk. Results stay in the
+library sidecar. Tabs are Never, Ignored, Rare, Hot, All, and By prompt.
+Ignore a file to keep it off the “never used” list.
 
 ## Installation
 
 Download an installer from the
-[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.8.0)
+[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.9.0)
 when one is attached, or build it yourself. Installers are unsigned.
 
 From source (Node.js 22.12+):
@@ -156,7 +173,7 @@ npm ci
 npm run dev
 ```
 
-Pushing a version tag (`v0.8.0`) runs the checks, builds
+Pushing a version tag (`v0.9.0`) runs the checks, builds
 `WildcardsManager-<version>-win-x64.exe`, and attaches it to that GitHub
 Release. Settings → App updates checks that release when the update folder
 is empty. **Check for update** only reports a newer installer. **What's new**
@@ -166,7 +183,7 @@ is a separate button for these notes. **Install** downloads and installs.
 
 ## Upgrading from v0.6
 
-If you skipped v0.7, libraries and sidecars still do not need a manual
+If you skipped v0.7 or v0.8, libraries and sidecars still do not need a manual
 migration. If you moved model or wildcard folders onto another drive, use
 Library Manager → **Migrate library paths…** instead of editing paths by hand.
 

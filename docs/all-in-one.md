@@ -89,7 +89,7 @@ what you are trying to do.
   examples for diagnostics.
 - [`screenshot.png`](screenshot.png) — README image; replace with a better
   capture without changing links.
-- [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) — current public release (v0.8)
+- [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) — current public release (v0.9)
   overview, installation, and known limitations.
 - [`../CHANGELOG.md`](../CHANGELOG.md) — version-by-version notable changes.
 - [`../LICENSE.md`](../LICENSE.md) — software and sample-library licenses.
@@ -680,10 +680,11 @@ Use the main-window tabs **LoRA files** and **Checkpoint files** (alongside
 
 - **Left:** searchable model list with filters and a rescan control.
 - **Middle:** identity for the selected file — relative path, AutoV2 hash, size,
-  Civitai link when matched, folder preview (same-stem `.jpg` / `.png`), and
+  source link when known (Civitai match, or the Hugging Face repo a download
+  came from), folder preview (same-stem `.jpg` / `.png`), and
   Civitai cover (from catalog / preview cache). Hover titles for short help.
-- **Right:** embedded Civitai model page when a page URL is known (same
-  `persist:civitai-preview` session as the Browse preview webview).
+- **Right:** embedded model page when a page URL is known (Civitai uses the
+  Browse preview session; a Hugging Face download uses the Hub page).
 
 Folder indexing **follows directory symlinks and Windows junctions**, so models
 stored on another drive but linked under the configured root appear in the list.
@@ -772,14 +773,16 @@ The **Prompts** tab manages prompt folders under the configured prompts root
   prompts). Use Last output while editing prompts during a run without leaving
   this tab. Collapse the panel (toolbar icon) for more editor room — while
   collapsed, selecting a folder does **not** scan for samples.
-- The `!gen.txt` title bar has three square buttons on the right: **Once**
-  (lightning, blue), **Infinite** (infinity, the same dark button as
-  Generation), and **Cancel** (square, red). Hover each one for the tooltip.
+- The `!gen.txt` title bar, on the same line as the run buttons, shows the
+  Generation style (camera / sparkles / box for **Realistic** / **Anime** /
+  **3D**), checkpoint, seed (with the dice and shuffle buttons), and width ×
+  height. Those controls are the Generation form: a change on either tab
+  updates the other. **Once** (lightning, blue), **Infinite** (infinity), and
+  **Cancel** (square, red) sit at the right. Hover each one for the tooltip.
   **Once** and **Infinite** save the editor, point Generation at this folder,
-  and queue that `!gen.txt` with the current Generation style, checkpoint,
-  seed, and Recursive setting. **Cancel** stops the run and interrupts the
-  image in progress. Style, checkpoint, seed, and Recursive stay on the
-  **Generation** tab.
+  and queue that `!gen.txt` with the style, checkpoint, seed, size, and
+  Recursive setting shown here. **Cancel** stops the run and interrupts the
+  image in progress.
 
 ### Generation workspace
 
@@ -995,8 +998,10 @@ matching workspace (wildcard editor, LoRA, or Checkpoint).
 Use the topbar **Civitai** button to search and download LoRAs and checkpoints,
 or switch to **Images** for the community gallery. A separate **Hugging Face**
 control opens Hub search/downloads. Hub results are cards: the repo name,
-stats, and **Download** / **Archive** sit together on the card. Clicking the
-repo name opens that Hub page in a side panel inside the Hugging Face window.
+stats, and **Download** / **Archive** sit together on the card. When the repo
+includes a sample image, that image is the card cover, cropped to a
+portrait 2:3 frame. Clicking the repo name opens that Hub page in a side
+panel inside the Hugging Face window.
 The external-link icon still opens it in the system browser. Drag the divider
 to resize the panel, and use the collapse button to hide it. **Download**
 prefers a `.safetensors` weight when the repo has one, so a trainer leftover
@@ -1005,9 +1010,14 @@ repo id with `/` replaced by `-`: `misapapa71/model-rinka-krea2` and
 `pytorch_lora_weights.safetensors` become
 `misapapa71-model-rinka-krea2.safetensors`. A finished download leaves Browse
 and appears on **Downloaded**, between Browse and Archive. **Show in search**
-puts that repo back in Browse and leaves the file on disk. The LoRA category
-on that download dialog is the last one you queued, the same memory Civitai
-downloads use.
+puts that repo back in Browse and leaves the file on disk. The download
+dialog uses the same LoRA layout as Civitai: category (last one you queued,
+shared with Civitai), extra categories, weights, **Extra comment**, and
+**Extra prompt**. A LoRA snippet is the Hub URL, then the extra comment, then
+`<lora:filename:weights>` with the extra prompt on that line. That same Hub
+URL is saved on the downloaded LoRA or checkpoint, so its page URL and the
+side page open the repo it came from. Checkpoints use the same
+category-folder picker.
 
 #### SFW vs NSFW sites
 
@@ -2650,7 +2660,7 @@ WildcardsManager-<version>-<os>-<arch>.<ext>
 ```
 
 Local `npm run dist` / `dist:win` / `dist:mac` / `dist:linux` **auto-increment
-the patch** (`0.8.0` → `0.8.1`) before building so in-app **Check for update**
+the patch** (`0.9.0` → `0.9.1`) before building so in-app **Check for update**
 sees a newer installer, then **delete older** `WildcardsManager-*` artifacts in
 `release/` (keeps only the current version’s `.exe` / `.blockmap` / etc.). CI
 skips the bump (`GITHUB_ACTIONS` / `CI`) so tagged releases keep the version
@@ -2688,8 +2698,8 @@ Before tagging:
 5. create and push the tag:
 
    ```powershell
-   git tag v0.8.0
-   git push origin v0.8.0
+   git tag v0.9.0
+   git push origin v0.9.0
    ```
 
 `CHANGELOG.md` is the permanent version history and follows Keep a Changelog.
@@ -2780,7 +2790,11 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - **Generation** tab — ComfyUI queue, Edit/Save Workflow, style profiles,
   categorize into prompts (v0.6). v0.8 adds per-style Options (CLIP, VAE,
   KSampler), a fixed seed that repeats on Once and Infinite, and an optional
-  New output subfolder.
+  New output subfolder. v0.9 puts style, checkpoint, seed, and size on the
+  Prompts title bar (synced with Generation), steps width and height to
+  common sizes whose sides are multiples of 16, and samples prompt coverage
+  the way a real run does (folder-uniform walks, Rare tab, Simulation
+  iteration count).
 - **Civitai Images and Videos** browse/download/archive + background Download
   all (v0.5); feed frontiers / Browse catch-up (v0.6).
 - **Library Manager** with multiple libraries, per-style generation output
@@ -2789,7 +2803,10 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - **LM Studio** prompt assist on the wildcard editor (local server; writes only
   after you apply a proposal).
 - Checkpoint half-star ratings; blocked Civitai authors.
-- **Hugging Face Hub** browser and download queue (v0.5).
+- **Hugging Face Hub** browser and download queue (v0.5). v0.9 matches the
+  Civitai download dialog (category, extra categories, weights, extra comment,
+  extra prompt), stores the Hub page on the downloaded file, and shows a
+  portrait sample image on the card when the repo has one.
 - **In-app updates** from GitHub Releases by default, with **What's new**
   release notes before install. A local electron-builder `release/` folder
   still overrides that, including **What's new**, which then reads
@@ -3401,7 +3418,7 @@ Same browse, sort, content filter, and Download all behavior, with a **Videos fo
 
 ### 103. How do I use Hugging Face, and what should I not expect the app to do?
 
-The **Hugging Face** button searches the Hub, with filters remembered per library. A token under **Settings → AI** is for gated repos. Clicking a repo name opens that Hub page in a side panel in the Hugging Face window. The external-link icon still opens the system browser. Downloads use their own queue (pause, resume, cancel) next to Civitai model downloads. When the repo contains a `.safetensors` file, that file is downloaded instead of a `.bin` such as `optimizer.bin`. The saved name is the repo id with `/` replaced by `-` (`org/name` → `org-name.safetensors`). A finished download leaves Browse and is listed on **Downloaded** (between Browse and Archive). The LoRA category on the download dialog is the last one queued, shared with Civitai downloads. **Show in search** returns it to Browse and does not delete the file. Archived Hub models are per library.
+The **Hugging Face** button searches the Hub, with filters remembered per library. A token under **Settings → AI** is for gated repos. Cards show a sample image when the repo has one, cropped to a portrait 2:3 frame. Clicking a repo name opens that Hub page in a side panel in the Hugging Face window. The external-link icon still opens the system browser. Downloads use their own queue (pause, resume, cancel) next to Civitai model downloads. When the repo contains a `.safetensors` file, that file is downloaded instead of a `.bin` such as `optimizer.bin`. The saved name is the repo id with `/` replaced by `-` (`org/name` → `org-name.safetensors`). A finished download leaves Browse and is listed on **Downloaded** (between Browse and Archive). The download dialog matches Civitai’s LoRA form: last queued category (shared with Civitai), extra categories, weights, extra comment, and extra prompt. The Hub page is also stored on the downloaded LoRA or checkpoint, so its page URL opens that repo. Checkpoints use the category-folder picker. **Show in search** returns it to Browse and does not delete the file. Archived Hub models are per library.
 
 The app will not train a LoRA, install ComfyUI for you, rewrite globs on rename, rename a single YAML key for you, survive undo across a restart, or implement every A1111 or ComfyUI wildcard feature. It does not upload your library anywhere. When you ask an assistant for help, describe the tab and the message you see. Do not paste API keys. You do not need to paste `library.json` for ordinary how-to questions.
 
@@ -3504,7 +3521,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 ## Generation modes and benchmark
 
 - Once: one job, then stop. Infinite: keep queuing until cancel.
-- Prompts `!gen.txt` title bar has square icon buttons for the same actions: Once (lightning, blue), Infinite (infinity, dark), Cancel (stop square, red). They write the editor, set the Generation folder and prompt source to that folder, then start with the saved style, checkpoint, seed, Recursive, and benchmark settings. **Generate this folder** still only points the dropdown and does not start a run.
+- Prompts `!gen.txt` title bar, left of the run buttons, edits the same Generation form: style (Realistic / Anime / 3D), checkpoint, seed, width, and height. A change on either tab updates the other. Once (lightning, blue), Infinite (infinity, dark), and Cancel (stop square, red) write the editor, set the Generation folder and prompt source to that folder, then start with that style, checkpoint, seed, size, Recursive, and benchmark settings. **Generate this folder** still only points the dropdown and does not start a run.
 - Benchmark is a separate checkbox. It walks `.safetensors` in the checkpoint folder that are not in this library’s `ignoredCheckpoints`. Once = one image each. Infinite = until each included stem has 10 images or the user cancels.
 - Output: `{benchmarkRoot}/{fileStem}/`. Stats: `{benchmarkRoot}/benchmark-stats.json`.
 - A saved timing is sampler steps from the first reported step through the last. Model load and file save are outside that range. If the run never reports the full range, the image is deleted and the slot is retried.
@@ -3538,7 +3555,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 - Image/video files: `<folder>/<base model>/…`, mtime = Civitai upload time. Id registries live in AppData and do not reset when the folder path changes.
 - Download all: skip archived and already downloaded, archive after save, summary, then about 5 minutes, then the next sort. Tip watermarks stop a later run from re-walking covered Newest (and ranked feeds after a full exhaust). **Continue to end** ignores the tip for the current Browse walk.
 - Blocked creators are per library and hide model and media cards.
-- Hugging Face: separate browser, token for gated repos, own download queue, per-library archive list. Tabs: Browse, Downloaded, Archive, Queue. A finished download is stored as `downloadedHfModels` in that library's `library.json` and leaves Browse. The Hugging Face download dialog's LoRA category is `lastLoraDownloadCategoryId` (same value Civitai queues write). It is saved when the download is queued. Show in search removes it from that list and does not delete the file. Clicking a repo name opens the Hub page in a side panel (`persist:hf-preview`). The external-link icon opens the system browser. Download prefers `.safetensors` over `.bin` (so `optimizer.bin` is not the default). The saved file name is the repo id with `/` replaced by `-`, plus that weight's extension (`org/name` + `pytorch_lora_weights.safetensors` → `org-name.safetensors`).
+- Hugging Face: separate browser, token for gated repos, own download queue, per-library archive list. Tabs: Browse, Downloaded, Archive, Queue. A finished download is stored as `downloadedHfModels` in that library's `library.json` and leaves Browse. The Hugging Face download dialog uses the same LoRA layout as Civitai: category, extra categories, weights, extra comment, and extra prompt. The category is `lastLoraDownloadCategoryId` (same value Civitai queues write) and is saved when the download is queued. A LoRA snippet is `# https://huggingface.co/<repo>`, then the extra comment, then `<lora:filename:weights>` plus the extra prompt. That Hub URL is also written onto the downloaded file’s page URL (`models.json` link, origin `huggingface`) so the LoRA or checkpoint side page opens the repo. Checkpoints use the category-folder picker and do not append a wildcard. Show in search removes it from that list and does not delete the file. Hub cards show a sample image when the repo has one (model-card thumbnail, otherwise the best cover/showcase image file). The cover frame is portrait 2:3; the image is cropped to that frame. Clicking a repo name opens the Hub page in a side panel (`persist:hf-preview`). The external-link icon opens the system browser. Download prefers `.safetensors` over `.bin` (so `optimizer.bin` is not the default). The saved file name is the repo id with `/` replaced by `-`, plus that weight's extension (`org/name` + `pytorch_lora_weights.safetensors` → `org-name.safetensors`).
 
 ## Syntax decisions the model must not soften
 
