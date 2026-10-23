@@ -12,6 +12,7 @@ import {
   type HfBrowseFilters,
   type HfFamilyQueryBranch,
 } from '../domain/huggingfaceSearch.js';
+import { hfPreviewUrlFromRepoFiles } from '../domain/huggingfacePreview.js';
 import { compareHfWeightFiles } from '../domain/huggingfaceWeightPick.js';
 import { getHuggingFaceToken } from './settingsStore.js';
 
@@ -28,6 +29,8 @@ export type HuggingFaceModelHit = {
   lastModified: string | null;
   trendingScore: number | null;
   pageUrl: string;
+  /** Sample image from the repo, when it has one. */
+  previewUrl: string | null;
 };
 
 export type HuggingFaceSearchResult = {
@@ -90,6 +93,16 @@ function mapModelHit(raw: unknown): HuggingFaceModelHit | null {
   const tags = Array.isArray(row.tags)
     ? row.tags.filter((t): t is string => typeof t === 'string')
     : [];
+  const files: string[] = [];
+  if (Array.isArray(row.siblings)) {
+    for (const item of row.siblings) {
+      const sibling = asRecord(item);
+      if (!sibling) continue;
+      const path = asString(sibling.rfilename) ?? asString(sibling.path);
+      if (path) files.push(path);
+    }
+  }
+  const card = asRecord(row.cardData);
   return {
     id,
     likes: asNumber(row.likes) ?? 0,
@@ -103,6 +116,11 @@ function mapModelHit(raw: unknown): HuggingFaceModelHit | null {
     lastModified: asString(row.lastModified),
     trendingScore: asNumber(row.trendingScore),
     pageUrl: huggingfaceModelPageUrl(id),
+    previewUrl: hfPreviewUrlFromRepoFiles({
+      repoId: id,
+      files,
+      thumbnail: card ? asString(card.thumbnail) : null,
+    }),
   };
 }
 

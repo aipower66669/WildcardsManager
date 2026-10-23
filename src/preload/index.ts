@@ -812,6 +812,15 @@ const api: WcmDesktopApi = {
     getGenerationForm: () => ipcRenderer.invoke(IPC.comfyGetGenerationForm),
     setGenerationForm: (patch) =>
       ipcRenderer.invoke(IPC.comfySetGenerationForm, patch),
+    onGenerationForm: (cb) => {
+      const handler = (
+        _event: unknown,
+        form: import('../shared/contracts.js').GenerationFormStateDto,
+      ) => cb(form);
+      ipcRenderer.on(IPC.comfyGenerationFormChanged, handler);
+      return () =>
+        ipcRenderer.removeListener(IPC.comfyGenerationFormChanged, handler);
+    },
     getCheckpointBenchmarkStatus: () =>
       ipcRenderer.invoke(IPC.comfyGetCheckpointBenchmarkStatus),
     getCheckpointBenchmarkResults: () =>

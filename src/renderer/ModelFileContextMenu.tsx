@@ -19,6 +19,7 @@ import {
   buildLoraClipboardSnippet,
   parseCivitaiModelPageUrl,
 } from '../domain/civitaiSnippet.js';
+import { parseHuggingFaceModelPageUrl } from '../domain/huggingfaceSearch.js';
 
 export type ModelFileContextMenuState = {
   file: ModelFileManagerEntryDto;
@@ -83,6 +84,9 @@ export function ModelFileContextMenu({
   const ref = useRef<HTMLDivElement | null>(null);
   const file = menu.file;
   const hasCivitai = Boolean(file.civitaiModelId && file.civitaiPageUrl);
+  const hfRepo = file.civitaiPageUrl
+    ? parseHuggingFaceModelPageUrl(file.civitaiPageUrl)?.repoId
+    : undefined;
   const hasHash = Boolean(file.autoV2);
 
   useEffect(() => {
@@ -198,6 +202,28 @@ export function ModelFileContextMenu({
             onClick={() => copyText(file.civitaiPageUrl!)}
           >
             <Link2 size={14} /> Copy Civitai URL
+          </button>
+        </>
+      ) : hfRepo && file.civitaiPageUrl ? (
+        <>
+          <div className="file-context-menu-separator" role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() =>
+              runThenClose(() =>
+                window.wcm.huggingface.openModelPage(hfRepo),
+              )
+            }
+          >
+            <ExternalLink size={14} /> Open Hugging Face page
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => copyText(file.civitaiPageUrl!)}
+          >
+            <Link2 size={14} /> Copy page URL
           </button>
         </>
       ) : null}

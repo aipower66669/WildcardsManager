@@ -39,11 +39,11 @@ import {
   HF_SORTS,
   huggingfaceModelPageUrl,
 } from '../domain/huggingfaceSearch';
-import { DEFAULT_LORA_DOWNLOAD_WEIGHTS } from '../domain/loraDownloadCategory';
 import {
   hfRepoSaveFileName,
   pickPreferredHfWeight,
 } from '../domain/huggingfaceWeightPick';
+import { HfDownloadModal, type HfDownloadFormValues } from './HfDownloadModal';
 import { modalOverlayDismiss } from './modalOverlayDismiss';
 
 function formatCount(n: number): string {
@@ -98,6 +98,32 @@ function highlightTags(tags: string[]): string[] {
   return [...new Set(out)].slice(0, 8);
 }
 
+function HfResultThumb({
+  previewUrl,
+  onOpen,
+}: {
+  previewUrl: string;
+  onOpen: () => void;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <button
+      type="button"
+      className="hf-result-thumb"
+      title="Preview on Hugging Face"
+      onClick={onOpen}
+    >
+      <img
+        src={previewUrl}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+    </button>
+  );
+}
+
 type Tab = 'browse' | 'downloaded' | 'archive' | 'queue';
 
 type DownloadConfirm = {
@@ -107,9 +133,6 @@ type DownloadConfirm = {
   type: HfDownloadTypeDto;
   fileName: string;
   loraCategoryId: string;
-  category: string;
-  weights: string;
-  destError: string | null;
 };
 
 export function HuggingFaceBrowserModal({
@@ -458,9 +481,6 @@ export function HuggingFaceBrowserModal({
         type,
         fileName,
         loraCategoryId,
-        category,
-        weights: DEFAULT_LORA_DOWNLOAD_WEIGHTS,
-        destError: null,
       };
       const dest = await window.wcm.huggingface.checkDownloadDestination({
         type,
@@ -479,51 +499,27 @@ export function HuggingFaceBrowserModal({
     }
   };
 
-  const refreshDestError = async (draft: DownloadConfirm) => {
-    try {
-      const dest = await window.wcm.huggingface.checkDownloadDestination({
-        type: draft.type,
-        fileName: draft.fileName,
-        loraCategoryId:
-          draft.type === 'LORA' ? draft.loraCategoryId || undefined : undefined,
-        category:
-          draft.type === 'Checkpoint' ? draft.category || undefined : undefined,
-      });
-      setConfirm({
-        ...draft,
-        fileName: dest.fileName ?? draft.fileName,
-        destError: null,
-      });
-    } catch (err) {
-      setConfirm({
-        ...draft,
-        destError: err instanceof Error ? err.message : String(err),
-      });
-    }
-  };
-
-  const enqueueDownload = async () => {
-    if (!confirm || confirm.destError) return;
-    if (confirm.type === 'LORA' && !confirm.loraCategoryId) {
-      setConfirm({ ...confirm, destError: 'Pick a LoRA download category.' });
-      return;
-    }
+  const enqueueDownload = async (values: HfDownloadFormValues) => {
+    if (!confirm) return;
     setConfirmBusy(true);
     try {
       const snap = await window.wcm.huggingface.downloadModel({
         repoId: confirm.hit.id,
-        filePath: confirm.filePath,
-        type: confirm.type,
-        fileName: confirm.fileName,
+        filePath: values.filePath,
+        type: values.type,
+        fileName: values.fileName,
         modelName: confirm.hit.id,
         loraCategoryId:
-          confirm.type === 'LORA' ? confirm.loraCategoryId : undefined,
-        category: confirm.type === 'Checkpoint' ? confirm.category : undefined,
-        weights: confirm.type === 'LORA' ? confirm.weights : undefined,
+          values.type === 'LORA' ? values.loraCategoryId : undefined,
+        extraLoraCategoryIds: values.extraLoraCategoryIds,
+        category: values.type === 'Checkpoint' ? values.category : undefined,
+        weights: values.type === 'LORA' ? values.weights : undefined,
+        extraComment: values.extraComment,
+        extraPrompt: values.extraPrompt,
       });
       setQueueSnap(snap);
-      if (confirm.type === 'LORA' && confirm.loraCategoryId) {
-        const remembered = confirm.loraCategoryId;
+      if (values.type === 'LORA' && values.loraCategoryId) {
+        const remembered = values.loraCategoryId;
         setLoraCategories((prev) =>
           prev ? { ...prev, lastCategoryId: remembered } : prev,
         );
@@ -949,6 +945,12 @@ export function HuggingFaceBrowserModal({
                           : ''
                       }`}
                     >
+                      {item.previewUrl ? (
+                        <HfResultThumb
+                          previewUrl={item.previewUrl}
+                          onOpen={() => openHubPreview(item.id)}
+                        />
+                      ) : null}
                       <div className="hf-result-main">
                         <div className="hf-result-title">
                           <button
@@ -1238,144 +1240,17 @@ export function HuggingFaceBrowserModal({
       </div>
 
       {confirm ? (
-        <div
-          className="modal-overlay hf-confirm-overlay"
-          {...modalOverlayDismiss(() => setConfirm(null))}
-        >
-          <div
-            className="modal hf-confirm-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <header className="modal-head">
-              <h2>Download {confirm.hit.id}</h2>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => setConfirm(null)}
-              >
-                <X size={16} />
-              </button>
-            </header>
-            <div className="modal-body">
-              <label className="field">
-                <span>Weight file</span>
-                <select
-                  value={confirm.filePath}
-                  onChange={(e) => {
-                    const filePath = e.target.value;
-                    const fileName = hfRepoSaveFileName(confirm.hit.id, filePath);
-                    void refreshDestError({ ...confirm, filePath, fileName });
-                  }}
-                >
-                  {confirm.detail.siblings.map((f) => (
-                    <option key={f.path} value={f.path}>
-                      {f.path}
-                      {f.size != null ? ` (${formatBytes(f.size)})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Save as</span>
-                <input
-                  className="text-input"
-                  value={confirm.fileName}
-                  spellCheck={false}
-                  onChange={(e) => {
-                    const fileName = e.target.value;
-                    void refreshDestError({ ...confirm, fileName });
-                  }}
-                />
-              </label>
-              <label className="field">
-                <span>Destination type</span>
-                <select
-                  value={confirm.type}
-                  onChange={(e) => {
-                    const type = e.target.value as HfDownloadTypeDto;
-                    void refreshDestError({ ...confirm, type });
-                  }}
-                >
-                  <option value="LORA">LoRA</option>
-                  <option value="Checkpoint">Checkpoint</option>
-                </select>
-              </label>
-              {confirm.type === 'LORA' ? (
-                <>
-                  <label className="field">
-                    <span>LoRA category</span>
-                    <select
-                      value={confirm.loraCategoryId}
-                      onChange={(e) => {
-                        const loraCategoryId = e.target.value;
-                        void refreshDestError({ ...confirm, loraCategoryId });
-                      }}
-                    >
-                      <option value="">Select…</option>
-                      {(loraCategories?.categories ?? []).map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Weights</span>
-                    <input
-                      className="text-input"
-                      value={confirm.weights}
-                      onChange={(e) =>
-                        setConfirm({ ...confirm, weights: e.target.value })
-                      }
-                    />
-                  </label>
-                </>
-              ) : (
-                <label className="field">
-                  <span>Category folder</span>
-                  <select
-                    value={confirm.category}
-                    onChange={(e) => {
-                      const category = e.target.value;
-                      void refreshDestError({ ...confirm, category });
-                    }}
-                  >
-                    <option value="">(root)</option>
-                    {checkpointCategories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {confirm.destError ? (
-                <p className="hint error-text">{confirm.destError}</p>
-              ) : null}
-              <div className="manage-actions">
-                <button
-                  type="button"
-                  className="ghost-btn"
-                  onClick={() => setConfirm(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={confirmBusy || Boolean(confirm.destError)}
-                  onClick={() => void enqueueDownload()}
-                >
-                  {confirmBusy ? (
-                    <Loader2 size={14} className="spin" />
-                  ) : (
-                    <Download size={14} />
-                  )}{' '}
-                  Queue download
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <HfDownloadModal
+          hit={confirm.hit}
+          detail={confirm.detail}
+          filePath={confirm.filePath}
+          fileName={confirm.fileName}
+          type={confirm.type}
+          loraCategoryId={confirm.loraCategoryId}
+          busy={confirmBusy}
+          onCancel={() => setConfirm(null)}
+          onConfirm={(values) => void enqueueDownload(values)}
+        />
       ) : null}
 
       <footer

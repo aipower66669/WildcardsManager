@@ -15,6 +15,7 @@ import { IPC } from '../shared/contracts.js';
 import { resolveDownloadCategoryDir } from './civitaiCategoryService.js';
 import { getLoraDownloadCategoryById } from './loraDownloadCategoryService.js';
 import { ingestDownloadedModelFile } from './ingestDownloadedModel.js';
+import { rememberHuggingFaceSourceLink } from './modelManualCivitaiLink.js';
 import { seedCachedFileAutoV2, computeFileAutoV2 } from './modelHashCache.js';
 import { appendLoraSnippetInMemory } from './wildcardMemoryEdit.js';
 import { loadSettings, markDownloadedHfModel } from './settingsStore.js';
@@ -338,10 +339,19 @@ export async function downloadHuggingFaceFile(
   }
   fs.renameSync(temp, dest);
 
+  rememberHuggingFaceSourceLink({
+    absolutePath: dest,
+    repoId: opts.repoId,
+  });
   ingestDownloadedModelFile(dest);
   void computeFileAutoV2(dest).then((hash) => {
     if (!hash) return;
     seedCachedFileAutoV2(dest, hash);
+    rememberHuggingFaceSourceLink({
+      absolutePath: dest,
+      repoId: opts.repoId,
+      autoV2: hash,
+    });
     ingestDownloadedModelFile(dest, { notify: false });
   });
 

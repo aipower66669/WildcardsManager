@@ -193,6 +193,36 @@ export function huggingfaceModelPageUrl(modelId: string): string {
   return `${HF_SITE_ORIGIN}/${id}`;
 }
 
+/** `https://huggingface.co/<org>/<repo>` (extra path segments are ignored). */
+export function parseHuggingFaceModelPageUrl(
+  raw: string,
+): { repoId: string } | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  const host = url.hostname.toLowerCase().replace(/^www\./, '');
+  if (host !== 'huggingface.co') return null;
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (parts.length < 2) return null;
+  const head = parts[0]!.toLowerCase();
+  if (
+    head === 'datasets' ||
+    head === 'spaces' ||
+    head === 'collections' ||
+    head === 'docs' ||
+    head === 'models'
+  ) {
+    return null;
+  }
+  return { repoId: `${parts[0]}/${parts[1]}` };
+}
+
 export function parseHfBrowseFilters(raw: unknown): HfBrowseFilters {
   const defaults = { ...DEFAULT_HF_BROWSE_FILTERS };
   if (!raw || typeof raw !== 'object') return defaults;
@@ -292,6 +322,9 @@ export function buildHfModelSearchQuery(
   params.set('sort', filters.sort);
   params.set('direction', String(filters.direction));
   params.set('limit', String(filters.limit));
+  // File list + model-card YAML, so cards can show a sample image.
+  params.set('full', 'true');
+  params.set('cardData', 'true');
 
   if (filters.gated === 'true' || filters.gated === 'false') {
     params.set('gated', filters.gated);

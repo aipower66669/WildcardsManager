@@ -34,6 +34,7 @@ import type {
   ComfyConnectionDto,
   ComfyContractCheckDto,
   ComfyModelCatalogDto,
+  GenerationFormStateDto,
   GenerationProgressDto,
   GenerationStyleProfileDto,
   GenerationStyleProfileIdDto,
@@ -326,6 +327,7 @@ export function GenerationWorkspace({
   const [webviewSrc, setWebviewSrc] = useState('');
   const [formHydrated, setFormHydrated] = useState(false);
   const formHydratedRef = useRef(false);
+  const formEpochRef = useRef(0);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextPersist = useRef(true);
   const appliedFolderPick = useRef(0);
@@ -351,6 +353,7 @@ export function GenerationWorkspace({
     promptSource: 'folder' as PromptSource,
     benchmark: false,
   });
+  const lastSavedRef = useRef({ ...formSnapshotRef.current });
 
   const safetensorCheckpoints = useMemo(
     () => checkpoints.filter(isSafetensorsCheckpoint),
@@ -474,9 +477,10 @@ export function GenerationWorkspace({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      const epoch = formEpochRef.current;
       try {
         const form = await window.wcm.comfy.getGenerationForm();
-        if (cancelled) return;
+        if (cancelled || formEpochRef.current !== epoch) return;
         skipNextPersist.current = true;
         profilesRef.current = {
           realistic: { ...form.profiles.realistic },
@@ -677,10 +681,13 @@ export function GenerationWorkspace({
     };
     if (skipNextPersist.current) {
       skipNextPersist.current = false;
+      lastSavedRef.current = formSnapshotRef.current;
       return;
     }
     if (persistTimer.current) clearTimeout(persistTimer.current);
     persistTimer.current = setTimeout(() => {
+      persistTimer.current = null;
+      lastSavedRef.current = formSnapshotRef.current;
       void window.wcm.comfy.setGenerationForm(formSnapshotRef.current);
     }, 250);
     return () => {
@@ -724,6 +731,7 @@ export function GenerationWorkspace({
       promptSource: 'folder' as const,
     };
     formSnapshotRef.current = snapshot;
+    lastSavedRef.current = snapshot;
     const activeId = snapshot.activeProfile;
     profilesRef.current = {
       ...profilesRef.current,
@@ -752,10 +760,150 @@ export function GenerationWorkspace({
     return () => {
       if (!formHydrated) return;
       if (persistTimer.current) clearTimeout(persistTimer.current);
+      lastSavedRef.current = formSnapshotRef.current;
       void window.wcm.comfy.setGenerationForm(formSnapshotRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount-only flush
   }, [formHydrated]);
+
+  const applyRemoteFormRef = useRef<(form: GenerationFormStateDto) => void>(
+    () => {},
+  );
+  applyRemoteFormRef.current = (form) => {
+    const local = formSnapshotRef.current;
+    const saved = lastSavedRef.current;
+    const profileChanged = form.activeProfile !== local.activeProfile;
+    // Keep a field only when this tab changed it after the last save.
+    // A style change belongs to the other profile, so those keystrokes
+    // are not written onto it.
+    const pick = <T,>(
+      localValue: T,
+      remoteValue: T,
+      savedValue: T,
+    ): T =>
+      !profileChanged && localValue !== savedValue ? localValue : remoteValue;
+    const next = {
+      activeProfile: form.activeProfile,
+      relativeFolder: pick(
+        local.relativeFolder,
+        form.relativeFolder,
+        saved.relativeFolder,
+      ),
+      promptFoldersRecursive: pick(
+        local.promptFoldersRecursive,
+        form.promptFoldersRecursive === true,
+        saved.promptFoldersRecursive,
+      ),
+      checkpoint: pick(local.checkpoint, form.checkpoint, saved.checkpoint),
+      clip: pick(local.clip, form.clip, saved.clip),
+      vae: pick(local.vae, form.vae, saved.vae),
+      seed: pick(local.seed, form.seed, saved.seed),
+      width: pick(local.width, form.width, saved.width),
+      height: pick(local.height, form.height, saved.height),
+      steps: pick(local.steps, form.steps, saved.steps),
+      cfg: pick(local.cfg, form.cfg, saved.cfg),
+      samplerName: pick(local.samplerName, form.samplerName, saved.samplerName),
+      scheduler: pick(local.scheduler, form.scheduler, saved.scheduler),
+      denoise: pick(local.denoise, form.denoise, saved.denoise),
+      additionalPositivePrompt: pick(
+        local.additionalPositivePrompt,
+        form.additionalPositivePrompt,
+        saved.additionalPositivePrompt,
+      ),
+      negativePrompt: pick(
+        local.negativePrompt,
+        form.negativePrompt,
+        saved.negativePrompt,
+      ),
+      promptText: pick(local.promptText, form.promptText, saved.promptText),
+      promptSource: pick(
+        local.promptSource,
+        form.promptSource,
+        saved.promptSource,
+      ),
+      benchmark: pick(local.benchmark, form.benchmark === true, saved.benchmark),
+    };
+    const keptEdit =
+      next.checkpoint !== form.checkpoint ||
+      next.clip !== form.clip ||
+      next.vae !== form.vae ||
+      next.seed !== form.seed ||
+      next.width !== form.width ||
+      next.height !== form.height ||
+      next.steps !== form.steps ||
+      next.cfg !== form.cfg ||
+      next.samplerName !== form.samplerName ||
+      next.scheduler !== form.scheduler ||
+      next.denoise !== form.denoise ||
+      next.additionalPositivePrompt !== form.additionalPositivePrompt ||
+      next.negativePrompt !== form.negativePrompt ||
+      next.promptText !== form.promptText ||
+      next.promptSource !== form.promptSource ||
+      next.promptFoldersRecursive !== (form.promptFoldersRecursive === true) ||
+      next.benchmark !== (form.benchmark === true) ||
+      (next.relativeFolder ?? null) !== (form.relativeFolder ?? null);
+    profilesRef.current = {
+      realistic: { ...form.profiles.realistic },
+      hentai: { ...form.profiles.hentai },
+      '3d': { ...(form.profiles['3d'] ?? emptyStyleProfile()) },
+    };
+    formSnapshotRef.current = next;
+    const same =
+      next.activeProfile === profile &&
+      next.checkpoint === checkpoint &&
+      next.clip === clip &&
+      next.vae === vae &&
+      next.seed === seed &&
+      next.width === width &&
+      next.height === height &&
+      next.steps === steps &&
+      next.cfg === cfg &&
+      next.samplerName === samplerName &&
+      next.scheduler === scheduler &&
+      next.denoise === denoise &&
+      next.additionalPositivePrompt === additionalPositive &&
+      next.negativePrompt === negative &&
+      next.promptText === promptText &&
+      next.promptSource === promptSource &&
+      next.promptFoldersRecursive === promptFoldersRecursive &&
+      next.benchmark === benchmark &&
+      (next.relativeFolder ?? null) === selectedFolder;
+    if (!keptEdit) lastSavedRef.current = next;
+    if (same) return;
+    if (persistTimer.current) {
+      clearTimeout(persistTimer.current);
+      persistTimer.current = null;
+    }
+    skipNextPersist.current = !keptEdit;
+    setProfile(next.activeProfile);
+    setCheckpoint(next.checkpoint);
+    setClip(next.clip);
+    setVae(next.vae);
+    setSeed(next.seed);
+    setWidth(next.width);
+    setHeight(next.height);
+    setSteps(next.steps);
+    setCfg(next.cfg);
+    setSamplerName(next.samplerName);
+    setScheduler(next.scheduler);
+    setDenoise(next.denoise);
+    setAdditionalPositive(next.additionalPositivePrompt);
+    setNegative(next.negativePrompt);
+    setPromptText(next.promptText);
+    setPromptSource(next.promptSource);
+    setPromptFoldersRecursive(next.promptFoldersRecursive);
+    setBenchmark(next.benchmark);
+    if ((next.relativeFolder ?? null) !== selectedFolder) {
+      onSelectedFolderChange(next.relativeFolder);
+    }
+  };
+
+  useEffect(() => {
+    return window.wcm.comfy.onGenerationForm((form) => {
+      formEpochRef.current += 1;
+      applyRemoteFormRef.current(form);
+    });
+  }, []);
 
   const injectSavedWorkflow = useCallback(async () => {
     const wv = webviewRef.current as Electron.WebviewTag | null;
@@ -946,6 +1094,7 @@ export function GenerationWorkspace({
       profiles,
     };
     formSnapshotRef.current = snapshot;
+    lastSavedRef.current = snapshot;
     void window.wcm.comfy.setGenerationForm(snapshot);
   };
 
@@ -1001,6 +1150,7 @@ export function GenerationWorkspace({
           benchmark,
         };
         formSnapshotRef.current = snapshot;
+        lastSavedRef.current = snapshot;
         if (folderOverride) {
           profilesRef.current = {
             ...profilesRef.current,
@@ -1148,6 +1298,7 @@ export function GenerationWorkspace({
     const seedValue = value >>> 0;
     setSeed(seedValue);
     formSnapshotRef.current = { ...formSnapshotRef.current, seed: seedValue };
+    lastSavedRef.current = { ...lastSavedRef.current, seed: seedValue };
     const activeId = formSnapshotRef.current.activeProfile;
     profilesRef.current = {
       ...profilesRef.current,

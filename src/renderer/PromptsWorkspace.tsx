@@ -8,9 +8,14 @@ import {
   type MutableRefObject,
 } from 'react';
 import {
+  Box,
+  Camera,
   ClipboardCopy,
+  Cpu,
+  Dices,
   FilePlus2,
   FolderOpen,
+  Hash,
   Infinity,
   ListChecks,
   Loader2,
@@ -18,13 +23,23 @@ import {
   PanelRightOpen,
   PieChart,
   RefreshCw,
+  Scaling,
+  Shuffle,
+  Sparkles,
   Square,
   Trash2,
   Zap,
 } from 'lucide-react';
 import { remapPromptFolderPath } from '../domain/promptFolderNames';
+import { randomFixedGenerationSeed } from '../domain/generationPromptPick.js';
 import type { ParsedCivitaiModelPageUrl } from '../domain/civitaiSnippet.js';
-import type { GenPromptValidationFileDto, PromptTreeDto } from '../shared/contracts';
+import type {
+  GenerationFormStateDto,
+  GenerationStyleProfileIdDto,
+  GenPromptValidationFileDto,
+  ModelFileManagerEntryDto,
+  PromptTreeDto,
+} from '../shared/contracts';
 import { missingFileSearchQuery } from '../domain/missingFileSearch';
 import { WildcardEditor, type WildcardEditorHandle } from './WildcardEditor';
 import { PanelSplitter, type PanelSplitterHandlers } from './PanelSplitter';
@@ -162,6 +177,19 @@ export function PromptsWorkspace({
   const [generationNote, setGenerationNote] = useState<string | null>(null);
   const [generationRunning, setGenerationRunning] = useState(isGenerationRunning);
   const [generationStarting, setGenerationStarting] = useState(false);
+  const [styleProfile, setStyleProfile] =
+    useState<GenerationStyleProfileIdDto>('realistic');
+  const [checkpoint, setCheckpoint] = useState('');
+  const [genSeed, setGenSeed] = useState(-1);
+  const [genWidth, setGenWidth] = useState(1024);
+  const [genHeight, setGenHeight] = useState(1024);
+  const [benchmarkOn, setBenchmarkOn] = useState(false);
+  const [checkpoints, setCheckpoints] = useState<ModelFileManagerEntryDto[]>(
+    [],
+  );
+  const formEpochRef = useRef(0);
+  const patchTimer = useRef<number | null>(null);
+  const pendingPatch = useRef<Partial<GenerationFormStateDto>>({});
   const [genExists, setGenExists] = useState(false);
   const [editorText, setEditorText] = useState('');
   const genEditorRef = useRef<WildcardEditorHandle | null>(null);
@@ -367,6 +395,101 @@ export function PromptsWorkspace({
     };
   }, []);
 
+  const applyGenerationFields = useCallback((form: GenerationFormStateDto) => {
+    const pending = pendingPatch.current;
+    setStyleProfile(pending.activeProfile ?? form.activeProfile);
+    setCheckpoint(pending.checkpoint ?? form.checkpoint);
+    setGenSeed(pending.seed ?? form.seed);
+    setGenWidth(pending.width ?? form.width);
+    setGenHeight(pending.height ?? form.height);
+    setBenchmarkOn(form.benchmark === true);
+  }, []);
+
+  const flushGenerationPatch = useCallback(async () => {
+    if (patchTimer.current != null) {
+      window.clearTimeout(patchTimer.current);
+      patchTimer.current = null;
+    }
+    const patch = pendingPatch.current;
+    pendingPatch.current = {};
+    if (Object.keys(patch).length === 0) return;
+    const saved = await window.wcm.comfy.setGenerationForm(patch);
+    applyGenerationFields(saved);
+  }, [applyGenerationFields]);
+
+  const queueGenerationPatch = useCallback(
+    (patch: Partial<GenerationFormStateDto>) => {
+      pendingPatch.current = { ...pendingPatch.current, ...patch };
+      if (patchTimer.current != null) window.clearTimeout(patchTimer.current);
+      patchTimer.current = window.setTimeout(() => {
+        void flushGenerationPatch();
+      }, 200);
+    },
+    [flushGenerationPatch],
+  );
+
+  const commitGenerationPatch = useCallback(
+    (patch: Partial<GenerationFormStateDto>) => {
+      pendingPatch.current = { ...pendingPatch.current, ...patch };
+      void flushGenerationPatch();
+    },
+    [flushGenerationPatch],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const epoch = formEpochRef.current;
+    void window.wcm.comfy
+      .getGenerationForm()
+      .then((form) => {
+        if (cancelled || formEpochRef.current !== epoch) return;
+        applyGenerationFields(form);
+      })
+      .catch(() => {
+        // Generation form is optional until the first save.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [applyGenerationFields]);
+
+  useEffect(() => {
+    return window.wcm.comfy.onGenerationForm((form) => {
+      formEpochRef.current += 1;
+      applyGenerationFields(form);
+    });
+  }, [applyGenerationFields]);
+
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    void window.wcm.modelFiles
+      .listCheckpoints()
+      .then((list) => {
+        if (!cancelled) setCheckpoints(list.files);
+      })
+      .catch(() => {
+        if (!cancelled) setCheckpoints([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [active]);
+
+  useEffect(() => {
+    return () => {
+      if (patchTimer.current != null) {
+        window.clearTimeout(patchTimer.current);
+        patchTimer.current = null;
+      }
+      const patch = pendingPatch.current;
+      pendingPatch.current = {};
+      if (Object.keys(patch).length > 0) {
+        void window.wcm.comfy.setGenerationForm(patch);
+      }
+    };
+  }, []);
+
   useEffect(() => subscribeGenerationRunning(setGenerationRunning), []);
 
   useEffect(() => {
@@ -384,11 +507,26 @@ export function PromptsWorkspace({
     });
   }, []);
 
+  const switchStyle = async (next: GenerationStyleProfileIdDto) => {
+    if (next === styleProfile) return;
+    await flushGenerationPatch();
+    setStyleProfile(next);
+    try {
+      const saved = await window.wcm.comfy.setGenerationForm({
+        activeProfile: next,
+      });
+      applyGenerationFields(saved);
+    } catch (e) {
+      setGenerationNote(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const startFromPrompts = async (mode: GenerationRunMode) => {
     if (!selectedFolder || generationRunning || generationStarting) return;
     setGenerationStarting(true);
     setGenerationNote(null);
     try {
+      await flushGenerationPatch();
       if (saveTimer.current !== undefined) {
         window.clearTimeout(saveTimer.current);
         saveTimer.current = undefined;
@@ -737,12 +875,162 @@ export function PromptsWorkspace({
             ) : null}
             {dirty ? <span className="hint">Saving…</span> : null}
           </div>
+          <div className="prompts-gen-bar">
+            <div className="prompts-gen-fields">
+              <div
+                className="prompts-style-icons"
+                role="group"
+                aria-label="Generation style"
+              >
+                {(
+                  [
+                    ['realistic', 'Realistic', Camera],
+                    ['hentai', 'Anime', Sparkles],
+                    ['3d', '3D', Box],
+                  ] as const
+                ).map(([id, label, Icon]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={styleProfile === id ? 'active' : undefined}
+                    title={label}
+                    aria-label={label}
+                    aria-pressed={styleProfile === id}
+                    onClick={() => void switchStyle(id)}
+                  >
+                    <Icon size={14} />
+                  </button>
+                ))}
+              </div>
+              <label className="prompts-gen-checkpoint" title="Checkpoint">
+                <Cpu size={14} aria-hidden />
+                <select
+                  className="text-input"
+                  aria-label="Checkpoint"
+                  value={checkpoint}
+                  disabled={benchmarkOn}
+                  title={
+                    benchmarkOn
+                      ? 'Benchmark is on, so Generation walks every checkpoint'
+                      : 'Checkpoint'
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCheckpoint(value);
+                    commitGenerationPatch({ checkpoint: value });
+                  }}
+                >
+                  <option value="">Select…</option>
+                  {checkpoint &&
+                  !checkpoints.some(
+                    (file) =>
+                      file.relativePath.replaceAll('\\', '/') === checkpoint,
+                  ) ? (
+                    <option value={checkpoint}>
+                      {checkpoint
+                        .replace(/^.*[\\/]/, '')
+                        .replace(/\.safetensors$/i, '')}
+                    </option>
+                  ) : null}
+                  {checkpoints
+                    .filter(
+                      (file) =>
+                        file.name.toLowerCase().endsWith('.safetensors') &&
+                        file.enabled !== false,
+                    )
+                    .map((file) => {
+                      const value = file.relativePath.replaceAll('\\', '/');
+                      return (
+                        <option key={value} value={value}>
+                          {file.stem}
+                        </option>
+                      );
+                    })}
+                </select>
+              </label>
+              <div className="prompts-gen-seed">
+                <Hash size={14} aria-hidden />
+                <input
+                  className="text-input mono"
+                  type="number"
+                  aria-label="Seed"
+                  title="Seed. 1 or higher repeats the image. 0 or below rolls a new seed every run."
+                  value={genSeed}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const next =
+                      raw.trim() === '' || raw === '-'
+                        ? -1
+                        : Number.isFinite(Number(raw))
+                          ? Number(raw)
+                          : -1;
+                    setGenSeed(next);
+                    queueGenerationPatch({ seed: next });
+                  }}
+                />
+                <button
+                  type="button"
+                  className="generation-action-btn"
+                  title="Random seed (−1) — a new seed on every run"
+                  aria-label="Random seed"
+                  onClick={() => {
+                    setGenSeed(-1);
+                    commitGenerationPatch({ seed: -1 });
+                  }}
+                >
+                  <Dices size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="generation-action-btn"
+                  title="Randomize seed — write one random number and keep it"
+                  aria-label="Randomize seed"
+                  onClick={() => {
+                    const next = randomFixedGenerationSeed();
+                    setGenSeed(next);
+                    commitGenerationPatch({ seed: next });
+                  }}
+                >
+                  <Shuffle size={14} />
+                </button>
+              </div>
+              <div className="prompts-gen-size" title="Width and height">
+                <Scaling size={14} aria-hidden />
+                <input
+                  className="text-input"
+                  type="number"
+                  aria-label="Width"
+                  title="Width"
+                  value={genWidth}
+                  onChange={(e) => {
+                    const next = Number(e.target.value) || 1024;
+                    setGenWidth(next);
+                    queueGenerationPatch({ width: next });
+                  }}
+                />
+                <span className="prompts-gen-times" aria-hidden>
+                  ×
+                </span>
+                <input
+                  className="text-input"
+                  type="number"
+                  aria-label="Height"
+                  title="Height"
+                  value={genHeight}
+                  onChange={(e) => {
+                    const next = Number(e.target.value) || 1024;
+                    setGenHeight(next);
+                    queueGenerationPatch({ height: next });
+                  }}
+                />
+              </div>
+            </div>
           <div className="prompts-gen-actions" role="group" aria-label="Generate">
             <span
               className="generation-action-tip"
               title={
                 selectedFolder
-                  ? 'Generate one image from this folder’s !gen.txt. Uses the current Generation style, checkpoint, seed, and Recursive setting. A fixed seed repeats that image.'
+                  ? 'Generate one image from this folder’s !gen.txt. Uses the style, checkpoint, seed, size, and Recursive setting shown here. A fixed seed repeats that image.'
                   : 'Select a prompt folder first.'
               }
             >
@@ -762,7 +1050,7 @@ export function PromptsWorkspace({
               className="generation-action-tip"
               title={
                 selectedFolder
-                  ? 'Keep generating images from this folder’s !gen.txt until Cancel. Uses the current Generation style, checkpoint, seed, and Recursive setting. A fixed seed repeats the same image. 0 or below rolls a new seed each image.'
+                  ? 'Keep generating images from this folder’s !gen.txt until Cancel. Uses the style, checkpoint, seed, size, and Recursive setting shown here. A fixed seed repeats the same image. 0 or below rolls a new seed each image.'
                   : 'Select a prompt folder first.'
               }
             >
@@ -797,6 +1085,7 @@ export function PromptsWorkspace({
                 <Square size={14} />
               </button>
             </span>
+          </div>
           </div>
         </div>
         {generationNote ? (

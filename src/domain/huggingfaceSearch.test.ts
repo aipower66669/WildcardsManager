@@ -7,6 +7,7 @@ import {
   planHfFamilyFetches,
   parseHfBrowseFilters,
   parseHfNextCursor,
+  parseHuggingFaceModelPageUrl,
   DEFAULT_HF_BROWSE_FILTERS,
   type HfFamilyFetchedPage,
   type HfFamilyQueryBranch,
@@ -195,5 +196,18 @@ describe('huggingfaceSearch', () => {
     expect(thirdPlan.find((plan) => plan.branch.id === 'krea')?.onlyIds).toEqual([
       'old/three',
     ]);
+  });
+
+  it('reads a Hub model page as org/repo', () => {
+    expect(
+      parseHuggingFaceModelPageUrl(
+        'https://huggingface.co/org/name/tree/main',
+      ),
+    ).toEqual({ repoId: 'org/name' });
+    expect(
+      parseHuggingFaceModelPageUrl('https://www.huggingface.co/org/name'),
+    ).toEqual({ repoId: 'org/name' });
+    expect(parseHuggingFaceModelPageUrl('https://huggingface.co/datasets/org/name')).toBeNull();
+    expect(parseHuggingFaceModelPageUrl('https://civitai.com/models/1/name')).toBeNull();
   });
 });

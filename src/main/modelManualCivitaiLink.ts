@@ -4,6 +4,10 @@ import {
   type CivitaiOrigin,
 } from '../domain/civitaiSnippet.js';
 import {
+  huggingfaceModelPageUrl,
+  parseHuggingFaceModelPageUrl,
+} from '../domain/huggingfaceSearch.js';
+import {
   collectAutoV2HashesFromVersions,
   normalizeAutoV2,
   unionAutoV2Hashes,
@@ -33,13 +37,25 @@ import {
   type ManualLinkEntry,
 } from './modelRootStore.js';
 
+export const HUGGINGFACE_LINK_ORIGIN = 'huggingface';
+
 export type ManualCivitaiLink = {
   modelId: number;
-  origin: CivitaiOrigin;
+  origin: CivitaiOrigin | typeof HUGGINGFACE_LINK_ORIGIN;
   name: string;
   pageUrl: string;
   previewUrl?: string;
 };
+
+export function isHuggingFaceSourceLink(link: {
+  origin: string;
+  pageUrl: string;
+}): boolean {
+  return (
+    link.origin === HUGGINGFACE_LINK_ORIGIN ||
+    parseHuggingFaceModelPageUrl(link.pageUrl) != null
+  );
+}
 
 function toLink(entry: ManualLinkEntry): ManualCivitaiLink {
   return {
@@ -66,7 +82,7 @@ export function lookupManualCivitaiLink(
 }
 
 export function manualLinkToFields(link: ManualCivitaiLink): {
-  civitaiModelId: number;
+  civitaiModelId?: number;
   civitaiName: string;
   civitaiPageUrl: string;
   previewUrl?: string;
@@ -74,10 +90,15 @@ export function manualLinkToFields(link: ManualCivitaiLink): {
   civitaiLinkManual: true;
 } {
   const previewUrl = link.previewUrl;
+  const pageUrl = isHuggingFaceSourceLink(link)
+    ? huggingfaceModelPageUrl(
+        parseHuggingFaceModelPageUrl(link.pageUrl)?.repoId ?? link.name,
+      )
+    : link.pageUrl;
   return {
-    civitaiModelId: link.modelId,
+    ...(isHuggingFaceSourceLink(link) ? {} : { civitaiModelId: link.modelId }),
     civitaiName: link.name,
-    civitaiPageUrl: link.pageUrl,
+    civitaiPageUrl: pageUrl,
     previewUrl,
     previewLocalUrl:
       previewUrl && hasCachedCivitaiPreview(previewUrl)
@@ -85,6 +106,33 @@ export function manualLinkToFields(link: ManualCivitaiLink): {
         : null,
     civitaiLinkManual: true,
   };
+}
+
+/** Store the Hub page on the downloaded file (path, and AutoV2 once known). */
+export function rememberHuggingFaceSourceLink(opts: {
+  absolutePath: string;
+  repoId: string;
+  autoV2?: string | null;
+}): void {
+  const parsed = parseHuggingFaceModelPageUrl(huggingfaceModelPageUrl(opts.repoId));
+  if (!parsed) return;
+  const entry: ManualLinkEntry = {
+    modelId: 0,
+    origin: HUGGINGFACE_LINK_ORIGIN,
+    name: parsed.repoId,
+    pageUrl: huggingfaceModelPageUrl(parsed.repoId),
+  };
+  const ctx = loadModelsStoreForPath(opts.absolutePath);
+  if (!ctx) return;
+  ctx.store.links.byPath[ctx.pathKey] = entry;
+  const hash = normalizeAutoV2(opts.autoV2 ?? undefined);
+  if (hash) {
+    const existing = ctx.store.links.byAutoV2[hash];
+    if (!existing || existing.origin === HUGGINGFACE_LINK_ORIGIN) {
+      ctx.store.links.byAutoV2[hash] = entry;
+    }
+  }
+  saveModelsStore(ctx.root, ctx.store);
 }
 
 /**
@@ -182,10 +230,25 @@ export async function setManualCivitaiLink(opts: {
   autoV2?: string | null;
   pageUrl: string;
 }): Promise<ManualCivitaiLink> {
+  const hf = parseHuggingFaceModelPageUrl(opts.pageUrl);
+  if (hf) {
+    rememberHuggingFaceSourceLink({
+      absolutePath: opts.absolutePath,
+      repoId: hf.repoId,
+      autoV2: opts.autoV2,
+    });
+    return {
+      modelId: 0,
+      origin: HUGGINGFACE_LINK_ORIGIN,
+      name: hf.repoId,
+      pageUrl: huggingfaceModelPageUrl(hf.repoId),
+    };
+  }
+
   const parsed = parseCivitaiModelPageUrl(opts.pageUrl);
   if (!parsed) {
     throw new Error(
-      'Enter a Civitai model URL like https://civitai.com/models/12345/name',
+      'Enter a Civitai model URL like https://civitai.com/models/12345/name, or a Hugging Face repo URL.',
     );
   }
 

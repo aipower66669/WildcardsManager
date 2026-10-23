@@ -13,6 +13,7 @@ import type {
   ModelFileManagerEntryDto,
 } from '../shared/contracts.js';
 import { usePersistedWorkspaceListFilter } from './usePersistedWorkspaceListFilter';
+import { parseHuggingFaceModelPageUrl } from '../domain/huggingfaceSearch.js';
 import { isUnrated } from '../domain/modelRating.js';
 import { ModelIdentityPanel } from './ModelIdentityPanel';
 import { ModelCivitaiPagePane } from './ModelCivitaiPagePane';
@@ -562,19 +563,28 @@ export function CheckpointFilesWorkspace({
               Website
             </button>
           </div>
-          {rightTab === 'website' && modelId != null ? (
+          {rightTab === 'website' && (modelId != null || pageUrl) ? (
             <div className="civitai-preview-bar-actions">
               <button
                 type="button"
                 className="civitai-icon-btn action-open"
                 title="Open in external browser"
                 aria-label="Open in external browser"
-                onClick={() =>
-                  void window.wcm.civitai.openModelPage(
-                    modelId,
-                    modelName ?? String(modelId),
-                  )
-                }
+                onClick={() => {
+                  const hf = pageUrl
+                    ? parseHuggingFaceModelPageUrl(pageUrl)?.repoId
+                    : undefined;
+                  if (hf) {
+                    void window.wcm.huggingface.openModelPage(hf);
+                    return;
+                  }
+                  if (modelId != null) {
+                    void window.wcm.civitai.openModelPage(
+                      modelId,
+                      modelName ?? String(modelId),
+                    );
+                  }
+                }}
               >
                 <ExternalLink size={15} />
               </button>

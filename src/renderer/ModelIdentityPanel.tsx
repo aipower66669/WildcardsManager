@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, RefreshCw, X } from 'lucide-react';
+import { parseHuggingFaceModelPageUrl } from '../domain/huggingfaceSearch.js';
 import type {
   ModelFileManagerEntryDto,
   ModelFileRematchFilenameCandidateDto,
@@ -312,6 +313,21 @@ export function ModelIdentityPanel({
 
   const dirty =
     urlDraft.trim() !== (file.civitaiPageUrl ?? '').trim();
+  const hfRepo = file.civitaiPageUrl
+    ? parseHuggingFaceModelPageUrl(file.civitaiPageUrl)?.repoId
+    : undefined;
+  const openStoredPage = () => {
+    if (hfRepo) {
+      void window.wcm.huggingface.openModelPage(hfRepo);
+      return;
+    }
+    if (file.civitaiModelId != null) {
+      void window.wcm.civitai.openModelPage(
+        file.civitaiModelId,
+        file.civitaiName ?? file.stem,
+      );
+    }
+  };
 
   const saveRating = async (next: number) => {
     setRatingBusy(true);
@@ -361,23 +377,21 @@ export function ModelIdentityPanel({
         ) : null}
         {showCivitaiLink ? (
           <div className="model-meta-row">
-            <dt>Civitai</dt>
+            <dt>{hfRepo ? 'Hugging Face' : 'Civitai'}</dt>
             <dd>
-              {file.civitaiModelId != null ? (
+              {file.civitaiModelId != null || hfRepo ? (
                 <button
                   type="button"
                   className="linkish"
-                  onClick={() =>
-                    void window.wcm.civitai.openModelPage(
-                      file.civitaiModelId!,
-                      file.civitaiName ?? file.stem,
-                    )
-                  }
+                  onClick={openStoredPage}
                   title={file.civitaiPageUrl}
                 >
                   <ExternalLink size={13} />
-                  {file.civitaiName ?? `Model ${file.civitaiModelId}`}
-                  {file.civitaiLinkManual ? ' · manual' : ''}
+                  {file.civitaiName ??
+                    (file.civitaiModelId != null
+                      ? `Model ${file.civitaiModelId}`
+                      : 'Model')}
+                  {file.civitaiLinkManual && !hfRepo ? ' · manual' : ''}
                 </button>
               ) : (
                 <span className="hint">No match</span>
@@ -491,8 +505,8 @@ export function ModelIdentityPanel({
       {showCivitaiLink ? (
         <div className="model-civitai-link-edit">
           <label>
-            <span title="Paste a civitai.com / civitai.red /models/… URL to link this file">
-              Civitai page URL
+            <span title="Civitai model page, or the Hugging Face repo this file was downloaded from">
+              Page URL
             </span>
             <input
               type="url"

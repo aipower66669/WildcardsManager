@@ -158,6 +158,7 @@ export const IPC = {
   comfyGenerationProgress: 'wcm:comfy:generationProgress',
   comfyGetGenerationForm: 'wcm:comfy:getGenerationForm',
   comfySetGenerationForm: 'wcm:comfy:setGenerationForm',
+  comfyGenerationFormChanged: 'wcm:comfy:generationFormChanged',
   comfyGetCheckpointBenchmarkStatus:
     'wcm:comfy:getCheckpointBenchmarkStatus',
   comfyGetCheckpointBenchmarkResults:
@@ -2069,6 +2070,8 @@ export type HuggingFaceModelHitDto = {
   lastModified: string | null;
   trendingScore: number | null;
   pageUrl: string;
+  /** Sample image from the repo, when it has one. */
+  previewUrl?: string | null;
 };
 
 export type HuggingFaceSearchResultDto = {
@@ -3935,6 +3938,10 @@ export type WcmDesktopApi = {
     setGenerationForm(
       patch: Partial<GenerationFormStateDto>,
     ): Promise<GenerationFormStateDto>;
+    /** Fired after a form save so Prompts and Generation stay on the same values. */
+    onGenerationForm(
+      cb: (form: GenerationFormStateDto) => void,
+    ): () => void;
     /** Next checkpoint / counts / fastest-slowest from benchmark-stats.json. */
     getCheckpointBenchmarkStatus(): Promise<CheckpointBenchmarkStatusDto>;
     /** Full per-checkpoint avg timings for the Benchmark results chart. */

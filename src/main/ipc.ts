@@ -4019,7 +4019,18 @@ export function registerIpc(): void {
     if (!patch || typeof patch !== 'object') {
       throw new Error('Invalid generation form');
     }
-    return saveGenerationForm(patch as Parameters<typeof saveGenerationForm>[0]);
+    const saved = saveGenerationForm(
+      patch as Parameters<typeof saveGenerationForm>[0],
+    );
+    for (const win of BrowserWindow.getAllWindows()) {
+      try {
+        if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+        win.webContents.send(IPC.comfyGenerationFormChanged, saved);
+      } catch {
+        // ignore
+      }
+    }
+    return saved;
   });
   ipcMain.handle(IPC.comfyGetCheckpointBenchmarkStatus, async () =>
     getCheckpointBenchmarkStatus(),

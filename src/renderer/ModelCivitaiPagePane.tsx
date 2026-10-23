@@ -1,4 +1,5 @@
 import { ExternalLink } from 'lucide-react';
+import { parseHuggingFaceModelPageUrl } from '../domain/huggingfaceSearch';
 
 type Props = {
   pageUrl?: string | null;
@@ -51,12 +52,27 @@ export function ModelCivitaiPagePane({
     );
   }
 
+  const hfRepo = pageUrl
+    ? parseHuggingFaceModelPageUrl(pageUrl)?.repoId
+    : undefined;
+  const openStoredPage = () => {
+    if (hfRepo) {
+      void window.wcm.huggingface.openModelPage(hfRepo);
+      return;
+    }
+    if (modelId != null) {
+      void window.wcm.civitai.openModelPage(
+        modelId,
+        modelName ?? String(modelId),
+      );
+    }
+  };
   const body = pageUrl ? (
     <webview
       className="civitai-preview-webview"
       src={pageUrl}
       allowpopups={true}
-      partition="persist:civitai-preview"
+      partition={hfRepo ? 'persist:hf-preview' : 'persist:civitai-preview'}
     />
   ) : (
     <div className="civitai-preview-empty">
@@ -76,18 +92,13 @@ export function ModelCivitaiPagePane({
           <div className="civitai-preview-bar">
             <strong title={pageUrl}>{modelName ?? 'Civitai'}</strong>
             <div className="civitai-preview-bar-actions">
-              {modelId != null ? (
+              {modelId != null || hfRepo ? (
                 <button
                   type="button"
                   className="civitai-icon-btn action-open"
                   title="Open in external browser"
                   aria-label="Open in external browser"
-                  onClick={() =>
-                    void window.wcm.civitai.openModelPage(
-                      modelId,
-                      modelName ?? String(modelId),
-                    )
-                  }
+                  onClick={openStoredPage}
                 >
                   <ExternalLink size={15} />
                 </button>
