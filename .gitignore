@@ -20,3 +20,4 @@ electron.vite.config.*.mjs
 # Local editor rules (machine paths). Do not publish.
 .cursor/
 
+/ComfyUI-Workflow/WildcardsManager-0.10.0-win-x64.zip
