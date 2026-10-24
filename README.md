@@ -9,7 +9,7 @@
 [Release notes](RELEASE_NOTES.md) · [Changelog](CHANGELOG.md)
 
 A desktop graph editor, validator, simulator, and safe refactoring tool for Stable Diffusion / ComfyUI **Dynamic Prompts** wildcard libraries. Open a folder, explore dependencies as a graph, catch missing files and
-cycles, edit wildcards in place, refactor references safely with undo, browse/download LoRAs and checkpoints from Civitai (queued downloads, LoRA download categories), browse **community Images** and Hugging Face Hub models, manage installed model folders, organize prompt folders (`!gen.txt` + samples), and drive ComfyUI generation from those prompts — **Krea 2**, or **SDXL, Pony, and Illustrious** from one checkpoint graph with hires fix.
+cycles, edit wildcards in place, refactor references safely with undo, browse/download LoRAs and checkpoints from Civitai (queued downloads, LoRA download categories), browse **community Images** and Hugging Face Hub models, manage installed model folders, organize prompt folders (`!gen.txt` + samples), and drive ComfyUI generation from those prompts — **Krea 2**, or **SDXL, Pony, and Illustrious** (v0.9.1+) from one checkpoint graph with hires fix.
 
 Built for wildcard libraries used by
 [Stable Diffusion WebUI Dynamic Prompts](https://github.com/adieyal/sd-dynamic-prompts)
