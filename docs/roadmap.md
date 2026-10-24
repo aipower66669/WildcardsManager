@@ -123,10 +123,10 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - Deterministic 69-file SFW `sample_wildcards/` with `0main`.
 - Windows NSIS packaging. electron-builder also lists macOS DMG and Linux
   AppImage targets; those are not built, not tested, and not published.
-- Test workflow on Windows and Ubuntu when a version tag (`v*`) is pushed.
-  Branch pushes and pull requests do not start it.
-- Tagged `v*` release workflow: Windows NSIS installer attached to the GitHub
-  Release (`RELEASE_NOTES.md` is the body).
+- A version tag (`v*`) runs typecheck and tests on Windows and Ubuntu, then
+  attaches the Windows NSIS installer to the GitHub Release (`RELEASE_NOTES.md`
+  is the body). A failed test does not start the build. Branch pushes and
+  pull requests do not start it. Manual dispatch runs the tests only.
 - User/developer documentation and README screenshot.
 - PolyForm Noncommercial licensing for code and CC BY-NC-SA for sample content.
 

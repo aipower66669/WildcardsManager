@@ -7,6 +7,13 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- A version tag runs tests on Windows and Ubuntu, then builds the Windows
+  installer, in one workflow. A failed test does not start the build. The
+  release packs `comfyui-lora-training.zip` from the tracked node folder,
+  because that zip is gitignored.
+
 ## [0.9.0] - 2026-10-24
 
 ### Added

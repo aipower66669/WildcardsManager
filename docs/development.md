@@ -22,7 +22,7 @@ npm ci
 | `npm run preview` | Preview the production Electron bundle |
 | `npm run typecheck` | Strict TypeScript check without output |
 | `npm test` | Run all domain tests once |
-| `npm run check` | Same gates as GitHub `tests.yml` / build: typecheck then vitest |
+| `npm run check` | Same gates as the tag workflow: typecheck then vitest |
 | `npm run test:watch` | Run Vitest interactively |
 | `npm run dist` | Build/package for the current OS |
 | `npm run dist:win` | Windows x64 NSIS (the installer GitHub publishes) |
@@ -197,17 +197,18 @@ that and launches the installer already on disk.
 
 ## CI and releases
 
-`.github/workflows/tests.yml` runs `npm ci`, typecheck, and tests on Windows and
-Ubuntu only when a version tag (`v*`) is pushed. Branch pushes and pull
-requests do not start it.
-
-`.github/workflows/release.yml` runs on those same version tags (`v*`) and on
-manual dispatch. A tag push typechecks and tests, then builds the Windows NSIS
-installer (`npm run build:win`, no version bump) and attaches
-`WildcardsManager-*.exe`, the blockmap, and `latest.yml` to that GitHub
-Release, using `RELEASE_NOTES.md` as the body. Manual dispatch only runs the
-check. macOS and Linux are not built or tested. There is no installer to
-download for those systems. Running from source there might work.
+`.github/workflows/release.yml` is the only tag workflow. A version tag (`v*`)
+runs `npm ci`, typecheck, and tests on Windows and Ubuntu. The Windows NSIS
+installer (`npm run build:win`, no version bump) starts only after both of
+those pass. It then packs `comfyui-lora-training/` into
+`ComfyUI-Workflow/comfyui-lora-training.zip` (that zip is gitignored, so the
+checkout does not contain it) and attaches `WildcardsManager-*.exe`, the
+blockmap, `latest.yml`, that zip, and the Krea 2 and SDXL workflow JSON files
+to that GitHub Release, using `RELEASE_NOTES.md` as the body.
+A failed test does not start the build. Branch pushes and pull requests do
+not start it. Manual dispatch runs the tests only. macOS and Linux are not
+built. There is no installer to download for those systems. Running from
+source there might work.
 
 Before tagging:
 

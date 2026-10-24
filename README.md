@@ -106,7 +106,7 @@ npm run dev
 Then **Open folder** → `sample_wildcards/` → select `0main.txt` (or `portrait-focus.txt`).
 
 ```powershell
-npm run check       # typecheck + vitest (same as GitHub Tests / Build gates)
+npm run check       # typecheck + vitest (same gates as the tag workflow, before the installer)
 npm run dist        # Windows installer (GitHub tags publish this .exe only)
 ```
 
