@@ -34,6 +34,7 @@ import {
 } from '../domain/promptSubstitution.js';
 import { versionFileIsMarkedInstalled } from '../domain/civitaiVersionMark.js';
 import type {
+  GenerationFamily,
   GraphLayoutStyle,
   ValidationPlatform,
   CivitaiArchitectureIdDto,
@@ -229,6 +230,11 @@ export type LibraryConfig = {
    * ComfyUI rejects Dynamic Prompt logic inside `__wildcard__` names.
    */
   validationPlatform: ValidationPlatform;
+  /**
+   * Generation graph family. `krea2` keeps the current Generation screen.
+   * `sdxl` hides CLIP and VAE and queues the hires upscaler graph.
+   */
+  generationFamily: GenerationFamily;
   /** Civitai site this library browses/downloads from (.com vs .red). */
   civitaiOrigin: CivitaiOrigin;
 };
@@ -1118,6 +1124,7 @@ function parseLibraryConfig(
       row.validationPlatform === 'comfyui'
         ? row.validationPlatform
         : fallbackPlatform,
+    generationFamily: row.generationFamily === 'sdxl' ? 'sdxl' : 'krea2',
     civitaiOrigin: normalizeCivitaiOrigin(
       typeof row.civitaiOrigin === 'string' && row.civitaiOrigin.trim()
         ? row.civitaiOrigin
@@ -1183,6 +1190,7 @@ function createEmptyLibrary(name: string): LibraryConfig {
     enabledSdxlFamilies: [...DEFAULT_ENABLED_SDXL_FAMILIES],
     enabledCivitaiCategories: [...DEFAULT_ENABLED_CIVITAI_CATEGORIES],
     validationPlatform: 'comfyui',
+    generationFamily: 'krea2',
     civitaiOrigin: DEFAULT_CIVITAI_ORIGIN,
   };
 }
@@ -1539,6 +1547,7 @@ function settingsForDisk(
       benchmarkOutputFolder: lib.benchmarkOutputFolder,
       civitaiOrigin: lib.civitaiOrigin,
       validationPlatform: lib.validationPlatform,
+      generationFamily: lib.generationFamily === 'sdxl' ? 'sdxl' : 'krea2',
     } as LibraryConfig;
   });
 
@@ -1756,6 +1765,7 @@ export type LibraryCreateInput = {
   enabledSdxlFamilies?: CivitaiSdxlFamilyToggleIdDto[];
   enabledCivitaiCategories?: CivitaiModelCategoryIdDto[];
   validationPlatform?: ValidationPlatform;
+  generationFamily?: GenerationFamily;
   civitaiOrigin?: CivitaiOrigin;
 };
 
@@ -1902,6 +1912,9 @@ export function createLibraryConfig(input: LibraryCreateInput): LibraryConfig {
     input.validationPlatform === 'stable-diffusion'
   ) {
     lib.validationPlatform = input.validationPlatform;
+  }
+  if (input.generationFamily === 'krea2' || input.generationFamily === 'sdxl') {
+    lib.generationFamily = input.generationFamily;
   }
   if (input.civitaiOrigin !== undefined) {
     lib.civitaiOrigin = normalizeCivitaiOrigin(input.civitaiOrigin);

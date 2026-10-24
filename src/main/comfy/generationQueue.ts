@@ -10,6 +10,7 @@ import type {
 import { IPC } from '../../shared/contracts.js';
 import { GENERATION_OUTPUT_FILENAME } from '../../shared/comfy.js';
 import { applyBindings } from './applyBindings.js';
+import { applyCheckpointVaeOverride } from './checkpointVaeOverride.js';
 import {
   emptySampleClock,
   noteSampleProgress,
@@ -28,7 +29,10 @@ import {
   generationImageOutputFolder,
   resolveGenerationOutputRoot,
 } from './generationOutputRoots.js';
-import { loadWorkflowProfile } from './workflowStore.js';
+import {
+  activeWorkflowFamily,
+  loadWorkflowProfile,
+} from './workflowStore.js';
 import { isWorkflowGraph } from './workflowGraph.js';
 import {
   getGenerationSaveInNewSubfolder,
@@ -379,8 +383,15 @@ async function runJob(
     remainingImages: number;
   } | null,
 ): Promise<JobOutcome> {
-  const profile = loadWorkflowProfile();
-  if (!profile) throw new Error('Save a Comfy workflow profile first (Edit Workflow → Save Workflow)');
+  const family = activeWorkflowFamily();
+  const profile = loadWorkflowProfile(family);
+  if (!profile) {
+    throw new Error(
+      family === 'sdxl'
+        ? 'Open WildcardManager-ComfyUI-SDXL-Generation-Workflow.json in ComfyUI, then Save Workflow.'
+        : 'Save a Comfy workflow profile first (Edit Workflow → Save Workflow)',
+    );
+  }
   if (!isWorkflowGraph(profile.workflow)) {
     throw new Error('Saved workflow profile is invalid');
   }
@@ -497,11 +508,19 @@ async function runJob(
     steps: request.steps,
     cfg: request.cfg,
     denoise: request.denoise,
+    upscaler: request.upscaler?.trim() || undefined,
+    upscaleFactor: request.upscaleFactor,
+    hiresDenoise: request.hiresDenoise,
+    clipSkip:
+      request.clipSkip != null && Number.isFinite(request.clipSkip)
+        ? -Math.min(12, Math.max(1, Math.round(Math.abs(request.clipSkip))))
+        : undefined,
     samplerName: request.samplerName?.trim() || undefined,
     scheduler: request.scheduler?.trim() || undefined,
     outputFolder: ltOutputFolder,
     outputFilename: GENERATION_OUTPUT_FILENAME,
   });
+  applyCheckpointVaeOverride(graph, request.vae);
   // LT · Seed reads `value` (not `seed`). Always set it explicitly so a stale
   // binding path or leftover widget key cannot leave a fixed seed in place.
   injectLtSeedValue(graph, seed);

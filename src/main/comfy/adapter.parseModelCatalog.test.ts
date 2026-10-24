@@ -44,4 +44,27 @@ describe('parseModelCatalog', () => {
     expect(catalog.vaes).toEqual(['ae.safetensors', 'other.safetensors']);
     expect(catalog.clips).toEqual(['clip_l.safetensors', 't5xxl.safetensors']);
   });
+
+  it('reads upscalers from UpscaleModelLoader only', () => {
+    const catalog = parseModelCatalog({
+      UpscaleModelLoader: {
+        input: {
+          required: {
+            model_name: [['4x_foolhardy_Remacri.pth', '4x-UltraSharp.pth']],
+          },
+        },
+      },
+      SomeOtherLoader: {
+        input: {
+          required: {
+            model_name: [['not-an-upscaler.safetensors']],
+          },
+        },
+      },
+    });
+    expect(catalog.upscalers).toEqual([
+      '4x_foolhardy_Remacri.pth',
+      '4x-UltraSharp.pth',
+    ]);
+  });
 });

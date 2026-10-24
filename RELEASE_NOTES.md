@@ -3,16 +3,34 @@
 Package version: **0.9.0**  
 Release date: **October 24, 2026**
 
-v0.9 is a Prompts and Hugging Face release. The Prompts title bar drives the
-same Generation style, checkpoint, seed, and size as the Generation tab.
-Coverage samples prompt folders the way a real run does. Hugging Face
-downloads use the Civitai dialog and keep the Hub page on the file.
+v0.9 generates with **Krea 2** and with **SDXL**. SDXL, Pony, and
+Illustrious share one checkpoint graph: a VAE you can replace, CLIP skip, and
+a hires pass. Each library picks that family and keeps its own Generation
+settings for Realistic, Anime, and 3D.
+
+The same release puts the Generation style, checkpoint, seed, and size on the
+Prompts title bar, samples coverage the way a real run does, and makes
+Hugging Face downloads use the Civitai dialog.
 
 The [user guide](docs/user-guide.md) is the complete reference. This note is the
 map.
 
 ## What’s new in v0.9
 
+- **SDXL, Pony, and Illustrious.** Library Manager sets `generationFamily`
+  (`krea2` or `sdxl`, default `krea2`) on each library. The SDXL graph is one
+  Checkpoint loader. CLIP comes from that file, so the CLIP field is hidden.
+  **Options → VAE** replaces the packed VAE; blank keeps it. **CLIP skip**
+  defaults to 2 (Pony and Illustrious). **Upscaler**, **Upscale factor**
+  (default 1.5), and **Hires denoise** (default 0.5) run a second pass after
+  the base sample. Sampler and Scheduler list every name Comfy reports,
+  underscores included. Open
+  `WildcardManager-ComfyUI-SDXL-Generation-Workflow.json`, then **Save
+  Workflow**. Krea 2 keeps its own graph and its own saved file.
+- **Generation settings stay with the library and the style.** Checkpoint,
+  size, prompts, and Options are stored per library, and Realistic / Anime /
+  3D each keep their own copy. Switching libraries restores that library’s
+  screen. An older single form is copied onto each library once.
 - **Prompts title bar.** On the same line as Once, Infinite, and Cancel:
   Realistic / Anime / 3D (icons), checkpoint, seed (dice and shuffle), and
   width × height. A change on Prompts or Generation updates the other.
@@ -43,7 +61,14 @@ map.
 ## Upgrading from v0.8
 
 Libraries and sidecars do not need a migration. Generation settings you already
-saved stay on Realistic, Anime, and 3D.
+saved stay on Realistic, Anime, and 3D. The first launch after this build
+copies that one form onto every library; later edits stay on the library that
+saved them.
+
+An SDXL library needs its own **Save Workflow**. Open
+`ComfyUI-Workflow/WildcardManager-ComfyUI-SDXL-Generation-Workflow.json` in
+ComfyUI with that library active. The Krea graph is left in
+`comfy-workflow-krea2.json`.
 
 Re-run Coverage to replace a report that walked every decoded line. A Hugging
 Face file already on disk keeps its previous page link until you download it
@@ -86,7 +111,8 @@ One app, many libraries. Each library stores its own:
 - prompts folder and separate Generation output roots for **Realistic**,
   **Hentai**, and **3D**
 - checkpoint benchmark folder
-- Civitai site (`civitai.com` or `civitai.red`) and validation platform
+- Civitai site (`civitai.com` or `civitai.red`), validation platform, and
+  Generation family (`krea2` or `sdxl`)
 
 **Migrate library paths…** rewrites those pointers after you relocate a tree
 (drive or parent change). It does not move the files. Preview first; override
@@ -117,8 +143,14 @@ Generation talks to a ComfyUI you already run. Settings → AI holds the host,
 a launch shortcut, and Test / Check install. The node pack and a ready graph
 are in [`ComfyUI-Workflow/`](ComfyUI-Workflow/):
 
-The sample graph is a Krea 2 example. Another architecture needs the graph
-adapted in ComfyUI before you save it.
+Two sample graphs ship in that folder. The Krea 2 file uses that model’s
+UNET, CLIP, and VAE. The SDXL file is one Checkpoint loader and covers SDXL,
+Pony, and Illustrious. **LT · VAE** feeds Load VAE. Options → VAE writes
+the file you pick. A blank VAE keeps the one packed in the checkpoint.
+**CLIP Set Last Layer** is on the CLIP wire at skip 2. After the base sample
+the SDXL graph upscales (default `4x_foolhardy_Remacri.pth`, factor 1.5) and
+runs a second sampler at hires denoise 0.5. Another architecture needs the
+graph adapted in ComfyUI before you save it.
 
 1. Unzip `comfyui-lora-training.zip` and `comfyui-custom-save-node.zip`
    (`SaveImageToFolder`) into ComfyUI `custom_nodes/` and restart.
@@ -126,8 +158,8 @@ adapted in ComfyUI before you save it.
    [LoRA tag loader](https://github.com/badjeff/comfyui_lora_tag_loader),
    [Corza LoRA loader](https://github.com/CoreyCorza/comfyui-lora-loader),
    [Krea 2 enhancer](https://github.com/capitan01R/ComfyUI-Krea2T-Enhancer)).
-3. Open `WildcardManager-ComfyUI-Generation-Workflow.json` in ComfyUI. Change
-   the UNET, CLIP, and VAE filenames if your Krea 2 files differ.
+3. Open `WildcardManager-ComfyUI-Krea2-Generation-Workflow.json` or
+   `WildcardManager-ComfyUI-SDXL-Generation-Workflow.json` in ComfyUI.
 4. In the app, **Test** (server only), **Generation → Save Workflow**, then
    **Check install** (saved graph only). Queue a typed prompt or a prompt
    folder.
@@ -189,7 +221,7 @@ Library Manager → **Migrate library paths…** instead of editing paths by han
 
 Install `ComfyUI-Workflow/comfyui-lora-training.zip` into ComfyUI
 `custom_nodes/` if Generation reports missing LT nodes, then load
-`WildcardManager-ComfyUI-Generation-Workflow.json` and **Save Workflow**.
+the matching workflow JSON and **Save Workflow**.
 
 ## Known limitations
 

@@ -94,10 +94,10 @@ configured **images folder** (Settings) and an AppData download registry.
 
 ### Generation
 
-The app queues ComfyUI. It does not ship a ComfyUI install. The sample graph
-is a **Krea 2** example. The app itself is not limited to Krea 2: another
-architecture needs a graph you adapt in ComfyUI before you save it. Nodes and
-that graph are in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/). The
+The app queues ComfyUI. It does not ship a ComfyUI install. Two sample graphs
+are in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/): Krea 2, and one checkpoint
+graph for SDXL, Pony, and Illustrious. Another architecture needs a graph you
+adapt in ComfyUI before you save it. The
 [user guide](user-guide.md#install-the-nodes-and-the-sample-graph) names every
 extra pack, with links.
 
@@ -106,15 +106,17 @@ extra pack, with links.
 2. Unzip `ComfyUI-Workflow/comfyui-custom-save-node.zip` into ComfyUI
    `custom_nodes/` so you get `custom_nodes/comfyui-custom-save-node/`. That
    zip is the sample’s `SaveImageToFolder` node. Restart ComfyUI.
-3. Install the other custom nodes that graph uses (Dynamic Prompts, LoRA tag
-   loader, Corza LoRA loader, and the Krea 2 enhancer), then restart ComfyUI
-   again. The user guide has the repository links. A red node on the canvas
-   means one of those packs is still missing.
+3. Install the other custom nodes that graph uses, then restart ComfyUI
+   again. Both graphs need Dynamic Prompts and the LoRA tag loader. The Krea 2
+   graph also needs the Corza LoRA loader and the Krea 2 enhancer. The user
+   guide has the repository links. A red node on the canvas means one of those
+   packs is still missing.
 4. In ComfyUI, open
-   `ComfyUI-Workflow/WildcardManager-ComfyUI-Generation-Workflow.json`. The
-   sample expects Krea 2 UNET / CLIP / VAE filenames — change those loader
-   widgets if your Krea 2 files differ. For a different architecture, replace
-   the loaders, not only the filenames.
+   `WildcardManager-ComfyUI-Krea2-Generation-Workflow.json` or
+   `WildcardManager-ComfyUI-SDXL-Generation-Workflow.json`. The Krea 2 file
+   expects that model’s UNET, CLIP, and VAE. The SDXL file loads one
+   checkpoint (SDXL, Pony, or Illustrious). The Generation checkpoint field
+   fills that name.
 5. In the app: **Settings → AI** host, port, and **Test**. **Test** only checks
    that ComfyUI answers. Library Manager: prompts folder and a Generation
    output folder per style.
@@ -126,8 +128,13 @@ extra pack, with links.
    short typed prompt and **Once** should put an image in the style output
    folder. The Prompts tab has the same **Once**, **Infinite**, and **Cancel**
    actions as square icons on the `!gen.txt` title bar; they queue the folder
-   you are editing. Each style tab has **Generation** and **Options**. Options holds
-   CLIP, VAE, and KSampler steps, CFG, sampler, scheduler, and denoise. A
+   you are editing. Each style tab has **Generation** and **Options**. A Krea 2
+   library’s Options are CLIP, VAE, steps, CFG, sampler, scheduler, and
+   denoise. An SDXL library hides CLIP, shows VAE (blank keeps the checkpoint
+   VAE), CLIP skip (default 2), an upscaler, an upscale factor, and hires
+   denoise. Sampler and Scheduler show the Comfy name, underscores included.
+   Checkpoint, size, and those Options are saved for that library and for
+   Realistic, Anime, and 3D separately. Switching libraries restores them. A
    fixed seed repeats the same image on Once and Infinite. Folder-mode `/New`
    is optional under **Settings → AI** and is off until you turn it on.
 
@@ -147,8 +154,8 @@ continue beyond the visible cone. **Reset focus** returns to the root view.
 
 ### LoRA / Checkpoint files
 
-Configure **LoRA folder** and **checkpoint folder** in Settings (or Library
-manager). Each model tab lists files under that root — including **folder
+Configure **LoRA folder** and **checkpoint folder** in **Library Manager**.
+Each model tab lists files under that root — including **folder
 symlinks / junctions** to other drives — with search and filters. Selecting a
 model shows identity (AutoV2 hash, size, folder preview image, Civitai cover)
 and an embedded Civitai page when a catalog match exists. On **LoRA files**, you
@@ -179,7 +186,8 @@ checkpoints.
 
 1. In **Settings**, set **Site** to **civitai.com** (SFW catalog) or
    **civitai.red** (NSFW catalog).
-2. Set **LoRA folder** / **checkpoint folder** for downloads.
+2. In **Library Manager**, set **LoRA folder** / **checkpoint folder** for
+   downloads.
 3. Add an **API key** from the same site if you need gated downloads (browse
    works without a key; many downloads return 401 without one).
 

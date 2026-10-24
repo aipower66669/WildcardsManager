@@ -543,7 +543,8 @@ export function parseModelCatalog(info: Record<string, unknown>): ModelCatalog {
     for (const opt of options) set.add(opt);
   };
 
-  for (const node of Object.values(info)) {
+  const upscalers = new Set<string>();
+  for (const [className, node] of Object.entries(info)) {
     const def = node as {
       input?: { required?: Record<string, unknown>; optional?: Record<string, unknown> };
     };
@@ -552,6 +553,9 @@ export function parseModelCatalog(info: Record<string, unknown>): ModelCatalog {
       for (const [inputKey, spec] of Object.entries(group)) {
         if (isComboSpec(spec)) {
           collect(inputKey, comboOptions(spec));
+          if (className === 'UpscaleModelLoader' && inputKey === 'model_name') {
+            for (const name of comboOptions(spec)) upscalers.add(name);
+          }
         } else if (inputKey === 'steps' && !ranges.steps) {
           ranges.steps = numericRange(spec);
         } else if (inputKey === 'cfg' && !ranges.cfg) {
@@ -574,6 +578,7 @@ export function parseModelCatalog(info: Record<string, unknown>): ModelCatalog {
     loras: get('lora_name'),
     samplers: get('sampler_name'),
     schedulers: get('scheduler'),
+    upscalers: Array.from(upscalers).sort((a, b) => a.localeCompare(b)),
     ranges,
     fetchedAt: new Date().toISOString(),
   };

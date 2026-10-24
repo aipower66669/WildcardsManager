@@ -1,5 +1,5 @@
 # Check + ship the NSIS installer only for version tags (GitHub Release).
-# Branch / PR pushes are covered by tests.yml.
+# Branch pushes and pull requests do not start this workflow. tests.yml is the same.
 name: Build Windows
 
 on:
@@ -76,6 +76,7 @@ jobs:
             release/*.exe.blockmap
             release/latest.yml
             ComfyUI-Workflow/comfyui-lora-training.zip
-            ComfyUI-Workflow/WildcardManager-ComfyUI-Generation-Workflow.json
+            ComfyUI-Workflow/WildcardManager-ComfyUI-Krea2-Generation-Workflow.json
+            ComfyUI-Workflow/WildcardManager-ComfyUI-SDXL-Generation-Workflow.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

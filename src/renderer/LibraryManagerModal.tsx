@@ -558,6 +558,38 @@ export function LibraryManagerModal({ onClose, onChanged }: Props) {
                   </option>
                 </select>
 
+                <label
+                  className="field-label"
+                  htmlFor="library-generation-family"
+                  title="Krea 2 keeps Checkpoint, CLIP, VAE, and the full sampler list. SDXL uses this library’s checkpoint folder, hides CLIP, and can replace the checkpoint VAE. It also adds the upscaler, factor, and hires denoise."
+                >
+                  Generation family
+                </label>
+                <select
+                  id="library-generation-family"
+                  className="text-input"
+                  value={
+                    selected.generationFamily === 'sdxl' ? 'sdxl' : 'krea2'
+                  }
+                  disabled={busy}
+                  title="Which Generation graph and controls this library uses. Realistic, Anime, and 3D share it."
+                  onChange={(e) =>
+                    void run(async () => {
+                      if (!selected) return;
+                      const family =
+                        e.target.value === 'sdxl' ? 'sdxl' : 'krea2';
+                      await window.wcm.library.updateLibrary(selected.id, {
+                        generationFamily: family,
+                      });
+                      await reload();
+                      await onChanged();
+                    })
+                  }
+                >
+                  <option value="krea2">Krea 2</option>
+                  <option value="sdxl">SDXL</option>
+                </select>
+
                 {FOLDER_FIELDS.map(({ field, label, help, placeholder }) => (
                   <div key={field} className="library-manager-folder">
                     <label

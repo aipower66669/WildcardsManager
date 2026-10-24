@@ -45,7 +45,9 @@ key, while gated downloads need an API key from the selected site. LoRA
 download categories append snippets to a chosen wildcard; Shift+click reuses
 the last category. A **Search** tab covers wildcards and model filenames; a
 **Prompts** tab manages prompt folders; a **Generation** tab drives ComfyUI
-from typed prompts or `!gen.txt` folders.
+from typed prompts or `!gen.txt` folders. Each library is Krea 2 or SDXL.
+SDXL, Pony, and Illustrious share one checkpoint graph with a replaceable
+VAE, CLIP skip, and a hires pass.
 
 ### Diagnose and repair
 
@@ -107,7 +109,10 @@ Shipped today:
 - LoRA and Checkpoint file managers (list, filters, identity, embedded page,
   LoRA reverse-refs and training-step series; symlink-aware folder walk);
 - Global search across wildcards and model folders; Prompts workspace; Generation
-  tab (ComfyUI + LT node pack, per-style KSampler options, reproducible seeds);
+  tab (ComfyUI + LT node pack, per-library and per-style KSampler options,
+  reproducible seeds). Each library chooses Krea 2 or SDXL. The SDXL graph is
+  one checkpoint for SDXL, Pony, and Illustrious, with VAE override, CLIP skip,
+  and hires fix;
 - Civitai Images / Videos Download all with feed frontiers and Browse catch-up;
 - Library Manager (multiple libraries, path migration), LoRA training-series
   previews, LM Studio prompt assist, checkpoint ratings, blocked authors;

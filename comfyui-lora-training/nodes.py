@@ -732,6 +732,160 @@ class LoraTrainingScheduler:
         return scheduler or ""
 
 
+class LoraTrainingUpscaler:
+    """Upscale-model filename the app fills for the SDXL hires pass.
+
+    Convert UpscaleModelLoader ``model_name`` to an input and wire this in.
+    Output uses a wildcard type so it can connect to a COMBO socket.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model_name": ("STRING", {"default": "", "multiline": False}),
+            }
+        }
+
+    RETURN_TYPES = (ANY,)
+    RETURN_NAMES = ("model_name",)
+    FUNCTION = "emit"
+    CATEGORY = CATEGORY
+
+    def emit(self, model_name=""):
+        return (model_name or "",)
+
+    @classmethod
+    def IS_CHANGED(cls, model_name=""):
+        return model_name or ""
+
+
+class LoraTrainingUpscaleFactor:
+    """Final size versus the base image (1.5 on 1024 is 1536).
+
+    Wire this into LT · Hires size. The app writes the factor; that node
+    multiplies width and height and snaps both to a multiple of 8.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": (
+                    "FLOAT",
+                    {"default": 1.5, "min": 1.0, "max": 4.0, "step": 0.1},
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("FLOAT",)
+    RETURN_NAMES = ("factor",)
+    FUNCTION = "emit"
+    CATEGORY = CATEGORY
+
+    def emit(self, value=1.5):
+        return (float(value),)
+
+    @classmethod
+    def IS_CHANGED(cls, value=1.5):
+        return value
+
+
+class LoraTrainingHiresDenoise:
+    """Denoise for the second (hires) KSampler only. The base sampler stays on LT · Denoise."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": (
+                    "FLOAT",
+                    {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05},
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("FLOAT",)
+    RETURN_NAMES = ("denoise",)
+    FUNCTION = "emit"
+    CATEGORY = CATEGORY
+
+    def emit(self, value=0.5):
+        return (float(value),)
+
+    @classmethod
+    def IS_CHANGED(cls, value=0.5):
+        return value
+
+
+class LoraTrainingClipSkip:
+    """A1111 CLIP skip for CLIP Set Last Layer.
+
+    Options stores 1–12. The queue writes the Comfy stop layer (−1 keeps the
+    last layer, −2 is Pony and Illustrious). A positive value is accepted too
+    and turned into that stop layer, so either number works on the node.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": (
+                    "INT",
+                    {"default": -2, "min": -24, "max": 12, "step": 1},
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("INT",)
+    RETURN_NAMES = ("stop_at_clip_layer",)
+    FUNCTION = "emit"
+    CATEGORY = CATEGORY
+
+    def emit(self, value=-2):
+        layer = int(value)
+        if layer > 0:
+            layer = -layer
+        if layer == 0 or layer > -1:
+            layer = -1
+        if layer < -24:
+            layer = -24
+        return (layer,)
+
+    @classmethod
+    def IS_CHANGED(cls, value=-2):
+        return value
+
+
+class LoraTrainingHiresSize:
+    """Width and height for ImageScale: base size times the upscale factor, snapped to 8."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "width": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
+                "height": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
+                "factor": (
+                    "FLOAT",
+                    {"default": 1.5, "min": 1.0, "max": 4.0, "step": 0.1},
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("INT", "INT")
+    RETURN_NAMES = ("width", "height")
+    FUNCTION = "scale"
+    CATEGORY = CATEGORY
+
+    def scale(self, width, height, factor):
+        def snap(n):
+            snapped = int(round(float(n) / 8.0) * 8)
+            return max(64, snapped)
+
+        return (snap(float(width) * float(factor)), snap(float(height) * float(factor)))
+
+
 class LoraTrainingSaveOutput:
     """Finished-image sink. Behaves like SaveImage so /history can fetch it.
 
@@ -816,6 +970,11 @@ NODE_CLASS_MAPPINGS = {
     "LoraTrainingCfg": LoraTrainingCfg,
     "LoraTrainingSampler": LoraTrainingSampler,
     "LoraTrainingScheduler": LoraTrainingScheduler,
+    "LoraTrainingUpscaler": LoraTrainingUpscaler,
+    "LoraTrainingUpscaleFactor": LoraTrainingUpscaleFactor,
+    "LoraTrainingHiresDenoise": LoraTrainingHiresDenoise,
+    "LoraTrainingClipSkip": LoraTrainingClipSkip,
+    "LoraTrainingHiresSize": LoraTrainingHiresSize,
     "LoraTrainingSaveOutput": LoraTrainingSaveOutput,
 }
 
@@ -838,5 +997,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LoraTrainingCfg": "LT · CFG",
     "LoraTrainingSampler": "LT · Sampler",
     "LoraTrainingScheduler": "LT · Scheduler",
+    "LoraTrainingUpscaler": "LT · Upscaler",
+    "LoraTrainingUpscaleFactor": "LT · Upscale factor",
+    "LoraTrainingHiresDenoise": "LT · Hires denoise",
+    "LoraTrainingClipSkip": "LT · CLIP skip",
+    "LoraTrainingHiresSize": "LT · Hires size",
     "LoraTrainingSaveOutput": "LT · Save Output",
 }

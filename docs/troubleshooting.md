@@ -128,8 +128,8 @@ key from that same site’s account under **Settings → Civitai → API key**.
 1. Confirm the correct **site** is selected (`civitai.com` vs `civitai.red`).
 2. Create an API key in your account on that site, paste it under
    **Settings → Civitai → API key**, and save.
-3. Confirm a **LoRA folder** or **checkpoint folder** is configured for that
-   model type.
+3. In **Library Manager**, confirm a **LoRA folder** or **checkpoint folder**
+   is configured for that model type.
 4. If the model is early-access or otherwise restricted on Civitai’s side,
    the key alone may not be enough until the listing unlocks.
 
@@ -220,21 +220,24 @@ the end of the Civitai feed.
    If Options (Steps, CFG, Sampler, Scheduler, Denoise) does nothing, the
    saved graph does not have those LT nodes yet — add them, **Save Workflow**,
    and restart ComfyUI after replacing the LT pack.
-   Red nodes on the canvas are packs that are still missing. The sample graph
-   also needs [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts),
-   [badjeff/comfyui_lora_tag_loader](https://github.com/badjeff/comfyui_lora_tag_loader),
-   [CoreyCorza/comfyui-lora-loader](https://github.com/CoreyCorza/comfyui-lora-loader),
-   and, for this Krea 2 graph,
-   [capitan01R/ComfyUI-Krea2T-Enhancer](https://github.com/capitan01R/ComfyUI-Krea2T-Enhancer).
+   Red nodes on the canvas are packs that are still missing. Both sample graphs
+   need [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts)
+   and [badjeff/comfyui_lora_tag_loader](https://github.com/badjeff/comfyui_lora_tag_loader).
+   The Krea 2 graph also needs
+   [CoreyCorza/comfyui-lora-loader](https://github.com/CoreyCorza/comfyui-lora-loader)
+   and [capitan01R/ComfyUI-Krea2T-Enhancer](https://github.com/capitan01R/ComfyUI-Krea2T-Enhancer).
    Install steps are in the
    [user guide](user-guide.md#install-the-nodes-and-the-sample-graph).
-3. Open `WildcardManager-ComfyUI-Generation-Workflow.json` in ComfyUI. It is a
-   Krea 2 graph. Change the UNET, CLIP, and VAE filenames when your Krea 2
-   files differ. For another architecture, adapt the loaders, then
-   **Save Workflow** in the Generation tab. That writes
-   `%AppData%/Roaming/wildcards-manager/comfy-workflow.json`. Generation has
-   no graph until that save succeeds. If you edit the graph later, save again.
-   Then run **Check install**.
+3. Open `WildcardManager-ComfyUI-Krea2-Generation-Workflow.json` or
+   `WildcardManager-ComfyUI-SDXL-Generation-Workflow.json` in ComfyUI. The
+   Krea 2 graph uses that model’s UNET, CLIP, and VAE. The SDXL graph is one
+   Checkpoint loader and covers SDXL, Pony, and Illustrious. Then
+   **Save Workflow** in the Generation tab while that library’s
+   `generationFamily` is selected. That writes
+   `%AppData%/Roaming/wildcards-manager/comfy-workflow-krea2.json` or
+   `comfy-workflow-sdxl.json`. Generation has no graph for that family until
+   that save succeeds. If you edit the graph later, save again. Then run
+   **Check install**.
 4. If the queue starts and then reports no output image, the save node is not
    receiving **LT · Output Folder** / **LT · Output Filename**. The sample
    graph already wires those into `SaveImageToFolder` from

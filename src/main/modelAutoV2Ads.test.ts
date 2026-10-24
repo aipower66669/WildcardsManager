@@ -128,6 +128,7 @@ describe('migrateModelHashesToAds basename rematch', () => {
         enabledSdxlFamilies: [],
         enabledCivitaiCategories: [],
         validationPlatform: 'comfyui',
+        generationFamily: 'krea2',
         civitaiOrigin: 'https://civitai.com',
       },
     ]);

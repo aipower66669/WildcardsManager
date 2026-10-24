@@ -8,10 +8,29 @@ import type {
   WorkflowProfile,
 } from '../../shared/comfyWorkflowSchema.js';
 import { isWorkflowGraph, type WorkflowGraph } from './workflowGraph.js';
+import type { GenerationFamily } from '../../shared/contracts.js';
+import { getActiveLibrary } from '../settingsStore.js';
 import { resolveContract, ROLE_LABELS, type ContractRole } from './contract.js';
 
-function profilePath(): string {
-  return path.join(app.getPath('userData'), 'comfy-workflow.json');
+export function activeWorkflowFamily(): GenerationFamily {
+  try {
+    return getActiveLibrary().generationFamily === 'sdxl' ? 'sdxl' : 'krea2';
+  } catch {
+    return 'krea2';
+  }
+}
+
+function profilePath(family: GenerationFamily): string {
+  return path.join(app.getPath('userData'), `comfy-workflow-${family}.json`);
+}
+
+/** First load copies the old single file into the Krea slot and leaves it there. */
+function migrateLegacyKreaWorkflow(): void {
+  const dir = app.getPath('userData');
+  const legacy = path.join(dir, 'comfy-workflow.json');
+  const krea = profilePath('krea2');
+  if (fs.existsSync(krea) || !fs.existsSync(legacy)) return;
+  fs.copyFileSync(legacy, krea);
 }
 
 function hashWorkflow(workflow: Record<string, unknown>): string {
@@ -21,10 +40,13 @@ function hashWorkflow(workflow: Record<string, unknown>): string {
     .slice(0, 24);
 }
 
-export function loadWorkflowProfile(): WorkflowProfile | null {
+export function loadWorkflowProfile(
+  family: GenerationFamily = activeWorkflowFamily(),
+): WorkflowProfile | null {
   try {
+    migrateLegacyKreaWorkflow();
     const raw = JSON.parse(
-      fs.readFileSync(profilePath(), 'utf8'),
+      fs.readFileSync(profilePath(family), 'utf8'),
     ) as WorkflowProfile;
     if (raw?.formatVersion !== 1 || !raw.workflow || !raw.bindings) {
       return null;
@@ -45,6 +67,7 @@ export function saveWorkflowProfile(
     workflow: Record<string, unknown>;
     name?: string;
   },
+  family: GenerationFamily = activeWorkflowFamily(),
 ): SaveWorkflowProfileResult {
   const warnings: string[] = [];
 
@@ -84,7 +107,7 @@ export function saveWorkflowProfile(
   }
 
   const now = new Date().toISOString();
-  const existing = loadWorkflowProfile();
+  const existing = loadWorkflowProfile(family);
   const uiWorkflow =
     input.uiWorkflow !== undefined
       ? input.uiWorkflow
@@ -119,6 +142,18 @@ export function saveWorkflowProfile(
     ...(resolved.bindings.denoise
       ? { denoise: resolved.bindings.denoise }
       : {}),
+    ...(resolved.bindings.upscaler
+      ? { upscaler: resolved.bindings.upscaler }
+      : {}),
+    ...(resolved.bindings.upscaleFactor
+      ? { upscaleFactor: resolved.bindings.upscaleFactor }
+      : {}),
+    ...(resolved.bindings.hiresDenoise
+      ? { hiresDenoise: resolved.bindings.hiresDenoise }
+      : {}),
+    ...(resolved.bindings.clipSkip
+      ? { clipSkip: resolved.bindings.clipSkip }
+      : {}),
     ...(resolved.bindings.samplerName
       ? { samplerName: resolved.bindings.samplerName }
       : {}),
@@ -148,12 +183,9 @@ export function saveWorkflowProfile(
     ...(input.notes ? { notes: input.notes } : {}),
   };
 
-  fs.mkdirSync(path.dirname(profilePath()), { recursive: true });
-  fs.writeFileSync(
-    profilePath(),
-    `${JSON.stringify(profile, null, 2)}\n`,
-    'utf8',
-  );
+  const file = profilePath(family);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify(profile, null, 2)}\n`, 'utf8');
 
   return {
     profile,

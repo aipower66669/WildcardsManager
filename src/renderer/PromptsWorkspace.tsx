@@ -130,6 +130,8 @@ type Props = {
     relativeFolder: string | null;
     content: string;
   } | null>;
+  /** Generation form edits stay on this library. */
+  libraryId?: string | null;
 };
 
 const SAMPLES_COLLAPSED_KEY = 'wcm.prompts.samplesCollapsed';
@@ -170,7 +172,17 @@ export function PromptsWorkspace({
   onOpenLora,
   onOpenLoraInCivitaiCatalog,
   genTextRef,
+  libraryId = null,
 }: Props) {
+  const libraryIdRef = useRef(libraryId);
+  libraryIdRef.current = libraryId;
+  const persistGenerationForm = (
+    patch: Parameters<typeof window.wcm.comfy.setGenerationForm>[0],
+  ) =>
+    window.wcm.comfy.setGenerationForm(
+      patch,
+      libraryIdRef.current ?? undefined,
+    );
   const [tree, setTree] = useState<PromptTreeDto>({ root: null, folders: [] });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -413,7 +425,7 @@ export function PromptsWorkspace({
     const patch = pendingPatch.current;
     pendingPatch.current = {};
     if (Object.keys(patch).length === 0) return;
-    const saved = await window.wcm.comfy.setGenerationForm(patch);
+    const saved = await persistGenerationForm(patch);
     applyGenerationFields(saved);
   }, [applyGenerationFields]);
 
@@ -485,7 +497,7 @@ export function PromptsWorkspace({
       const patch = pendingPatch.current;
       pendingPatch.current = {};
       if (Object.keys(patch).length > 0) {
-        void window.wcm.comfy.setGenerationForm(patch);
+        void persistGenerationForm(patch);
       }
     };
   }, []);
@@ -512,7 +524,7 @@ export function PromptsWorkspace({
     await flushGenerationPatch();
     setStyleProfile(next);
     try {
-      const saved = await window.wcm.comfy.setGenerationForm({
+      const saved = await persistGenerationForm({
         activeProfile: next,
       });
       applyGenerationFields(saved);

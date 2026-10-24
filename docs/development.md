@@ -198,10 +198,11 @@ that and launches the installer already on disk.
 ## CI and releases
 
 `.github/workflows/tests.yml` runs `npm ci`, typecheck, and tests on Windows and
-Ubuntu for pushes/PRs to `dev`, `main`, or `master`.
+Ubuntu only when a version tag (`v*`) is pushed. Branch pushes and pull
+requests do not start it.
 
-`.github/workflows/release.yml` runs on version tags (`v*`) and on manual
-dispatch. A tag push typechecks and tests, then builds the Windows NSIS
+`.github/workflows/release.yml` runs on those same version tags (`v*`) and on
+manual dispatch. A tag push typechecks and tests, then builds the Windows NSIS
 installer (`npm run build:win`, no version bump) and attaches
 `WildcardsManager-*.exe`, the blockmap, and `latest.yml` to that GitHub
 Release, using `RELEASE_NOTES.md` as the body. Manual dispatch only runs the

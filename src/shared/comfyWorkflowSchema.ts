@@ -39,6 +39,11 @@ export type WorkflowBindings = {
   steps?: InputBinding;
   cfg?: InputBinding;
   denoise?: InputBinding;
+  upscaler?: InputBinding;
+  upscaleFactor?: InputBinding;
+  hiresDenoise?: InputBinding;
+  /** LT · CLIP skip. A1111 count 1–12. The node turns 2 into stop layer −2. */
+  clipSkip?: InputBinding;
   width?: InputBinding;
   height?: InputBinding;
   checkpoint?: InputBinding;

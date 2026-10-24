@@ -147,8 +147,6 @@ export function ApplicationSettingsModal({
   activeLibraryId,
   onClose,
   onSave,
-  onLoraFolderChanged,
-  onOpenGlobalSearch,
   onManageLibraries,
   onSwitchLibrary,
 }: {
@@ -158,8 +156,6 @@ export function ApplicationSettingsModal({
   libraries: LibraryConfigDto[];
   activeLibraryId: string | null;
   onClose: () => void;
-  onLoraFolderChanged?: () => void;
-  onOpenGlobalSearch?: () => void;
   onManageLibraries?: () => void;
   onSwitchLibrary?: (id: string) => void | Promise<void>;
   onSave: (
@@ -174,13 +170,8 @@ export function ApplicationSettingsModal({
   const [selectedLayout, setSelectedLayout] =
     useState<GraphLayoutStyle>(layoutStyle);
   const [childSuffix, setChildSuffix] = useState(convertChildSuffix);
-  const [loraFolder, setLoraFolder] = useState<string | null>(null);
-  const [checkpointFolder, setCheckpointFolder] = useState<string | null>(null);
   const [imagesFolder, setImagesFolder] = useState<string | null>(null);
   const [videosFolder, setVideosFolder] = useState<string | null>(null);
-  const [trainingLibraryFolder, setTrainingLibraryFolder] = useState<
-    string | null
-  >(null);
   const [civitaiApiKey, setCivitaiApiKey] = useState('');
   const [hasCivitaiApiKey, setHasCivitaiApiKey] = useState(false);
   const [huggingfaceToken, setHuggingFaceToken] = useState('');
@@ -250,11 +241,8 @@ export function ApplicationSettingsModal({
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      window.wcm.ui.getLoraFolder(),
-      window.wcm.ui.getCheckpointFolder(),
       window.wcm.ui.getImagesFolder(),
       window.wcm.ui.getVideosFolder(),
-      window.wcm.ui.getTrainingLibraryFolder(),
       window.wcm.ui.getCivitaiSettings(),
       window.wcm.ui.getSettings(),
       window.wcm.civitai.listBlockedCreators(),
@@ -264,11 +252,8 @@ export function ApplicationSettingsModal({
     ])
       .then(
         ([
-          lora,
-          checkpoint,
           images,
           videos,
-          trainingLib,
           civitai,
           ui,
           blocked,
@@ -277,11 +262,8 @@ export function ApplicationSettingsModal({
           hf,
         ]) => {
           if (cancelled) return;
-          setLoraFolder(lora);
-          setCheckpointFolder(checkpoint);
           setImagesFolder(images);
           setVideosFolder(videos);
-          setTrainingLibraryFolder(trainingLib);
           setHasCivitaiApiKey(civitai.hasApiKey);
           setCatalogAutoSyncMinutes(civitai.catalogAutoSyncIntervalMinutes);
           setDisableHardwareAcceleration(
@@ -521,68 +503,6 @@ export function ApplicationSettingsModal({
     }
   };
 
-  const pickLoraFolder = async () => {
-    setErr(null);
-    try {
-      const folder = await window.wcm.ui.pickLoraFolder();
-      if (folder !== null) {
-        setLoraFolder(folder);
-        onLoraFolderChanged?.();
-      }
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const clearLoraFolder = async () => {
-    setErr(null);
-    try {
-      await window.wcm.ui.clearLoraFolder();
-      setLoraFolder(null);
-      onLoraFolderChanged?.();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const openLoraFolder = async () => {
-    setErr(null);
-    try {
-      await window.wcm.ui.openLoraFolder();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const pickCheckpointFolder = async () => {
-    setErr(null);
-    try {
-      const folder = await window.wcm.ui.pickCheckpointFolder();
-      if (folder !== null) setCheckpointFolder(folder);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const clearCheckpointFolder = async () => {
-    setErr(null);
-    try {
-      await window.wcm.ui.clearCheckpointFolder();
-      setCheckpointFolder(null);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const openCheckpointFolder = async () => {
-    setErr(null);
-    try {
-      await window.wcm.ui.openCheckpointFolder();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
   const pickImagesFolder = async () => {
     setErr(null);
     try {
@@ -707,35 +627,6 @@ export function ApplicationSettingsModal({
     } finally {
       setUpdateBusy(false);
       setDownloadLabel(null);
-    }
-  };
-
-  const pickTrainingLibraryFolder = async () => {
-    setErr(null);
-    try {
-      const folder = await window.wcm.ui.pickTrainingLibraryFolder();
-      if (folder !== null) setTrainingLibraryFolder(folder);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const clearTrainingLibraryFolder = async () => {
-    setErr(null);
-    try {
-      await window.wcm.ui.clearTrainingLibraryFolder();
-      setTrainingLibraryFolder(null);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const openTrainingLibraryFolder = async () => {
-    setErr(null);
-    try {
-      await window.wcm.ui.openTrainingLibraryFolder();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -1566,7 +1457,7 @@ export function ApplicationSettingsModal({
               <>
                 <SettingsSection
                   title="Active library"
-                  help="Each library keeps its own wildcards / LoRA / checkpoint / prompts folders, Civitai tracking lists, and validation platform (ComfyUI vs Stable Diffusion)."
+                  help="Switch the library in use. Folders, Civitai site, validation platform, and Generation family (Krea 2 or SDXL) are edited in Library Manager."
                 >
                   <div className="settings-folder-row">
                     <label className="settings-field grow">
@@ -1601,28 +1492,13 @@ export function ApplicationSettingsModal({
                 </SettingsSection>
 
                 <SettingsSection
-                  title="Prompts"
-                  help="Configure the prompts folder and per-style Generation output folders (Realistic / Hentai / 3D) in Library Manager. Each prompt subfolder can hold a !gen.txt and sample images."
+                  title="Library folders"
+                  help="LoRA folder, checkpoint folder, training library, prompts, and Generation output are set on the selected library in Library Manager."
                 >
                   <p className="hint settings-empty">
-                    Set prompts / Generation output folders in Library Manager.
+                    Set LoRA, checkpoints, training library, prompts, and
+                    Generation output in Library Manager.
                   </p>
-                </SettingsSection>
-
-                <SettingsSection
-                  title="Checkpoints"
-                  help={
-                    checkpointFolder
-                      ? `Downloads go to ${checkpointFolder}.`
-                      : 'Optional. Choose a folder for checkpoint downloads from the Civitai browser.'
-                  }
-                >
-                  <SettingsFolderRow
-                    path={checkpointFolder}
-                    onPick={() => void pickCheckpointFolder()}
-                    onOpen={() => void openCheckpointFolder()}
-                    onClear={() => void clearCheckpointFolder()}
-                  />
                 </SettingsSection>
 
                 <SettingsSection
@@ -1654,43 +1530,6 @@ export function ApplicationSettingsModal({
                     onPick={() => void pickVideosFolder()}
                     onOpen={() => void openVideosFolder()}
                     onClear={() => void clearVideosFolder()}
-                  />
-                </SettingsSection>
-
-                <SettingsSection
-                  title="LoRA models"
-                  help={
-                    loraFolder
-                      ? `Checking ${loraFolder} for <lora:name:weight> tags. Matching is case-insensitive by relative path or basename. Use Search library to check wildcards, LoRAs, and checkpoints before downloading. Changes apply immediately to the next analysis / live validation.`
-                      : 'Optional. Choose a folder of .safetensors, .ckpt, or .pt files to warn when a <lora:…> tag cannot be resolved. Matching is case-insensitive by relative path or basename.'
-                  }
-                >
-                  <SettingsFolderRow
-                    path={loraFolder}
-                    onPick={() => void pickLoraFolder()}
-                    onOpen={() => void openLoraFolder()}
-                    onClear={() => void clearLoraFolder()}
-                    onSearch={
-                      onOpenGlobalSearch
-                        ? () => onOpenGlobalSearch()
-                        : undefined
-                    }
-                  />
-                </SettingsSection>
-
-                <SettingsSection
-                  title="LoRA training library"
-                  help={
-                    trainingLibraryFolder
-                      ? `Matching multi-step LoRA series to datasets under ${trainingLibraryFolder} (dataset.json preview icons).`
-                      : 'Optional. Root folder of your training datasets. Each dataset has a dataset.json that names the preview icon shown for multi-step LoRA series.'
-                  }
-                >
-                  <SettingsFolderRow
-                    path={trainingLibraryFolder}
-                    onPick={() => void pickTrainingLibraryFolder()}
-                    onOpen={() => void openTrainingLibraryFolder()}
-                    onClear={() => void clearTrainingLibraryFolder()}
                   />
                 </SettingsSection>
               </>

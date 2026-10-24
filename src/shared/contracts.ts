@@ -1084,6 +1084,8 @@ export type ComfyModelCatalogDto = {
   loras: string[];
   samplers: string[];
   schedulers: string[];
+  /** Files Comfy lists on `UpscaleModelLoader` (`models/upscale_models`). */
+  upscalers: string[];
   fetchedAt: string;
 };
 
@@ -1172,6 +1174,17 @@ export type GenerationStyleProfileDto = {
   scheduler: string;
   /** KSampler denoise, 0..1. Applied when LT · Denoise is in the workflow. */
   denoise: number;
+  /** Upscale-model file for an SDXL hires pass. Empty keeps the name on LT · Upscaler. */
+  upscaler: string;
+  /** Final size versus the base image. 1.5 on 1024×1024 is 1536×1536. */
+  upscaleFactor: number;
+  /** Second KSampler denoise, 0..1. Applied when LT · Hires denoise is in the workflow. */
+  hiresDenoise: number;
+  /**
+   * A1111 CLIP skip. 2 writes −2 into LT · CLIP skip (Pony and Illustrious).
+   * 1 keeps the last CLIP layer.
+   */
+  clipSkip: number;
   /** Appended to every positive prompt (comma-separated), e.g. style tags. */
   additionalPositivePrompt: string;
   negativePrompt: string;
@@ -1199,6 +1212,10 @@ export type GenerationFormStateDto = {
   samplerName: string;
   scheduler: string;
   denoise: number;
+  upscaler: string;
+  upscaleFactor: number;
+  hiresDenoise: number;
+  clipSkip: number;
   additionalPositivePrompt: string;
   negativePrompt: string;
   promptText: string;
@@ -1285,6 +1302,14 @@ export type GenerationStartRequestDto = {
   scheduler?: string;
   /** KSampler denoise, 0..1. */
   denoise?: number;
+  /** Upscale model file. Empty leaves LT · Upscaler unchanged. */
+  upscaler?: string;
+  /** Final size versus the base image, 1–4. */
+  upscaleFactor?: number;
+  /** Hires-pass denoise, 0..1. */
+  hiresDenoise?: number;
+  /** A1111 CLIP skip, 1–12. Queued as Comfy stop layer −1 or −2. */
+  clipSkip?: number;
   /** Appended after the main positive with `, ` when non-empty. */
   additionalPositivePrompt?: string;
   negativePrompt?: string;
@@ -1519,6 +1544,11 @@ export type LibraryConfigDto = {
   enabledCivitaiCategories: CivitaiModelCategoryIdDto[];
   /** Wildcard validation target for this library. */
   validationPlatform: ValidationPlatform;
+  /**
+   * Generation graph family for this library. Krea 2 keeps CLIP and VAE.
+   * SDXL hides those and queues the hires upscaler graph.
+   */
+  generationFamily: GenerationFamily;
   /** Civitai site this library browses/downloads from. */
   civitaiOrigin: CivitaiOriginDto;
 };
@@ -1546,6 +1576,7 @@ export type LibraryCreateRequestDto = {
   enabledSdxlFamilies?: CivitaiSdxlFamilyToggleIdDto[];
   enabledCivitaiCategories?: CivitaiModelCategoryIdDto[];
   validationPlatform?: ValidationPlatform;
+  generationFamily?: GenerationFamily;
   civitaiOrigin?: CivitaiOriginDto;
 };
 
@@ -1567,6 +1598,7 @@ export type LibraryUpdateRequestDto = {
   enabledSdxlFamilies?: CivitaiSdxlFamilyToggleIdDto[];
   enabledCivitaiCategories?: CivitaiModelCategoryIdDto[];
   validationPlatform?: ValidationPlatform;
+  generationFamily?: GenerationFamily;
   civitaiOrigin?: CivitaiOriginDto;
 };
 
@@ -1895,6 +1927,9 @@ export type AppReleaseNotesDto = {
 
 export type GraphLayoutStyle = 'default' | 'optimized' | 'compact';
 export type ValidationPlatform = 'comfyui' | 'stable-diffusion';
+
+/** Which Comfy graph and Generation controls a library uses. */
+export type GenerationFamily = 'krea2' | 'sdxl';
 /** Focus a model card/preview inside the in-app Civitai browser. */
 export type CivitaiFocusModelDto = {
   modelId: number;
@@ -3937,6 +3972,7 @@ export type WcmDesktopApi = {
     getGenerationForm(): Promise<GenerationFormLoadedDto>;
     setGenerationForm(
       patch: Partial<GenerationFormStateDto>,
+      libraryId?: string,
     ): Promise<GenerationFormStateDto>;
     /** Fired after a form save so Prompts and Generation stay on the same values. */
     onGenerationForm(

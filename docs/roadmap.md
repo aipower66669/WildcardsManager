@@ -48,12 +48,17 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
   Prompts title bar (synced with Generation), steps width and height to
   common sizes whose sides are multiples of 16, and samples prompt coverage
   the way a real run does (folder-uniform walks, Rare tab, Simulation
-  iteration count).
+  iteration count). v0.9 also stores `generationFamily` per library (`krea2`
+  or `sdxl`). SDXL, Pony, and Illustrious share one checkpoint graph: VAE
+  override, CLIP skip (default 2), upscaler, scale factor, and hires denoise.
+  Sampler and Scheduler show the Comfy name, underscores included. Generation
+  parameters and Options are saved per library and per style.
 - **Civitai Images and Videos** browse/download/archive + background Download
   all (v0.5); feed frontiers / Browse catch-up (v0.6).
 - **Library Manager** with multiple libraries, per-style generation output
-  roots, checkpoint benchmark folder, LoRA training library, and path migration
-  when a tree moves (documented in v0.7).
+  roots, a per-library generation family (Krea 2 or SDXL), checkpoint
+  benchmark folder, LoRA training library, and path migration when a tree
+  moves (documented in v0.7; family in v0.9).
 - **LM Studio** prompt assist on the wildcard editor (local server; writes only
   after you apply a proposal).
 - Checkpoint half-star ratings; blocked Civitai authors.
@@ -118,7 +123,8 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - Deterministic 69-file SFW `sample_wildcards/` with `0main`.
 - Windows NSIS packaging. electron-builder also lists macOS DMG and Linux
   AppImage targets; those are not built, not tested, and not published.
-- Test workflow on Windows/Linux for pushes and pull requests.
+- Test workflow on Windows and Ubuntu when a version tag (`v*`) is pushed.
+  Branch pushes and pull requests do not start it.
 - Tagged `v*` release workflow: Windows NSIS installer attached to the GitHub
   Release (`RELEASE_NOTES.md` is the body).
 - User/developer documentation and README screenshot.

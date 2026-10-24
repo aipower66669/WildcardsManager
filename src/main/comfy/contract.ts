@@ -30,6 +30,10 @@ export type ContractRole =
   | 'samplerName'
   | 'scheduler'
   | 'denoise'
+  | 'upscaler'
+  | 'upscaleFactor'
+  | 'hiresDenoise'
+  | 'clipSkip'
   | 'outputFolder'
   | 'outputFilename';
 
@@ -57,6 +61,10 @@ export const CONTRACT_CLASSES: Record<ContractRole, string> = {
   samplerName: 'LoraTrainingSampler',
   scheduler: 'LoraTrainingScheduler',
   denoise: 'LoraTrainingDenoise',
+  upscaler: 'LoraTrainingUpscaler',
+  upscaleFactor: 'LoraTrainingUpscaleFactor',
+  hiresDenoise: 'LoraTrainingHiresDenoise',
+  clipSkip: 'LoraTrainingClipSkip',
   outputFolder: 'LoraTrainingOutputFolder',
   outputFilename: 'LoraTrainingOutputFilename',
 };
@@ -78,6 +86,10 @@ export const TITLE_MARKERS: Record<ContractRole, string> = {
   samplerName: 'LT:SAMPLER',
   scheduler: 'LT:SCHEDULER',
   denoise: 'LT:DENOISE',
+  upscaler: 'LT:UPSCALER',
+  upscaleFactor: 'LT:UPSCALEFACTOR',
+  hiresDenoise: 'LT:HIRESDENOISE',
+  clipSkip: 'LT:CLIPSKIP',
   outputFolder: 'LT:OUTFOLDER',
   outputFilename: 'LT:OUTFILE',
 };
@@ -110,6 +122,10 @@ const ALL_ROLES: ContractRole[] = [
   'samplerName',
   'scheduler',
   'denoise',
+  'upscaler',
+  'upscaleFactor',
+  'hiresDenoise',
+  'clipSkip',
   'outputFolder',
   'outputFilename',
 ];
@@ -131,6 +147,10 @@ const ROLE_LABELS: Record<ContractRole, string> = {
   samplerName: 'Sampler',
   scheduler: 'Scheduler',
   denoise: 'Denoise',
+  upscaler: 'Upscaler',
+  upscaleFactor: 'Upscale factor',
+  hiresDenoise: 'Hires denoise',
+  clipSkip: 'CLIP skip',
   outputFolder: 'Output folder',
   outputFilename: 'Output filename',
 };
@@ -151,6 +171,10 @@ const INPUT_KEYS: Record<Exclude<ContractRole, 'output'>, string[]> = {
   samplerName: ['sampler_name', 'value'],
   scheduler: ['scheduler', 'value'],
   denoise: ['value', 'denoise'],
+  upscaler: ['model_name', 'value'],
+  upscaleFactor: ['value', 'factor'],
+  hiresDenoise: ['value', 'denoise'],
+  clipSkip: ['value', 'stop_at_clip_layer'],
   outputFolder: ['folder'],
   outputFilename: ['filename'],
 };
@@ -200,7 +224,15 @@ function pickInputKey(
 
 function valueTypeFor(role: ContractRole): InputBinding['valueType'] {
   if (role === 'steps') return 'integer';
-  if (role === 'cfg' || role === 'denoise') return 'number';
+  if (
+    role === 'cfg' ||
+    role === 'denoise' ||
+    role === 'upscaleFactor' ||
+    role === 'hiresDenoise'
+  ) {
+    return 'number';
+  }
+  if (role === 'clipSkip') return 'integer';
   if (role === 'seed' || role === 'width' || role === 'height') {
     return 'integer-string';
   }

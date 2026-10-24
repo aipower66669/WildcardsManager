@@ -780,6 +780,7 @@ export function App() {
   const [recent, setRecent] = useState<string[]>([]);
   const [libraries, setLibraries] = useState<LibraryConfigDto[]>([]);
   const [activeLibraryId, setActiveLibraryId] = useState<string | null>(null);
+  const seenLibraryIdRef = useRef(activeLibraryId);
   const [activeLibraryName, setActiveLibraryName] = useState<string | null>(
     null,
   );
@@ -1037,16 +1038,23 @@ export function App() {
     };
   }, [filterMode, root, activeLibraryId]);
 
+  // Drop keep-alive tabs when the library changes, and keep the open tab
+  // mounted. Unmounting the open tab left Generation (and the other workspaces)
+  // blank until the user left and came back, because nothing set it mounted
+  // again while the tab stayed the same.
   useEffect(() => {
-    setPromptsTabMounted(false);
-    setGenerationTabMounted(false);
-    setSearchTabMounted(false);
-    setLorasTabMounted(false);
-    setCheckpointsTabMounted(false);
-  }, [activeLibraryId]);
-
-  // Mount the active tab (and deep-link targets) immediately.
-  useEffect(() => {
+    const libraryChanged = seenLibraryIdRef.current !== activeLibraryId;
+    seenLibraryIdRef.current = activeLibraryId;
+    if (libraryChanged) {
+      setPromptsTabMounted(workspaceTab === 'prompts');
+      setGenerationTabMounted(workspaceTab === 'generation');
+      setSearchTabMounted(workspaceTab === 'search');
+      setLorasTabMounted(workspaceTab === 'loras' || Boolean(loraTabSelectPath));
+      setCheckpointsTabMounted(
+        workspaceTab === 'checkpoints' || Boolean(checkpointTabSelectPath),
+      );
+      return;
+    }
     if (workspaceTab === 'prompts') setPromptsTabMounted(true);
     if (workspaceTab === 'generation') setGenerationTabMounted(true);
     if (workspaceTab === 'search') setSearchTabMounted(true);
@@ -1054,7 +1062,12 @@ export function App() {
     if (workspaceTab === 'checkpoints' || checkpointTabSelectPath) {
       setCheckpointsTabMounted(true);
     }
-  }, [workspaceTab, loraTabSelectPath, checkpointTabSelectPath]);
+  }, [
+    activeLibraryId,
+    workspaceTab,
+    loraTabSelectPath,
+    checkpointTabSelectPath,
+  ]);
 
   // Keep-alive after the user visits a tab (effect above). Do not pre-mount
   // LoRA/checkpoint lists at startup — that walked/hashed the library and
@@ -4336,6 +4349,7 @@ export function App() {
           {promptsTabMounted ? (
             <PromptsWorkspace
               key={`prompts:${activeLibraryId ?? 'none'}`}
+              libraryId={activeLibraryId}
               active={workspaceTab === 'prompts'}
               filesWidth={filesWidth}
               detailsWidth={detailsWidth}
@@ -4388,7 +4402,17 @@ export function App() {
           ) : null}
           {generationTabMounted ? (
             <GenerationWorkspace
-              key={`generation:${activeLibraryId ?? 'none'}`}
+              key={`generation:${activeLibraryId ?? 'none'}:${
+                libraries.find((lib) => lib.id === activeLibraryId)
+                  ?.generationFamily ?? 'krea2'
+              }`}
+              generationFamily={
+                libraries.find((lib) => lib.id === activeLibraryId)
+                  ?.generationFamily === 'sdxl'
+                  ? 'sdxl'
+                  : 'krea2'
+              }
+              libraryId={activeLibraryId}
               active={workspaceTab === 'generation'}
               filesWidth={filesWidth}
               detailsWidth={detailsWidth}
@@ -5858,19 +5882,12 @@ export function App() {
           libraries={libraries}
           activeLibraryId={activeLibraryId}
           onClose={() => setSimSettingsOpen(false)}
-          onOpenGlobalSearch={() => {
-            setSimSettingsOpen(false);
-            setGlobalSearchLauncherOpen(true);
-          }}
           onManageLibraries={() => {
             setSimSettingsOpen(false);
             setLibraryManagerOpen(true);
           }}
           onSwitchLibrary={async (id) => {
             await switchLibrary(id);
-          }}
-          onLoraFolderChanged={() => {
-            void refresh();
           }}
           onSave={async (settings, layoutStyle, childSuffix) => {
             await window.wcm.ui.setSimulationSettings(

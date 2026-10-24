@@ -72,6 +72,8 @@ export interface ModelCatalog {
   loras: string[];
   samplers: string[];
   schedulers: string[];
+  /** `UpscaleModelLoader.model_name` only — not every node that has `model_name`. */
+  upscalers: string[];
   ranges: {
     steps?: NumericRange;
     cfg?: NumericRange;

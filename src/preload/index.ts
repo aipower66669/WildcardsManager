@@ -810,8 +810,8 @@ const api: WcmDesktopApi = {
         ipcRenderer.removeListener(IPC.comfyGenerationProgress, handler);
     },
     getGenerationForm: () => ipcRenderer.invoke(IPC.comfyGetGenerationForm),
-    setGenerationForm: (patch) =>
-      ipcRenderer.invoke(IPC.comfySetGenerationForm, patch),
+    setGenerationForm: (patch, libraryId) =>
+      ipcRenderer.invoke(IPC.comfySetGenerationForm, patch, libraryId),
     onGenerationForm: (cb) => {
       const handler = (
         _event: unknown,

@@ -9,7 +9,7 @@
 [Release notes](RELEASE_NOTES.md) · [Changelog](CHANGELOG.md)
 
 A desktop graph editor, validator, simulator, and safe refactoring tool for Stable Diffusion / ComfyUI **Dynamic Prompts** wildcard libraries. Open a folder, explore dependencies as a graph, catch missing files and
-cycles, edit wildcards in place, refactor references safely with undo, browse/download LoRAs and checkpoints from Civitai (queued downloads, LoRA download categories), browse **community Images** and Hugging Face Hub models, manage installed model folders, organize prompt folders (`!gen.txt` + samples), and drive ComfyUI generation from those prompts.
+cycles, edit wildcards in place, refactor references safely with undo, browse/download LoRAs and checkpoints from Civitai (queued downloads, LoRA download categories), browse **community Images** and Hugging Face Hub models, manage installed model folders, organize prompt folders (`!gen.txt` + samples), and drive ComfyUI generation from those prompts — **Krea 2**, or **SDXL, Pony, and Illustrious** from one checkpoint graph with hires fix.
 
 Built for wildcard libraries used by
 [Stable Diffusion WebUI Dynamic Prompts](https://github.com/adieyal/sd-dynamic-prompts)
@@ -55,7 +55,7 @@ turning into a ComfyUI or A1111 plugin.
 | --- | --- |
 | **Open & remember libraries** | Recursively index `.txt`, `.yaml`, `.yml`, and `.json`; restore the last library/file and window layout; keep recent roots; watch for filesystem changes and rebuild on demand |
 | **Switch workspaces** | Top-level tabs for **Wildcard files**, **LoRA files**, **Checkpoint files**, **Prompts**, **Generation**, and **Search** — same app shell, resizable panels |
-| **Generate with ComfyUI** | **Generation** tab: typed prompt or prompt-folder `!gen.txt`, three style profiles, **Generation** / **Options** (CLIP, VAE, KSampler), a fixed seed that repeats on Once and Infinite, Edit/Save Workflow. Install [`ComfyUI-Workflow/`](ComfyUI-Workflow/) into your ComfyUI, open the sample graph, then **Save Workflow** ([steps](docs/user-guide.md#install-the-nodes-and-the-sample-graph)) |
+| **Generate with ComfyUI** | **Generation** tab: typed prompt or prompt-folder `!gen.txt`, three style profiles, a fixed seed that repeats on Once and Infinite, Edit/Save Workflow. Each library is **Krea 2** or **SDXL**. SDXL, Pony, and Illustrious share one checkpoint graph: replaceable VAE, CLIP skip (default 2), upscaler, scale factor, and a hires pass. Settings stay on that library and on Realistic / Anime / 3D. Install [`ComfyUI-Workflow/`](ComfyUI-Workflow/), open the matching graph, then **Save Workflow** ([steps](docs/user-guide.md#install-the-nodes-and-the-sample-graph)) |
 | **Search the library** | Toolbar search launcher + **Search** tab across wildcard names/content and LoRA / checkpoint filenames |
 | **Explore dependencies** | Root-to-descendant graph plus direct callers; focused ancestor path with depth/breadth caps; drillable `+N more` frontiers; viewport culling; minimap, pan/zoom, and click-to-center on selection |
 | **Choose a graph layout** | Persisted Default alphabetical grid or Optimized Dagre layered layout that reduces crossings and keeps related nodes closer |
@@ -76,6 +76,21 @@ turning into a ComfyUI or A1111 plugin.
 | **Preview prompts** | Seeded weighted random expansion and bounded exhaustive expansion with nested variants/wildcards, globs, multi-select, custom separators, recursion protection, combination estimates, and copy-out |
 | **Analyze reach and balance** | Seeded Monte Carlo simulation up to 1,000,000 runs; hit, visit, overall-reach, parent-share, glob fan-out, and sibling-balance overlays |
 | **Test and distribute** | Validated 69-file SFW sample library, diagnostic fixtures, domain test suite, and a Windows NSIS installer on GitHub Releases |
+
+## SDXL, Pony, and Illustrious
+
+Library Manager sets each library’s generation family. **Krea 2** (the default) keeps Load Diffusion Model, Load CLIP, and Load VAE. **SDXL** uses one checkpoint file. Pony and Illustrious use that same graph: the checkpoint already contains the model, both text encoders, and the VAE.
+
+On an SDXL library the Generation tab adds:
+
+- **VAE** — blank keeps the VAE packed in the checkpoint; a picked file replaces it
+- **CLIP skip** — default 2, the setting Pony and Illustrious were trained with; 1 keeps the last layer for base SDXL
+- **Hires fix** — upscaler (default `4x_foolhardy_Remacri`), scale factor (default 1.5), and a second sampler at hires denoise 0.5
+- **Sampler and Scheduler** — every name Comfy reports, shown as Comfy sends them, underscores included
+
+Realistic, Anime, and 3D each keep their own checkpoint, size, and Options. Switching libraries restores that library’s three styles. Flux and other architectures still need a graph you adapt in ComfyUI before Save Workflow.
+
+Open `ComfyUI-Workflow/WildcardManager-ComfyUI-SDXL-Generation-Workflow.json` in ComfyUI, set the library’s family to SDXL, and **Save Workflow**. The [install steps](docs/user-guide.md#install-the-nodes-and-the-sample-graph) list the node packs.
 
 ## Quick start
 
@@ -132,9 +147,9 @@ it. Code, docs, install notes, and guides all count. Contributions are accepted
 under the same noncommercial terms as the repo ([`LICENSE.md`](LICENSE.md)).
 
 The part that needs the most outside help right now is **getting started**:
-installing the app, installing the ComfyUI nodes, loading the Generation
-workflow, and explaining the wildcard graph to someone who has not opened the
-app before. If a step confused you, that is a useful contribution.
+installing the app, installing the ComfyUI nodes, loading the Krea 2 or SDXL
+Generation workflow, and explaining the wildcard graph to someone who has not
+opened the app before. If a step confused you, that is a useful contribution.
 
 ### Ways to help
 
@@ -164,7 +179,7 @@ that adds the link under this heading.
 Topics that would help most:
 
 - installing Wildcards Manager and opening `sample_wildcards/`
-- installing `comfyui-lora-training` and getting the Generation tab to queue
+- installing `comfyui-lora-training` and getting the Krea 2 or SDXL Generation tab to queue
 - how Dynamic Prompts wildcards, `!gen.txt` folders, and the graph fit together
 
 Please keep linked material noncommercial-friendly and free of personal library
@@ -186,7 +201,7 @@ dumps (real LoRA trees, prompt folders, or model catalogs).
 
 ## Releases
 
-See the [release notes](RELEASE_NOTES.md) for **v0.7** and the
+See the [release notes](RELEASE_NOTES.md) for **v0.9** and the
 [changelog](CHANGELOG.md) for the complete version history.
 
 ## License

@@ -10,7 +10,7 @@ A local desktop app for people who keep large Dynamic Prompts wildcard libraries
 
 ### 2. Does the app generate images by itself?
 
-No. Generation sends a job to ComfyUI. The Windows installer does not install ComfyUI, models, or custom nodes. You install those, point **Settings → AI** at the server, and **Save Workflow** so the app has a graph to queue.
+No. Generation sends a job to ComfyUI. Shipped graphs cover Krea 2, and SDXL, Pony, and Illustrious (one checkpoint, with a replaceable VAE, CLIP skip, and a hires pass). The Windows installer does not install ComfyUI, models, or custom nodes. You install those, set the library’s Generation family, point **Settings → AI** at the server, and **Save Workflow** for that family.
 
 ### 3. Which installers exist?
 
@@ -28,7 +28,7 @@ Yes. Startup pins Electron `userData` and `sessionData` to `%AppData%/Roaming/wi
 
 ### 6. Where do settings live?
 
-App preferences, folder pointers, window geometry, the Civitai API key, the Hugging Face token, and the generation form live under that `wildcards-manager` folder (`settings.json`, `generation-form.json`, `comfy-workflow.json`, `comfy-settings.json`, and similar). Archive, Maybe, Notify, categories, prompt substitutions, and ignored checkpoints live in the library sidecar, not in AppData.
+App preferences, folder pointers, window geometry, the Civitai API key, the Hugging Face token, and the generation form live under that `wildcards-manager` folder (`settings.json`, `generation-form.json`, `comfy-workflow-krea2.json`, `comfy-workflow-sdxl.json`, `comfy-settings.json`, and similar). `generation-form.json` keeps a separate Generation form for each library. An older `comfy-workflow.json` is copied into the Krea slot on first load and left in place. Archive, Maybe, Notify, categories, prompt substitutions, and ignored checkpoints live in the library sidecar, not in AppData.
 
 ### 7. What folder should I open as the library?
 
@@ -50,7 +50,7 @@ Open the repository’s `sample_wildcards/` folder and select `0main.txt`. The l
 
 ### 11. Can I keep more than one library?
 
-Yes. **Library Manager** stores several libraries. Each has its own wildcards root, model folders, Civitai site (`civitai.com` or `civitai.red`), and validation platform (ComfyUI or Stable Diffusion). Switching libraries reloads that library’s sidecar. Lists are not mixed.
+Yes. **Library Manager** stores several libraries. Each has its own wildcards root, model folders, Civitai site (`civitai.com` or `civitai.red`), validation platform (ComfyUI or Stable Diffusion), and Generation family (`krea2` or `sdxl`, default `krea2`). Switching libraries reloads that library’s sidecar and the open workspace, including that library’s Generation form. Lists are not mixed.
 
 ### 12. What does each library pointer do?
 
@@ -212,7 +212,7 @@ The plus button creates a path relative to the open root. If you omit a supporte
 
 ### 50. How does a `<lora:name:weight>` tag resolve?
 
-Against the library’s LoRA folder, by relative path or by file name, case-insensitive. Comments are ignored. A complete tag with no matching file is `missing_lora`. `<lora:>` with no name is `invalid_lora`. Set the folder in Library Manager or Settings before expecting those warnings.
+Against the library’s LoRA folder, by relative path or by file name, case-insensitive. Comments are ignored. A complete tag with no matching file is `missing_lora`. `<lora:>` with no name is `invalid_lora`. Set the folder in Library Manager before expecting those warnings.
 
 ### 51. What is an unused LoRA?
 
@@ -258,15 +258,15 @@ The file managers can reveal the file in the system folder and open the known Ci
 
 ### 61. What has to be true before Generate works?
 
-ComfyUI is running (or a launch shortcut is set under **Settings → AI**). **Test** reaches the host and port. **Save Workflow** has copied a graph into the app. **Check install**, after that save, accepts the saved graph (prompt, seed, and a save node). It does not scan ComfyUI for missing custom nodes. The style you picked has an output folder. A prompt is typed, or a prompt folder with `!gen.txt` is selected. The checkpoint you want is still ticked **Use in this library**. The sample graph is Krea 2; another architecture needs the graph adapted in ComfyUI first. Install steps are in the user guide under **Install the nodes and the sample graph**.
+ComfyUI is running (or a launch shortcut is set under **Settings → AI**). **Test** reaches the host and port. **Save Workflow** has copied a graph into the app. **Check install**, after that save, accepts the saved graph (prompt, seed, and a save node). It does not scan ComfyUI for missing custom nodes. The style you picked has an output folder. A prompt is typed, or a prompt folder with `!gen.txt` is selected. The checkpoint you want is still ticked **Use in this library**. Sample graphs cover Krea 2, and SDXL / Pony / Illustrious (one checkpoint loader). Another architecture needs the graph adapted in ComfyUI first. Install steps are in the user guide under **Install the nodes and the sample graph**.
 
 ### 62. Which nodes must the graph contain?
 
-**LT · Prompt**, **LT · Seed**, and a save node the app can find (**LT · Save Output**, or a class name containing `SaveImage`). When present, the app also fills Negative, Model, CLIP, VAE, Width, Height, Steps, CFG, Sampler, Scheduler, Denoise, Output Folder, and Output Filename. A blank Sampler or Scheduler leaves the name already on that node. The sample graph in `ComfyUI-Workflow/` is a Krea 2 example. It expects ComfyUI Dynamic Prompts, [badjeff/comfyui_lora_tag_loader](https://github.com/badjeff/comfyui_lora_tag_loader), [CoreyCorza/comfyui-lora-loader](https://github.com/CoreyCorza/comfyui-lora-loader), and [capitan01R/ComfyUI-Krea2T-Enhancer](https://github.com/capitan01R/ComfyUI-Krea2T-Enhancer). `SaveImageToFolder` is not inside the LT zip; it is `comfyui-custom-save-node.zip` in the same folder. Install `comfyui-lora-training` so the folder is `custom_nodes/comfyui-lora-training/` and contains `__init__.py`. Restart ComfyUI after replacing the pack so the new KSampler nodes appear.
+**LT · Prompt**, **LT · Seed**, and a save node the app can find (**LT · Save Output**, or a class name containing `SaveImage`). When present, the app also fills Negative, Model, CLIP, VAE, Width, Height, Steps, CFG, Sampler, Scheduler, Denoise, Output Folder, and Output Filename. The SDXL graph also fills CLIP skip, Upscaler, Upscale factor, and Hires denoise, and runs a second sampler after the upscale. CLIP on that graph comes from the checkpoint, so an SDXL library hides the CLIP field. A blank Sampler or Scheduler leaves the name already on that node. A blank VAE keeps the VAE packed in the checkpoint. `ComfyUI-Workflow/` has a Krea 2 graph and an SDXL / Pony / Illustrious graph (`WildcardManager-ComfyUI-SDXL-Generation-Workflow.json`, one Checkpoint loader). The Krea 2 graph expects ComfyUI Dynamic Prompts, [badjeff/comfyui_lora_tag_loader](https://github.com/badjeff/comfyui_lora_tag_loader), [CoreyCorza/comfyui-lora-loader](https://github.com/CoreyCorza/comfyui-lora-loader), and [capitan01R/ComfyUI-Krea2T-Enhancer](https://github.com/capitan01R/ComfyUI-Krea2T-Enhancer). `SaveImageToFolder` is not inside the LT zip; it is `comfyui-custom-save-node.zip` in the same folder. Install `comfyui-lora-training` so the folder is `custom_nodes/comfyui-lora-training/` and contains `__init__.py`. Restart ComfyUI after replacing the pack so the new KSampler nodes appear.
 
 ### 63. What do Edit Workflow and Save Workflow do?
 
-**Edit Workflow** opens the graph in ComfyUI so you can change it. **Save Workflow** stores the API graph and the LiteGraph UI JSON in `%AppData%/Roaming/wildcards-manager/comfy-workflow.json`. Until that file exists, Generation has nothing to queue. Save again after you change the graph. The prompt toolbar stays quiet when the graph is ready. It warns when no workflow is saved, and names the missing nodes when the saved graph cannot run.
+**Edit Workflow** opens the graph for the active library’s `generationFamily` in ComfyUI so you can change it. **Save Workflow** stores that family’s API graph and LiteGraph UI JSON in `%AppData%/Roaming/wildcards-manager/comfy-workflow-krea2.json` or `comfy-workflow-sdxl.json`. Until that family’s file exists, Generation has nothing to queue. Save again after you change the graph. Saving one family does not overwrite the other. The prompt toolbar stays quiet when the graph is ready. It warns when no workflow is saved, and names the missing nodes when the saved graph cannot run.
 
 ### 64. What is Use this prompt versus a prompt folder?
 
@@ -282,7 +282,7 @@ The dice sets Seed to −1. Any seed of 0 or below, or a non-numeric seed, rolls
 
 ### 67. What is on Generation versus Options?
 
-Under each style tab (**Realistic**, **Anime**, **3D**), **Generation** holds the prompt folder, checkpoint, seed, size, and prompts. **Anime** is the tab label for the profile Library Manager calls **Hentai**. **Options** holds CLIP, VAE, and the KSampler fields: Steps, CFG, Sampler, Scheduler, and Denoise. Each style keeps its own values. Steps, CFG, and Denoise apply when **LT · Steps**, **LT · CFG**, and **LT · Denoise** are in the saved workflow. Sampler and Scheduler apply only when you pick a name; blank keeps the name already on **LT · Sampler** or **LT · Scheduler**. Defaults for a new style are 20 steps, CFG 7, and denoise 1. Hover a label for a short explanation. Additional Positive and Negative use the same prompt editor as **Use this prompt** (wildcard highlighting and `__` completion). They resize vertically, and that height is remembered.
+Under each style tab (**Realistic**, **Anime**, **3D**), **Generation** holds the prompt folder, checkpoint, seed, size, and prompts. **Anime** is the tab label for the profile Library Manager calls **Hentai**. A Krea 2 library’s **Options** holds CLIP, VAE, and the KSampler fields: Steps, CFG, Sampler, Scheduler, and Denoise. An SDXL library hides CLIP, shows VAE (blank keeps the VAE packed in the checkpoint), CLIP skip (default 2; 1 keeps the last layer), and adds Upscaler, Upscale factor (default 1.5), and Hires denoise (default 0.5) on Generation. Sampler and Scheduler show every name Comfy reports, underscores included. Each style keeps its own values, and each library keeps its own three styles. Switching libraries restores them. Steps, CFG, and Denoise apply when **LT · Steps**, **LT · CFG**, and **LT · Denoise** are in the saved workflow. Sampler and Scheduler apply only when you pick a name; blank keeps the name already on **LT · Sampler** or **LT · Scheduler**. Defaults for a new style are 20 steps, CFG 7, and denoise 1. Hover a label for a short explanation. Additional Positive and Negative use the same prompt editor as **Use this prompt** (wildcard highlighting and `__` completion). They resize vertically, and that height is remembered.
 
 ### 68. Why did reusing a seed not match the Infinite image?
 

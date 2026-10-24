@@ -1,10 +1,9 @@
 name: Tests
 
+# Version tags only. A branch push or a pull request does not start this workflow.
 on:
   push:
-    branches: [dev, main, master]
-  pull_request:
-    branches: [dev, main, master]
+    tags: ["v*"]
 
 jobs:
   test:

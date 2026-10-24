@@ -252,6 +252,7 @@ import {
   loadGenerationForm,
   loadGenerationFormWithPreview,
   saveGenerationForm,
+  setGenerationFormLibraryResolver,
 } from './comfy/generationFormStore.js';
 import {
   assistWildcardWithLmStudio,
@@ -488,6 +489,18 @@ function parseCatalogBrowseParams(p: Record<string, unknown>) {
 }
 
 export function registerIpc(): void {
+  setGenerationFormLibraryResolver(() => {
+    const libs = listLibraryConfigs();
+    let activeId = libs[0]?.id ?? 'local';
+    try {
+      activeId = getActiveLibraryId();
+    } catch {
+      // Keep the first library when settings are not ready.
+    }
+    const allIds = libs.map((lib) => lib.id);
+    if (!allIds.includes(activeId)) allIds.push(activeId);
+    return { activeId, allIds };
+  });
   ipcMain.handle(IPC.libraryPickRoot, async () => {
     const win = BrowserWindow.getFocusedWindow();
     const result = await dialog.showOpenDialog(win ?? undefined!, {
@@ -611,6 +624,7 @@ export function registerIpc(): void {
         enabledSdxlFamilies: row.enabledSdxlFamilies,
         enabledCivitaiCategories: row.enabledCivitaiCategories,
         validationPlatform: row.validationPlatform,
+        generationFamily: row.generationFamily,
         civitaiOrigin: row.civitaiOrigin,
       }),
     );
@@ -676,6 +690,9 @@ export function registerIpc(): void {
         row.validationPlatform === 'stable-diffusion'
       ) {
         update.validationPlatform = row.validationPlatform;
+      }
+      if (row.generationFamily === 'krea2' || row.generationFamily === 'sdxl') {
+        update.generationFamily = row.generationFamily;
       }
       if (
         row.civitaiOrigin === 'https://civitai.com' ||
@@ -3965,6 +3982,7 @@ export function registerIpc(): void {
       loras: catalog.loras,
       samplers: catalog.samplers,
       schedulers: catalog.schedulers,
+      upscalers: catalog.upscalers,
       fetchedAt: catalog.fetchedAt,
     };
   });
@@ -3974,7 +3992,12 @@ export function registerIpc(): void {
         ? workflow
         : loadWorkflowProfile()?.workflow;
     if (!graph || !isWorkflowGraph(graph)) {
-      throw new Error('No workflow available to check');
+      const family = getActiveLibrary().generationFamily === 'sdxl' ? 'sdxl' : 'krea2';
+      throw new Error(
+        family === 'sdxl'
+          ? 'Open WildcardManager-ComfyUI-SDXL-Generation-Workflow.json in ComfyUI, then Save Workflow.'
+          : 'No workflow available to check',
+      );
     }
     const resolved = resolveContract(graph);
     return {
@@ -4015,19 +4038,29 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.comfyGetGenerationForm, async () =>
     loadGenerationFormWithPreview(),
   );
-  ipcMain.handle(IPC.comfySetGenerationForm, async (_e, patch: unknown) => {
+  ipcMain.handle(IPC.comfySetGenerationForm, async (_e, patch: unknown, libraryId: unknown) => {
     if (!patch || typeof patch !== 'object') {
       throw new Error('Invalid generation form');
     }
+    const id = typeof libraryId === 'string' ? libraryId : undefined;
     const saved = saveGenerationForm(
       patch as Parameters<typeof saveGenerationForm>[0],
+      id,
     );
-    for (const win of BrowserWindow.getAllWindows()) {
-      try {
-        if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
-        win.webContents.send(IPC.comfyGenerationFormChanged, saved);
-      } catch {
-        // ignore
+    let activeId = '';
+    try {
+      activeId = getActiveLibraryId();
+    } catch {
+      activeId = '';
+    }
+    if (!id || id === activeId) {
+      for (const win of BrowserWindow.getAllWindows()) {
+        try {
+          if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+          win.webContents.send(IPC.comfyGenerationFormChanged, saved);
+        } catch {
+          // ignore
+        }
       }
     }
     return saved;

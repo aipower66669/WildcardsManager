@@ -45,6 +45,10 @@ function emptyStyleProfile(): GenerationStyleProfileDto {
     samplerName: '',
     scheduler: '',
     denoise: 1,
+    upscaler: '',
+    upscaleFactor: 1.5,
+    hiresDenoise: 0.5,
+    clipSkip: 2,
     additionalPositivePrompt: '',
     negativePrompt: '',
     promptText: '',
@@ -72,6 +76,10 @@ const DEFAULT_FORM: GenerationFormStateDto = {
   samplerName: '',
   scheduler: '',
   denoise: 1,
+  upscaler: '',
+  upscaleFactor: 1.5,
+  hiresDenoise: 0.5,
+  clipSkip: 2,
   additionalPositivePrompt: '',
   negativePrompt: '',
   promptText: '',
@@ -81,6 +89,51 @@ const DEFAULT_FORM: GenerationFormStateDto = {
 
 function formPath(): string {
   return path.join(app.getPath('userData'), 'generation-form.json');
+}
+
+type GenerationFormLibraryScope = {
+  activeId: string;
+  allIds: string[];
+};
+
+let resolveGenerationFormLibraries = (): GenerationFormLibraryScope => ({
+  activeId: 'local',
+  allIds: ['local'],
+});
+
+/** Main process supplies the real library ids. Tests keep the local default. */
+export function setGenerationFormLibraryResolver(
+  fn: () => GenerationFormLibraryScope,
+): void {
+  resolveGenerationFormLibraries = fn;
+}
+
+function libraryScope(): GenerationFormLibraryScope {
+  try {
+    const next = resolveGenerationFormLibraries();
+    const activeId = next.activeId.trim() || 'local';
+    const allIds = [
+      ...new Set(
+        next.allIds.map((id) => id.trim()).filter((id) => id.length > 0),
+      ),
+    ];
+    if (!allIds.includes(activeId)) allIds.push(activeId);
+    return { activeId, allIds };
+  } catch {
+    return { activeId: 'local', allIds: ['local'] };
+  }
+}
+
+function emptyForm(): GenerationFormStateDto {
+  return withActiveProfile({
+    activeProfile: DEFAULT_FORM.activeProfile,
+    profiles: {
+      realistic: { ...DEFAULT_FORM.profiles.realistic },
+      hentai: { ...DEFAULT_FORM.profiles.hentai },
+      '3d': { ...DEFAULT_FORM.profiles['3d'] },
+    },
+    benchmark: false,
+  });
 }
 
 function legacyPreviewPath(): string {
@@ -113,6 +166,17 @@ function asCfg(value: unknown, fallback: number): number {
 function asDenoise(value: unknown, fallback: number): number {
   const n = asFiniteNumber(value, fallback);
   return Math.min(1, Math.max(0, n));
+}
+
+function asClipSkip(value: unknown, fallback: number): number {
+  const n = asFiniteNumber(value, fallback);
+  return Math.min(12, Math.max(1, Math.round(n)));
+}
+
+function asUpscaleFactor(value: unknown, fallback: number): number {
+  const n = asFiniteNumber(value, fallback);
+  const clamped = Math.min(4, Math.max(1, n));
+  return Math.round(clamped * 10) / 10;
 }
 
 function asProfileId(value: unknown): GenerationStyleProfileIdDto | null {
@@ -165,6 +229,16 @@ function readStyleProfile(
     denoise: has('denoise')
       ? asDenoise(row.denoise, fallback.denoise)
       : fallback.denoise,
+    upscaler: has('upscaler') ? asString(row.upscaler) : fallback.upscaler,
+    upscaleFactor: has('upscaleFactor')
+      ? asUpscaleFactor(row.upscaleFactor, fallback.upscaleFactor)
+      : fallback.upscaleFactor,
+    hiresDenoise: has('hiresDenoise')
+      ? asDenoise(row.hiresDenoise, fallback.hiresDenoise)
+      : fallback.hiresDenoise,
+    clipSkip: has('clipSkip')
+      ? asClipSkip(row.clipSkip, fallback.clipSkip)
+      : fallback.clipSkip,
     additionalPositivePrompt: has('additionalPositivePrompt')
       ? asString(row.additionalPositivePrompt)
       : fallback.additionalPositivePrompt,
@@ -258,6 +332,10 @@ function withActiveProfile(
     | 'samplerName'
     | 'scheduler'
     | 'denoise'
+    | 'upscaler'
+    | 'upscaleFactor'
+    | 'hiresDenoise'
+    | 'clipSkip'
     | 'additionalPositivePrompt'
     | 'negativePrompt'
     | 'promptText'
@@ -280,6 +358,10 @@ function withActiveProfile(
     samplerName: active.samplerName,
     scheduler: active.scheduler,
     denoise: active.denoise,
+    upscaler: active.upscaler,
+    upscaleFactor: active.upscaleFactor,
+    hiresDenoise: active.hiresDenoise,
+    clipSkip: active.clipSkip,
     additionalPositivePrompt: active.additionalPositivePrompt,
     negativePrompt: active.negativePrompt,
     promptText: active.promptText,
@@ -287,54 +369,89 @@ function withActiveProfile(
   };
 }
 
-export function loadGenerationForm(): GenerationFormStateDto {
+function parseForm(raw: Record<string, unknown>): GenerationFormStateDto {
+  const { activeProfile, profiles } = profilesFromRaw(raw);
+  const lastOutputPath =
+    typeof raw.lastOutputPath === 'string' && raw.lastOutputPath.trim()
+      ? raw.lastOutputPath.trim()
+      : undefined;
+  return withActiveProfile({
+    activeProfile,
+    profiles,
+    benchmark: raw.benchmark === true,
+    ...(typeof raw.lastPrompt === 'string' && raw.lastPrompt.trim()
+      ? { lastPrompt: raw.lastPrompt }
+      : {}),
+    ...(typeof raw.lastNegativePrompt === 'string' &&
+    raw.lastNegativePrompt.trim()
+      ? { lastNegativePrompt: raw.lastNegativePrompt }
+      : {}),
+    ...(typeof raw.lastRelativeFolder === 'string' &&
+    raw.lastRelativeFolder.trim() &&
+    raw.lastRelativeFolder.trim() !== '_manual'
+      ? {
+          lastRelativeFolder: raw.lastRelativeFolder
+            .trim()
+            .replaceAll('\\', '/'),
+        }
+      : {}),
+    ...(typeof raw.lastSeed === 'number' &&
+    Number.isFinite(raw.lastSeed) &&
+    raw.lastSeed > 0
+      ? { lastSeed: Math.floor(raw.lastSeed) >>> 0 }
+      : {}),
+    ...(lastOutputPath ? { lastOutputPath } : {}),
+  });
+}
+
+type GenerationFormDisk = {
+  version: 2;
+  libraries: Record<string, unknown>;
+};
+
+function writeDisk(disk: GenerationFormDisk): void {
+  fs.mkdirSync(path.dirname(formPath()), { recursive: true });
+  fs.writeFileSync(formPath(), `${JSON.stringify(disk, null, 2)}\n`, 'utf8');
+}
+
+function readDisk(): GenerationFormDisk {
+  let raw: unknown;
   try {
-    const raw = JSON.parse(fs.readFileSync(formPath(), 'utf8')) as Record<
-      string,
-      unknown
-    >;
-    const { activeProfile, profiles } = profilesFromRaw(raw);
-    const lastOutputPath =
-      typeof raw.lastOutputPath === 'string' && raw.lastOutputPath.trim()
-        ? raw.lastOutputPath.trim()
-        : undefined;
-    return withActiveProfile({
-      activeProfile,
-      profiles,
-      benchmark: raw.benchmark === true,
-      ...(typeof raw.lastPrompt === 'string' && raw.lastPrompt.trim()
-        ? { lastPrompt: raw.lastPrompt }
-        : {}),
-      ...(typeof raw.lastNegativePrompt === 'string' &&
-      raw.lastNegativePrompt.trim()
-        ? { lastNegativePrompt: raw.lastNegativePrompt }
-        : {}),
-      ...(typeof raw.lastRelativeFolder === 'string' &&
-      raw.lastRelativeFolder.trim() &&
-      raw.lastRelativeFolder.trim() !== '_manual'
-        ? {
-            lastRelativeFolder: raw.lastRelativeFolder
-              .trim()
-              .replaceAll('\\', '/'),
-          }
-        : {}),
-      ...(typeof raw.lastSeed === 'number' &&
-      Number.isFinite(raw.lastSeed) &&
-      raw.lastSeed > 0
-        ? { lastSeed: Math.floor(raw.lastSeed) >>> 0 }
-        : {}),
-      ...(lastOutputPath ? { lastOutputPath } : {}),
-    });
+    raw = JSON.parse(fs.readFileSync(formPath(), 'utf8')) as unknown;
   } catch {
-    return withActiveProfile({
-      activeProfile: DEFAULT_FORM.activeProfile,
-      profiles: {
-        realistic: { ...DEFAULT_FORM.profiles.realistic },
-        hentai: { ...DEFAULT_FORM.profiles.hentai },
-        '3d': { ...DEFAULT_FORM.profiles['3d'] },
-      },
-      benchmark: false,
-    });
+    return { version: 2, libraries: {} };
+  }
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    (raw as { version?: unknown }).version === 2 &&
+    (raw as { libraries?: unknown }).libraries &&
+    typeof (raw as { libraries?: unknown }).libraries === 'object' &&
+    !Array.isArray((raw as { libraries?: unknown }).libraries)
+  ) {
+    return {
+      version: 2,
+      libraries: (raw as { libraries: Record<string, unknown> }).libraries,
+    };
+  }
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const libraries: Record<string, unknown> = {};
+    for (const id of libraryScope().allIds) libraries[id] = raw;
+    const disk: GenerationFormDisk = { version: 2, libraries };
+    writeDisk(disk);
+    return disk;
+  }
+  return { version: 2, libraries: {} };
+}
+
+export function loadGenerationForm(libraryId?: string): GenerationFormStateDto {
+  const id = libraryId?.trim() || libraryScope().activeId;
+  const row = readDisk().libraries[id];
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return emptyForm();
+  try {
+    return parseForm(row as Record<string, unknown>);
+  } catch {
+    return emptyForm();
   }
 }
 
@@ -491,6 +608,10 @@ export function generationRequestFromForm(
     samplerName: form.samplerName.trim() || undefined,
     scheduler: form.scheduler.trim() || undefined,
     denoise: form.denoise,
+    upscaler: form.upscaler.trim() || undefined,
+    upscaleFactor: form.upscaleFactor,
+    hiresDenoise: form.hiresDenoise,
+    clipSkip: form.clipSkip,
     additionalPositivePrompt: form.additionalPositivePrompt || undefined,
     negativePrompt: form.negativePrompt || undefined,
     benchmark: form.benchmark === true,
@@ -520,8 +641,10 @@ export function assertGenerationRequest(
 
 export function saveGenerationForm(
   patch: Partial<GenerationFormStateDto>,
+  libraryId?: string,
 ): GenerationFormStateDto {
-  const current = loadGenerationForm();
+  const id = libraryId?.trim() || libraryScope().activeId;
+  const current = loadGenerationForm(id);
   const activeProfile =
     patch.activeProfile !== undefined
       ? (asProfileId(patch.activeProfile) ?? current.activeProfile)
@@ -577,6 +700,19 @@ export function saveGenerationForm(
     if (patch.denoise !== undefined) {
       target.denoise = asDenoise(patch.denoise, target.denoise);
     }
+    if (patch.upscaler !== undefined) target.upscaler = asString(patch.upscaler);
+    if (patch.upscaleFactor !== undefined) {
+      target.upscaleFactor = asUpscaleFactor(
+        patch.upscaleFactor,
+        target.upscaleFactor,
+      );
+    }
+    if (patch.hiresDenoise !== undefined) {
+      target.hiresDenoise = asDenoise(patch.hiresDenoise, target.hiresDenoise);
+    }
+    if (patch.clipSkip !== undefined) {
+      target.clipSkip = asClipSkip(patch.clipSkip, target.clipSkip);
+    }
     if (patch.additionalPositivePrompt !== undefined) {
       target.additionalPositivePrompt = asString(patch.additionalPositivePrompt);
     }
@@ -626,7 +762,8 @@ export function saveGenerationForm(
         ? asString(patch.lastOutputPath).trim() || undefined
         : current.lastOutputPath,
   });
-  fs.mkdirSync(path.dirname(formPath()), { recursive: true });
-  fs.writeFileSync(formPath(), `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  const disk = readDisk();
+  disk.libraries[id] = next;
+  writeDisk(disk);
   return next;
 }

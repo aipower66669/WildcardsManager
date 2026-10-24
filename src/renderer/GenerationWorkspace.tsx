@@ -43,6 +43,12 @@ import type {
   PromptTreeDto,
 } from '../shared/contracts';
 import { appendGenPromptIfMissing } from '../domain/genPrompts.js';
+import {
+  generationSamplerOptions,
+  matchUpscaler,
+  samplerLabel,
+  schedulerLabel,
+} from '../domain/generationFamily';
 import { missingFileSearchQuery } from '../domain/missingFileSearch';
 import { randomFixedGenerationSeed } from '../domain/generationPromptPick.js';
 import {
@@ -85,6 +91,10 @@ type Props = {
    */
   runRef?: MutableRefObject<GenerationRunHandle | null>;
   /** Live Once inputs so Expand previews the prompt that would be queued. */
+  /** Active library’s graph family. Krea 2 leaves this screen unchanged. */
+  generationFamily?: 'krea2' | 'sdxl';
+  /** Saves and reloads the Generation form for this library only. */
+  libraryId?: string | null;
   expandSnapshotRef?: MutableRefObject<{
     kind: 'generation';
     promptSource: 'text' | 'folder';
@@ -155,6 +165,10 @@ function emptyStyleProfile(): GenerationStyleProfileDto {
     samplerName: '',
     scheduler: '',
     denoise: 1,
+    upscaler: '',
+    upscaleFactor: 1.5,
+    hiresDenoise: 0.5,
+    clipSkip: 2,
     additionalPositivePrompt: '',
     negativePrompt: '',
     promptText: '',
@@ -235,7 +249,18 @@ export function GenerationWorkspace({
   onOpenLoraInCivitaiCatalog,
   expandSnapshotRef,
   runRef,
+  generationFamily = 'krea2',
+  libraryId = null,
 }: Props) {
+  const libraryIdRef = useRef(libraryId);
+  libraryIdRef.current = libraryId;
+  const persistGenerationForm = (
+    patch: Parameters<typeof window.wcm.comfy.setGenerationForm>[0],
+  ) =>
+    window.wcm.comfy.setGenerationForm(
+      patch,
+      libraryIdRef.current ?? undefined,
+    );
   const webviewRef = useRef<HTMLElement | null>(null);
   const workflowLoadGen = useRef(0);
   const [connection, setConnection] = useState<ComfyConnectionDto | null>(
@@ -260,6 +285,10 @@ export function GenerationWorkspace({
   const [samplerName, setSamplerName] = useState('');
   const [scheduler, setScheduler] = useState('');
   const [denoise, setDenoise] = useState(1);
+  const [upscaler, setUpscaler] = useState('');
+  const [upscaleFactor, setUpscaleFactor] = useState(1.5);
+  const [hiresDenoise, setHiresDenoise] = useState(0.5);
+  const [clipSkip, setClipSkip] = useState(2);
   const [formSection, setFormSection] = useState<'generation' | 'options'>(
     'generation',
   );
@@ -347,6 +376,10 @@ export function GenerationWorkspace({
     samplerName: '',
     scheduler: '',
     denoise: 1,
+    upscaler: '',
+    upscaleFactor: 1.5,
+    hiresDenoise: 0.5,
+    clipSkip: 2,
     additionalPositivePrompt: '',
     negativePrompt: '',
     promptText: '',
@@ -371,6 +404,27 @@ export function GenerationWorkspace({
     () => stepGenerationResolution(width, height, 'up'),
     [width, height],
   );
+  const samplerOptions = useMemo(
+    () =>
+      generationSamplerOptions(
+        generationFamily,
+        catalog?.samplers ?? [],
+        samplerName,
+      ),
+    [catalog?.samplers, generationFamily, samplerName],
+  );
+  const upscalerOptions = useMemo(() => {
+    const names = catalog?.upscalers ?? [];
+    const matched = matchUpscaler(upscaler, names);
+    if (matched && !names.includes(matched)) return [matched, ...names];
+    return names;
+  }, [catalog?.upscalers, upscaler]);
+
+  useEffect(() => {
+    if (generationFamily !== 'sdxl') return;
+    const matched = matchUpscaler(upscaler, catalog?.upscalers ?? []);
+    if (matched && matched !== upscaler) setUpscaler(matched);
+  }, [catalog?.upscalers, generationFamily, upscaler]);
 
   useEffect(() => {
     let cancelled = false;
@@ -497,6 +551,10 @@ export function GenerationWorkspace({
         setSamplerName(form.samplerName);
         setScheduler(form.scheduler);
         setDenoise(form.denoise);
+        setUpscaler(form.upscaler ?? '');
+        setUpscaleFactor(form.upscaleFactor ?? 1.5);
+        setHiresDenoise(form.hiresDenoise ?? 0.5);
+        setClipSkip(form.clipSkip ?? 2);
         setSeed(form.seed);
         setWidth(form.width);
         setHeight(form.height);
@@ -505,9 +563,7 @@ export function GenerationWorkspace({
         setPromptText(form.promptText);
         setPromptSource(form.promptSource);
         setPromptFoldersRecursive(form.promptFoldersRecursive === true);
-        if (form.relativeFolder) {
-          onSelectedFolderChange(form.relativeFolder);
-        }
+        onSelectedFolderChange(form.relativeFolder ?? null);
         if (form.lastImageUrl) {
           setHeldPreview({
             url: form.lastImageUrl,
@@ -652,6 +708,10 @@ export function GenerationWorkspace({
         samplerName,
         scheduler,
         denoise,
+        upscaler,
+        upscaleFactor,
+        hiresDenoise,
+        clipSkip,
         additionalPositivePrompt: additionalPositive,
         negativePrompt: negative,
         promptText,
@@ -673,6 +733,10 @@ export function GenerationWorkspace({
       samplerName,
       scheduler,
       denoise,
+      upscaler,
+      upscaleFactor,
+      hiresDenoise,
+      clipSkip,
       additionalPositivePrompt: additionalPositive,
       negativePrompt: negative,
       promptText,
@@ -688,7 +752,7 @@ export function GenerationWorkspace({
     persistTimer.current = setTimeout(() => {
       persistTimer.current = null;
       lastSavedRef.current = formSnapshotRef.current;
-      void window.wcm.comfy.setGenerationForm(formSnapshotRef.current);
+      void persistGenerationForm(formSnapshotRef.current);
     }, 250);
     return () => {
       if (persistTimer.current) clearTimeout(persistTimer.current);
@@ -705,6 +769,10 @@ export function GenerationWorkspace({
     samplerName,
     scheduler,
     denoise,
+    upscaler,
+    upscaleFactor,
+    hiresDenoise,
+    clipSkip,
     seed,
     width,
     height,
@@ -746,9 +814,9 @@ export function GenerationWorkspace({
       persistTimer.current = null;
     }
     if (formHydratedRef.current) {
-      void window.wcm.comfy.setGenerationForm(snapshot);
+      void persistGenerationForm(snapshot);
     } else {
-      void window.wcm.comfy.setGenerationForm({
+      void persistGenerationForm({
         relativeFolder: folderPick.folder,
         promptSource: 'folder',
       });
@@ -761,7 +829,7 @@ export function GenerationWorkspace({
       if (!formHydrated) return;
       if (persistTimer.current) clearTimeout(persistTimer.current);
       lastSavedRef.current = formSnapshotRef.current;
-      void window.wcm.comfy.setGenerationForm(formSnapshotRef.current);
+      void persistGenerationForm(formSnapshotRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount-only flush
   }, [formHydrated]);
@@ -805,6 +873,18 @@ export function GenerationWorkspace({
       samplerName: pick(local.samplerName, form.samplerName, saved.samplerName),
       scheduler: pick(local.scheduler, form.scheduler, saved.scheduler),
       denoise: pick(local.denoise, form.denoise, saved.denoise),
+      upscaler: pick(local.upscaler, form.upscaler ?? '', saved.upscaler),
+      upscaleFactor: pick(
+        local.upscaleFactor,
+        form.upscaleFactor ?? 1.5,
+        saved.upscaleFactor,
+      ),
+      hiresDenoise: pick(
+        local.hiresDenoise,
+        form.hiresDenoise ?? 0.5,
+        saved.hiresDenoise,
+      ),
+      clipSkip: pick(local.clipSkip, form.clipSkip ?? 2, saved.clipSkip),
       additionalPositivePrompt: pick(
         local.additionalPositivePrompt,
         form.additionalPositivePrompt,
@@ -835,6 +915,10 @@ export function GenerationWorkspace({
       next.samplerName !== form.samplerName ||
       next.scheduler !== form.scheduler ||
       next.denoise !== form.denoise ||
+      next.upscaler !== (form.upscaler ?? '') ||
+      next.upscaleFactor !== (form.upscaleFactor ?? 1.5) ||
+      next.hiresDenoise !== (form.hiresDenoise ?? 0.5) ||
+      next.clipSkip !== (form.clipSkip ?? 2) ||
       next.additionalPositivePrompt !== form.additionalPositivePrompt ||
       next.negativePrompt !== form.negativePrompt ||
       next.promptText !== form.promptText ||
@@ -861,6 +945,10 @@ export function GenerationWorkspace({
       next.samplerName === samplerName &&
       next.scheduler === scheduler &&
       next.denoise === denoise &&
+      next.upscaler === upscaler &&
+      next.upscaleFactor === upscaleFactor &&
+      next.hiresDenoise === hiresDenoise &&
+      next.clipSkip === clipSkip &&
       next.additionalPositivePrompt === additionalPositive &&
       next.negativePrompt === negative &&
       next.promptText === promptText &&
@@ -887,6 +975,10 @@ export function GenerationWorkspace({
     setSamplerName(next.samplerName);
     setScheduler(next.scheduler);
     setDenoise(next.denoise);
+    setUpscaler(next.upscaler);
+    setUpscaleFactor(next.upscaleFactor);
+    setHiresDenoise(next.hiresDenoise);
+    setClipSkip(next.clipSkip);
     setAdditionalPositive(next.additionalPositivePrompt);
     setNegative(next.negativePrompt);
     setPromptText(next.promptText);
@@ -1037,6 +1129,10 @@ export function GenerationWorkspace({
       samplerName,
       scheduler,
       denoise,
+      upscaler,
+      upscaleFactor,
+      hiresDenoise,
+      clipSkip,
       additionalPositivePrompt: additionalPositive,
       negativePrompt: negative,
       promptText,
@@ -1058,6 +1154,10 @@ export function GenerationWorkspace({
     setSamplerName(incoming.samplerName);
     setScheduler(incoming.scheduler);
     setDenoise(incoming.denoise);
+    setUpscaler(incoming.upscaler ?? '');
+    setUpscaleFactor(incoming.upscaleFactor ?? 1.5);
+    setHiresDenoise(incoming.hiresDenoise ?? 0.5);
+    setClipSkip(incoming.clipSkip ?? 2);
     setSeed(incoming.seed);
     setWidth(incoming.width);
     setHeight(incoming.height);
@@ -1086,6 +1186,10 @@ export function GenerationWorkspace({
       samplerName: incoming.samplerName,
       scheduler: incoming.scheduler,
       denoise: incoming.denoise,
+      upscaler: incoming.upscaler ?? '',
+      upscaleFactor: incoming.upscaleFactor ?? 1.5,
+      hiresDenoise: incoming.hiresDenoise ?? 0.5,
+      clipSkip: incoming.clipSkip ?? 2,
       additionalPositivePrompt: incoming.additionalPositivePrompt,
       negativePrompt: incoming.negativePrompt,
       promptText: incoming.promptText,
@@ -1095,7 +1199,7 @@ export function GenerationWorkspace({
     };
     formSnapshotRef.current = snapshot;
     lastSavedRef.current = snapshot;
-    void window.wcm.comfy.setGenerationForm(snapshot);
+    void persistGenerationForm(snapshot);
   };
 
   const start = useCallback(
@@ -1119,7 +1223,11 @@ export function GenerationWorkspace({
         return fail('Set Checkpoint Benchmark folder in Library Manager');
       }
       if (!hasWorkflow) {
-        return fail('Save a workflow first (Edit Workflow → Save Workflow).');
+        return fail(
+          generationFamily === 'sdxl'
+            ? 'Open WildcardManager-ComfyUI-SDXL-Generation-Workflow.json in ComfyUI, then Save Workflow.'
+            : 'Save a workflow first (Edit Workflow → Save Workflow).',
+        );
       }
       setError(null);
       setPromptSaveNote(null);
@@ -1143,6 +1251,10 @@ export function GenerationWorkspace({
           samplerName,
           scheduler,
           denoise,
+          upscaler,
+          upscaleFactor,
+          hiresDenoise,
+          clipSkip,
           additionalPositivePrompt: additionalPositive,
           negativePrompt: negative,
           promptText,
@@ -1161,7 +1273,7 @@ export function GenerationWorkspace({
             },
           };
         }
-        await window.wcm.comfy.setGenerationForm(snapshot);
+        await persistGenerationForm(snapshot);
         if (folderOverride) {
           setPromptSource('folder');
           if (selectedFolder !== folderOverride) {
@@ -1186,6 +1298,10 @@ export function GenerationWorkspace({
           samplerName: samplerName.trim() || undefined,
           scheduler: scheduler.trim() || undefined,
           denoise,
+          upscaler: upscaler.trim() || undefined,
+          upscaleFactor,
+          hiresDenoise,
+          clipSkip,
           seed,
           width,
           height,
@@ -1218,6 +1334,11 @@ export function GenerationWorkspace({
       samplerName,
       scheduler,
       denoise,
+      upscaler,
+      upscaleFactor,
+      hiresDenoise,
+      clipSkip,
+      generationFamily,
       additionalPositive,
       negative,
       onSelectedFolderChange,
@@ -1311,7 +1432,7 @@ export function GenerationWorkspace({
       clearTimeout(persistTimer.current);
       persistTimer.current = null;
     }
-    void window.wcm.comfy.setGenerationForm({ seed: seedValue });
+    void persistGenerationForm({ seed: seedValue });
   };
 
   useEffect(() => {
@@ -1451,7 +1572,11 @@ export function GenerationWorkspace({
               role="tab"
               aria-selected={formSection === 'options'}
               className={formSection === 'options' ? 'active' : undefined}
-              title="CLIP, VAE, and KSampler settings for this style."
+              title={
+                generationFamily === 'sdxl'
+                  ? 'VAE and KSampler settings for this style.'
+                  : 'CLIP, VAE, and KSampler settings for this style.'
+              }
               onClick={() => setFormSection('options')}
             >
               Options
@@ -1714,6 +1839,71 @@ export function GenerationWorkspace({
             </div>
           </div>
 
+          {generationFamily === 'sdxl' ? (
+            <>
+              <label
+                className="field-label"
+                title="Model in ComfyUI models/upscale_models, such as Foolhardy Remacri. Sent to LT · Upscaler."
+              >
+                Upscaler
+              </label>
+              <select
+                className="text-input"
+                value={upscalerOptions.includes(upscaler) ? upscaler : ''}
+                onChange={(e) => setUpscaler(e.target.value)}
+              >
+                <option value="">—</option>
+                {upscalerOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+
+              <label
+                className="field-label"
+                title="Final size versus the base image. 1.5 on 1024×1024 is 1536×1536."
+              >
+                Upscale factor
+              </label>
+              <input
+                className="text-input"
+                type="number"
+                min={1}
+                max={4}
+                step={0.1}
+                value={upscaleFactor}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  setUpscaleFactor(
+                    Number.isFinite(n) ? Math.min(4, Math.max(1, n)) : 1.5,
+                  );
+                }}
+              />
+
+              <label
+                className="field-label"
+                title="Denoise for the hires pass only. The Denoise field on Options still feeds the first sampler."
+              >
+                Hires denoise
+              </label>
+              <input
+                className="text-input"
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={hiresDenoise}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  setHiresDenoise(
+                    Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0.5,
+                  );
+                }}
+              />
+            </>
+          ) : null}
+
           <label
             className="field-label"
             title="Extra text added after the !gen.txt line. __wildcards__ expand with the same seed. Leave empty to use only the folder prompt."
@@ -1786,6 +1976,8 @@ export function GenerationWorkspace({
             the workflow, then Save Workflow. A blank Sampler or Scheduler
             keeps the name already on that node.
           </p>
+          {generationFamily === 'sdxl' ? null : (
+            <>
           <label
             className="field-label"
             title="Optional text encoder. Leave blank to keep the CLIP already in the workflow."
@@ -1804,10 +1996,16 @@ export function GenerationWorkspace({
               </option>
             ))}
           </select>
+            </>
+          )}
 
           <label
             className="field-label"
-            title="Optional decoder that turns the result into an image. Leave blank to keep the VAE already in the workflow."
+            title={
+              generationFamily === 'sdxl'
+                ? 'Leave blank to use the VAE packed in the checkpoint. Pick a file, such as an SDXL VAE, to replace it on both the base image and the hires pass.'
+                : 'Optional decoder that turns the result into an image. Leave blank to keep the VAE already in the workflow.'
+            }
           >
             VAE (optional)
           </label>
@@ -1823,6 +2021,33 @@ export function GenerationWorkspace({
               </option>
             ))}
           </select>
+
+          {generationFamily === 'sdxl' ? (
+            <>
+              <label
+                className="field-label"
+                title="A1111 CLIP skip. Pony and Illustrious want 2. 1 keeps the last CLIP layer, which base SDXL usually wants."
+              >
+                CLIP skip
+              </label>
+              <input
+                className="text-input"
+                type="number"
+                min={1}
+                max={12}
+                step={1}
+                value={clipSkip}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  setClipSkip(
+                    Number.isFinite(n)
+                      ? Math.min(12, Math.max(1, Math.round(n)))
+                      : 2,
+                  );
+                }}
+              />
+            </>
+          ) : null}
 
           <label
             className="field-label"
@@ -1872,13 +2097,11 @@ export function GenerationWorkspace({
             onChange={(e) => setSamplerName(e.target.value)}
           >
             <option value="">—</option>
-            {withSavedChoice(catalog?.samplers ?? [], samplerName).map(
-              (name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ),
-            )}
+            {samplerOptions.map((name) => (
+              <option key={name} value={name}>
+                {samplerLabel(name)}
+              </option>
+            ))}
           </select>
 
           <label
@@ -1896,7 +2119,7 @@ export function GenerationWorkspace({
             {withSavedChoice(catalog?.schedulers ?? [], scheduler).map(
               (name) => (
                 <option key={name} value={name}>
-                  {name}
+                  {schedulerLabel(name)}
                 </option>
               ),
             )}
@@ -2083,7 +2306,9 @@ export function GenerationWorkspace({
                   </span>
                 ) : !contract && !hasWorkflow ? (
                   <span className="hint generation-workflow-status warn-text">
-                    No workflow saved yet
+                    {generationFamily === 'sdxl'
+                      ? 'Open WildcardManager-ComfyUI-SDXL-Generation-Workflow.json in ComfyUI, then Save Workflow.'
+                      : 'No workflow saved yet'}
                   </span>
                 ) : null}
                 <button

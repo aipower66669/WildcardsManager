@@ -35,6 +35,35 @@ and uses [Semantic Versioning](https://semver.org/).
 - A Hugging Face download stores the Hub page on the LoRA or checkpoint
   (`models.json` link, origin `huggingface`), so the page URL and the side
   page open that repo. The wildcard comment still gets the same URL.
+- An SDXL library can pick a VAE on Options. The SDXL graph wires **LT · VAE**
+  into Load VAE, and that VAE feeds the base decode, the hires encode, and
+  the final decode. Blank keeps the VAE packed in the checkpoint. A chosen
+  file is written into LT · VAE.
+- An SDXL library has **CLIP skip** on Options, default 2. The graph runs
+  **CLIP Set Last Layer** from **LT · CLIP skip** (Comfy stop layer −2).
+  That is the Pony and Illustrious training setting. Set it to 1 for base SDXL.
+- Settings → Library no longer edits LoRA, checkpoint, or training-library
+  folders. Those stay in Library Manager. Images and videos stay in Settings.
+- Generation parameters and Options are saved per library in
+  `generation-form.json`. Switching libraries restores that library’s
+  checkpoint, size, sampler, and the rest.
+- Each library stores `generationFamily` (`krea2` or `sdxl`, default
+  `krea2`) from **Library Manager**. A Krea 2 library keeps the Generation
+  screen as it is. An SDXL library hides CLIP, shows VAE and CLIP skip, and shows the upscaler,
+  upscale factor, and hires denoise. Sampler and Scheduler show the Comfy
+  name, underscores included.
+- `ComfyUI-Workflow/` includes
+  `WildcardManager-ComfyUI-SDXL-Generation-Workflow.json`. It is the same
+  Generation graph with one Checkpoint loader, for SDXL, Pony, and
+  Illustrious. **LT · VAE** feeds Load VAE. After the base sample it
+  decodes, upscales with an upscale model (default
+  `4x_foolhardy_Remacri.pth`), scales to width × factor and height × factor,
+  and runs a hires pass at denoise 0.5.
+  The Krea 2 graph is
+  `WildcardManager-ComfyUI-Krea2-Generation-Workflow.json`. Edit Workflow and
+  Save Workflow keep a separate file per family
+  (`comfy-workflow-krea2.json`, `comfy-workflow-sdxl.json`). An existing
+  `comfy-workflow.json` is copied into the Krea slot on first load.
 - Hugging Face cards show a sample image when the repo has one (the model-card
   thumbnail, otherwise the best cover or showcase file). The cover is a
   portrait 2:3 crop. Clicking the image opens the Hub page.
@@ -59,6 +88,9 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Switching libraries keeps the open tab on screen. Generation, Prompts,
+  LoRA files, Checkpoint files, and Search were unmounted and stayed blank
+  until you left the tab and came back.
 - **Cancel** on a coverage run stops the worker. It previously finished the
   whole simulation before it noticed the cancel.
 - The ComfyUI custom save node writes the sampling parameters back into the

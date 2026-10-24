@@ -22,6 +22,7 @@ export function toLibraryConfigDto(lib: LibraryConfig): LibraryConfigDto {
     enabledSdxlFamilies: [...lib.enabledSdxlFamilies],
     enabledCivitaiCategories: [...lib.enabledCivitaiCategories],
     validationPlatform: lib.validationPlatform ?? 'comfyui',
+    generationFamily: lib.generationFamily === 'sdxl' ? 'sdxl' : 'krea2',
     civitaiOrigin: lib.civitaiOrigin ?? 'https://civitai.com',
   };
 }

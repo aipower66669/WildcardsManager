@@ -30,6 +30,7 @@ only — do not change existing LT node class names, inputs, or behaviour.
 | `LoraTrainingNegativePrompt` | LT · Negative Prompt | Negative prompt text |
 | `LoraTrainingCLIP` | LT · CLIP | CLIP filename (wildcard → CLIPLoader combo) |
 | `LoraTrainingVAE` | LT · VAE | VAE filename (wildcard → VAELoader combo) |
+| `LoraTrainingClipSkip` | LT · CLIP skip | Stop layer written by the app (−2 for clip skip 2, −1 for clip skip 1). A positive 1–12 is also accepted and converted |
 | `LoraTrainingWidth` | LT · Width | Canvas / latent width |
 | `LoraTrainingHeight` | LT · Height | Canvas / latent height |
 | `LoraTrainingSteps` | LT · Steps | KSampler step count |

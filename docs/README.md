@@ -33,7 +33,8 @@ what you are trying to do.
 ## Repository resources
 
 - [`../ComfyUI-Workflow/`](../ComfyUI-Workflow/) — `comfyui-lora-training` zip
-  and the sample Generation graph. Install steps are in the
+  and the sample Generation graphs (Krea 2, and SDXL / Pony / Illustrious).
+  Install steps are in the
   [user guide](user-guide.md#install-the-nodes-and-the-sample-graph).
 - [`../sample_wildcards/`](../sample_wildcards/) — healthy SFW example library.
 - [`../fixtures/wildcards/`](../fixtures/wildcards/) — intentionally broken

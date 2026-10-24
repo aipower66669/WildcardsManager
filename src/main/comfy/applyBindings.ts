@@ -21,6 +21,11 @@ export type GenerationValues = {
   steps?: number;
   cfg?: number;
   denoise?: number;
+  upscaler?: string;
+  upscaleFactor?: number;
+  hiresDenoise?: number;
+  /** Queued as a negative stop layer. −2 is clip skip 2. Positive 1–12 is also valid on the node. */
+  clipSkip?: number;
   samplerName?: string;
   scheduler?: string;
   width?: number;
@@ -89,6 +94,10 @@ export function validateBindingsAgainstGraph(
   checkInput('steps', bindings.steps);
   checkInput('cfg', bindings.cfg);
   checkInput('denoise', bindings.denoise);
+  checkInput('upscaler', bindings.upscaler);
+  checkInput('upscaleFactor', bindings.upscaleFactor);
+  checkInput('hiresDenoise', bindings.hiresDenoise);
+  checkInput('clipSkip', bindings.clipSkip);
   checkInput('samplerName', bindings.samplerName);
   checkInput('scheduler', bindings.scheduler);
   checkInput('width', bindings.width);
@@ -151,6 +160,10 @@ export function applyBindings(
   apply(bindings.steps, values.steps);
   apply(bindings.cfg, values.cfg);
   apply(bindings.denoise, values.denoise);
+  apply(bindings.upscaler, values.upscaler);
+  apply(bindings.upscaleFactor, values.upscaleFactor);
+  apply(bindings.hiresDenoise, values.hiresDenoise);
+  apply(bindings.clipSkip, values.clipSkip);
   apply(bindings.samplerName, values.samplerName);
   apply(bindings.scheduler, values.scheduler);
   apply(bindings.outputFolder, values.outputFolder);

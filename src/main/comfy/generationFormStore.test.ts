@@ -25,9 +25,11 @@ const {
   canRunGenerationRequest,
   deleteLastGenerationOutput,
   generationRequestFromForm,
+  loadGenerationForm,
   loadGenerationFormWithPreview,
   saveGenerationForm,
   saveGenerationPreview,
+  setGenerationFormLibraryResolver,
 } = await import('./generationFormStore.js');
 
 describe('generationFormStore', () => {
@@ -38,6 +40,10 @@ describe('generationFormStore', () => {
   });
 
   afterEach(() => {
+    setGenerationFormLibraryResolver(() => ({
+      activeId: 'local',
+      allIds: ['local'],
+    }));
     vi.clearAllMocks();
   });
 
@@ -71,6 +77,10 @@ describe('generationFormStore', () => {
       samplerName: undefined,
       scheduler: undefined,
       denoise: 1,
+      upscaler: undefined,
+      upscaleFactor: 1.5,
+      hiresDenoise: 0.5,
+      clipSkip: 2,
       additionalPositivePrompt: 'photo',
       negativePrompt: 'bad',
       benchmark: false,
@@ -159,6 +169,10 @@ describe('generationFormStore', () => {
           samplerName: 'euler',
           scheduler: 'normal',
           denoise: 1,
+          upscaler: '',
+          upscaleFactor: 1.5,
+          hiresDenoise: 0.5,
+          clipSkip: 2,
           additionalPositivePrompt: 'photo',
           negativePrompt: 'cartoon',
           promptText: '',
@@ -178,6 +192,10 @@ describe('generationFormStore', () => {
           samplerName: 'exp_heun_2_x0',
           scheduler: 'sgm_uniform',
           denoise: 1,
+          upscaler: '',
+          upscaleFactor: 1.5,
+          hiresDenoise: 0.5,
+          clipSkip: 2,
           additionalPositivePrompt: '__style-hentai__',
           negativePrompt: 'photo',
           promptText: 'typed',
@@ -197,6 +215,10 @@ describe('generationFormStore', () => {
           samplerName: '',
           scheduler: '',
           denoise: 1,
+          upscaler: '',
+          upscaleFactor: 1.5,
+          hiresDenoise: 0.5,
+          clipSkip: 2,
           additionalPositivePrompt: '',
           negativePrompt: '',
           promptText: '',
@@ -358,5 +380,34 @@ describe('generationFormStore', () => {
     expect(loaded.lastOutputPath).toBeUndefined();
     expect(loaded.lastImageUrl).toBeUndefined();
     expect(loaded.lastPrompt).toBeUndefined();
+  });
+
+  it('keeps parameters and options on the library that saved them', () => {
+    setGenerationFormLibraryResolver(() => ({
+      activeId: 'krea',
+      allIds: ['krea', 'sdxl'],
+    }));
+    saveGenerationForm(
+      { checkpoint: 'krea.safetensors', steps: 20, cfg: 7, samplerName: 'euler' },
+      'krea',
+    );
+    saveGenerationForm(
+      {
+        checkpoint: 'pony.safetensors',
+        steps: 30,
+        cfg: 4,
+        samplerName: 'lcm',
+        clipSkip: 1,
+      },
+      'sdxl',
+    );
+    expect(loadGenerationForm('krea').checkpoint).toBe('krea.safetensors');
+    expect(loadGenerationForm('krea').steps).toBe(20);
+    expect(loadGenerationForm('krea').samplerName).toBe('euler');
+    expect(loadGenerationForm('sdxl').checkpoint).toBe('pony.safetensors');
+    expect(loadGenerationForm('sdxl').steps).toBe(30);
+    expect(loadGenerationForm('sdxl').cfg).toBe(4);
+    expect(loadGenerationForm('sdxl').samplerName).toBe('lcm');
+    expect(loadGenerationForm('sdxl').clipSkip).toBe(1);
   });
 });
