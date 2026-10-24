@@ -107,6 +107,7 @@ jobs:
             release/*.exe.blockmap
             release/latest.yml
             ComfyUI-Workflow/comfyui-lora-training.zip
+            ComfyUI-Workflow/comfyui-custom-save-node.zip
             ComfyUI-Workflow/WildcardManager-ComfyUI-Krea2-Generation-Workflow.json
             ComfyUI-Workflow/WildcardManager-ComfyUI-SDXL-Generation-Workflow.json
         env:

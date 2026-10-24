@@ -7,6 +7,12 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A version tag attaches `comfyui-custom-save-node.zip` (`SaveImageToFolder`)
+  to the GitHub Release, next to `comfyui-lora-training.zip` and the two
+  workflow files.
+
 ## [0.10.0] - 2026-10-25
 
 ### Added

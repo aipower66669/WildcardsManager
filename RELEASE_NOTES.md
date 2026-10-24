@@ -116,9 +116,11 @@ Libraries do not need a hand-edited `library.json`. If you moved model or
 wildcard folders onto another drive, use Library Manager → **Migrate library
 paths…**.
 
-Install `ComfyUI-Workflow/comfyui-lora-training.zip` into ComfyUI
-`custom_nodes/` if Generation reports missing LT nodes, then load the matching
-workflow JSON and **Save Workflow**.
+The release assets include `comfyui-lora-training.zip` and
+`comfyui-custom-save-node.zip`. Unzip both into ComfyUI `custom_nodes/`
+(`custom_nodes/comfyui-lora-training/` and
+`custom_nodes/comfyui-custom-save-node/`), restart ComfyUI, load the matching
+workflow JSON, and **Save Workflow**. The save-node zip is `SaveImageToFolder`.
 
 ## Known limitations
 
