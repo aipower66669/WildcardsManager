@@ -1,7 +1,49 @@
-# Wildcards Manager v0.9
+# Wildcards Manager v0.9.3
 
-Package version: **0.9.0**  
+Package version: **0.9.3**  
 Release date: **October 24, 2026**
+
+## Critical fix
+
+Builds before 0.9.3 could drop **Archive**, **Maybe**, **Notify**, and the
+**LoRA download categories** when two libraries shared one wildcards folder.
+Those lists lived in one shared `library.json`. A save or a quit could replace
+them with another library’s older copy, or save the categories as empty while
+Archive still had rows.
+
+0.9.3 keeps each library’s Civitai catalog in its own folder:
+
+`<wildcards folder name>.wcm/cache/civitai-catalog/<library id>/`
+
+Archive, Maybe, Notify, and the LoRA categories stay in one file,
+`<wildcards folder name>.wcm/library.json`, with a separate block per library
+id. That file is next to the wildcards folder, inside the ComfyUI tree. It is
+not in AppData. The `!.wcm` folders under LoRA and checkpoint roots are hashes
+and ratings, not these lists.
+
+Before a format change, the app copies `library.json` to
+`<wildcards folder name>.wcm/backups/pre-migrate-<timestamp>/`. If that copy
+fails, it does not rewrite the file. An empty category list cannot replace a
+saved one.
+
+## If those lists were wiped
+
+Quit Wildcards Manager completely, including the tray icon. Closing the window
+is not enough while it is still running.
+
+In the live `<wildcards folder name>.wcm` folder, rename `library.json` to
+`broken-library.json`. The new name must not start with `library.json`. Copy
+`library.json` from a backup of that same `.wcm` folder (a full ComfyUI backup
+is enough; you do not need an AppData backup). Start **0.9.3**.
+
+The backup file is one shared list. This build copies it into each library’s
+block, so both libraries match that backup. Anything changed after the backup
+has to be done again. Do not copy the whole ComfyUI tree back over the live
+folder, and do not edit `library.json` by hand.
+
+## v0.9
+
+Package version at that release: **0.9.0**
 
 v0.9 generates with **Krea 2** and with **SDXL**. SDXL, Pony, and
 Illustrious share one checkpoint graph: a VAE you can replace, CLIP skip, and
@@ -193,7 +235,7 @@ Ignore a file to keep it off the “never used” list.
 ## Installation
 
 Download an installer from the
-[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.9.0)
+[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.9.3)
 when one is attached, or build it yourself. Installers are unsigned.
 
 From source (Node.js 22.12+):
@@ -205,7 +247,7 @@ npm ci
 npm run dev
 ```
 
-Pushing a version tag (`v0.9.0`) runs the checks, builds
+Pushing a version tag (`v0.9.3`) runs the checks, builds
 `WildcardsManager-<version>-win-x64.exe`, and attaches it to that GitHub
 Release. Settings → App updates checks that release when the update folder
 is empty. **Check for update** only reports a newer installer. **What's new**

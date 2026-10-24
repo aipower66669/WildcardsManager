@@ -15,8 +15,7 @@ import {
   type PromptSubstitution,
 } from '../domain/promptSubstitution.js';
 import type { CivitaiOrigin } from '../domain/civitaiSnippet.js';
-import { libraryJsonPath, legacyWildcardsWcmDir } from '../domain/librarySidecarPaths.js';
-import { atomicWriteFile, readJsonFile } from './librarySidecarIo.js';
+import { readLibrarySlot, writeLibrarySlot } from './libraryLocalFile.js';
 import { noteBlockingWork } from './mainStallWatchdog.js';
 import path from 'node:path';
 
@@ -262,37 +261,21 @@ function listLen(value: unknown): number {
 
 export function readLibraryLocalPayload(
   wildcardsRoot: string | null | undefined,
+  libraryId?: string | null,
 ): LibraryLocalPayload | null {
-  if (!wildcardsRoot?.trim()) return null;
-  const sibling = readJsonFile<LibraryLocalPayload>(
-    libraryJsonPath(wildcardsRoot),
-  );
-  const legacy = readJsonFile<LibraryLocalPayload>(
-    path.join(legacyWildcardsWcmDir(wildcardsRoot), 'library.json'),
-  );
-  if (sibling && legacy) {
-    // Membership lists pick which file wins when both still exist. Keys that
-    // exist on only one file (prompt substitutions saved on the sibling while
-    // the in-tree file still has the longer archive lists) must survive.
-    const score = (p: LibraryLocalPayload) =>
-      PROTECTED_LIST_KEYS.reduce((sum, key) => sum + listLen(p[key]), 0);
-    const primary = score(sibling) >= score(legacy) ? sibling : legacy;
-    const secondary = primary === sibling ? legacy : sibling;
-    return { ...secondary, ...primary };
-  }
-  return sibling ?? legacy;
+  return readLibrarySlot(wildcardsRoot, libraryId);
 }
 
 export function writeLibraryLocalPayload(
   wildcardsRoot: string,
   payload: LibraryLocalPayload,
+  libraryId?: string | null,
 ): void {
+  const id = libraryId?.trim();
+  if (!id) return;
   // Compact JSON — pretty-print of 10k+ archive rows blocks the UI.
   noteBlockingWork('Writing library.json', () => {
-    atomicWriteFile(
-      libraryJsonPath(wildcardsRoot),
-      `${JSON.stringify({ ...payload, version: LIBRARY_LOCAL_VERSION })}\n`,
-    );
+    writeLibrarySlot(wildcardsRoot, id, payload);
   });
 }
 
@@ -370,8 +353,18 @@ export function protectLibraryListsFromEmptyClobber(
   return next;
 }
 
-const pendingLibraryLocal = new Map<string, LibraryLocalPayload>();
+type PendingLibraryLocal = {
+  root: string;
+  libraryId: string;
+  payload: LibraryLocalPayload;
+};
+
+const pendingLibraryLocal = new Map<string, PendingLibraryLocal>();
 let libraryLocalFlushTimer: ReturnType<typeof setImmediate> | null = null;
+
+function pendingLibraryKey(root: string, libraryId: string): string {
+  return `${path.resolve(root).toLowerCase()}\0${libraryId}`;
+}
 
 function membershipItemCount(payload: LibraryLocalPayload): number {
   return PROTECTED_LIST_KEYS.filter((key) => key !== 'loraDownloadCategories')
@@ -382,8 +375,8 @@ function flushPendingLibraryLocal(): void {
   libraryLocalFlushTimer = null;
   const batch = [...pendingLibraryLocal];
   pendingLibraryLocal.clear();
-  for (const [root, payload] of batch) {
-    writeLibraryLocalPayload(root, payload);
+  for (const [, pending] of batch) {
+    writeLibraryLocalPayload(pending.root, pending.payload, pending.libraryId);
   }
 }
 
@@ -397,25 +390,32 @@ export function flushLibraryLocalSync(): void {
 }
 
 export function persistLibraryLocalFromConfig(
-  lib: LibraryLocalSource,
+  lib: LibraryLocalSource & { id: string },
   opts?: { allowEmptyMembershipLists?: boolean; flushImmediate?: boolean },
 ): void {
-  if (!lib.wildcardsRoot?.trim()) return;
+  if (!lib.wildcardsRoot?.trim() || !lib.id?.trim()) return;
   const root = lib.wildcardsRoot;
+  const libraryId = lib.id.trim();
   const incoming = libraryConfigToPayload(lib);
   // Memory already has lists — don't re-parse a multi-MB library.json on
-  // every Archive click (that froze the UI). Only read disk when memory
-  // looks emptied (clobber guard).
+  // every Archive click (that froze the UI). Read disk when membership is
+  // empty, or when categories are empty, so a populated archive list cannot
+  // save over a real category list.
   const existing =
-    membershipItemCount(incoming) === 0
-      ? readLibraryLocalPayload(root)
+    membershipItemCount(incoming) === 0 ||
+    listLen(incoming.loraDownloadCategories) === 0
+      ? readLibraryLocalPayload(root, libraryId)
       : null;
   const payload = protectLibraryListsFromEmptyClobber(
     incoming,
     existing,
     opts,
   );
-  pendingLibraryLocal.set(root, payload);
+  pendingLibraryLocal.set(pendingLibraryKey(root, libraryId), {
+    root,
+    libraryId,
+    payload,
+  });
   if (opts?.flushImmediate === true) {
     flushLibraryLocalSync();
     return;

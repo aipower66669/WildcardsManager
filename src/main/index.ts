@@ -93,7 +93,10 @@ import {
   setWindowState,
   type WindowState,
 } from './settingsStore.js';
-import { flushAutoV2IndexSync } from './civitaiCatalogCache.js';
+import {
+  flushAutoV2IndexSync,
+  flushDirtyModelPagesSync,
+} from './civitaiCatalogCache.js';
 import { flushHashCachePersist } from './modelHashCache.js';
 import { migrateModelHashesToAds } from './modelHashAdsMigration.js';
 import { disposeAnalyzeWorker } from './analyzeWorkerClient.js';
@@ -430,6 +433,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   flushModelDownloadQueuePersist();
+  flushDirtyModelPagesSync();
   flushAutoV2IndexSync();
   flushSettingsSync();
   flushHashCachePersist();
@@ -447,6 +451,8 @@ app.on('before-quit', () => {
 app.on('window-all-closed', () => {
   folderWatcher.stop();
   flushModelDownloadQueuePersist();
+  flushDirtyModelPagesSync();
+  flushAutoV2IndexSync();
   flushSettingsSync();
   flushDownloadedImagesRegistrySync();
   flushDownloadedVideosRegistrySync();

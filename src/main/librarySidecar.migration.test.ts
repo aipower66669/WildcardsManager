@@ -94,18 +94,22 @@ describe('library sidecar layout (sample_wildcards only)', () => {
       './modelRootStore.js'
     );
 
-    writeLibraryLocalPayload(wildcardsRoot, {
-      version: 1,
-      lastRootFile: '0main.txt',
-      ignoredUnusedLoras: ['foo.safetensors'],
-      archivedCivitaiModels: [],
-      validationPlatform: 'comfyui',
-      enabledArchitectures: [],
-      enabledSdxlFamilies: [],
-      enabledCivitaiCategories: [],
-    });
+    writeLibraryLocalPayload(
+      wildcardsRoot,
+      {
+        version: 1,
+        lastRootFile: '0main.txt',
+        ignoredUnusedLoras: ['foo.safetensors'],
+        archivedCivitaiModels: [],
+        validationPlatform: 'comfyui',
+        enabledArchitectures: [],
+        enabledSdxlFamilies: [],
+        enabledCivitaiCategories: [],
+      },
+      'lib-a',
+    );
 
-    const payload = readLibraryLocalPayload(wildcardsRoot);
+    const payload = readLibraryLocalPayload(wildcardsRoot, 'lib-a');
     expect(payload?.lastRootFile).toBe('0main.txt');
     expect(fs.existsSync(libraryJsonPath(wildcardsRoot))).toBe(true);
 

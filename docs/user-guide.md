@@ -45,8 +45,17 @@ own wildcards root, model folders, Civitai site (`civitai.com` or
 `civitai.red`), validation platform (ComfyUI or Stable Diffusion), and
 Generation family (`generationFamily`: `krea2` or `sdxl`, default `krea2`).
 **Library Manager** sets that family on the library you have selected there.
-Switching libraries reloads that library’s sidecar lists and the Generation
-screen for that family; it does not mix them.
+**Base models to manage**, **SDXL families**, and **Civitai categories** are
+saved on that same library record. Two libraries that share a wildcards folder
+keep their own checkboxes. Each library’s Civitai catalog is its own folder,
+`<wildcards folder name>.wcm/cache/civitai-catalog/<library id>/`. Archive,
+Maybe, Notify, and the LoRA download categories are in one
+`<wildcards folder name>.wcm/library.json`, in a separate block per library.
+That file is beside the wildcards folder, in the ComfyUI tree, not in AppData.
+The `!.wcm` folders under LoRA and checkpoint roots are hashes and ratings.
+Switching libraries reloads that library’s catalog and the Generation screen
+for that family. If those lists disappear, see
+[Troubleshooting](troubleshooting.md#archive-maybe-notify-or-lora-categories-disappeared).
 
 Folder pointers on a library:
 

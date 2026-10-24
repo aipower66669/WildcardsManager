@@ -221,7 +221,7 @@ App-wide fields in `settings.json`:
 | `generationSaveInNewSubfolder` | Folder-mode images go in `{prompt folder}/New` when true |
 | `updateReleaseFolder` | Local installer folder that overrides GitHub updates |
 
-Per-library folder pointers on the library record:
+Per-library fields on the library record in `settings.json`:
 
 | Key | Meaning |
 | --- | --- |
@@ -237,6 +237,9 @@ Per-library folder pointers on the library record:
 | `generationOutputHentai` | Output for the Anime tab (profile id `hentai`) |
 | `generationOutput3d` | 3D generation output |
 | `benchmarkOutputFolder` | Checkpoint Benchmark folder |
+| `enabledArchitectures` | Base models this library manages. Saved on the library record so two libraries can share a wildcards folder and keep different choices |
+| `enabledSdxlFamilies` | SDXL families (SDXL only, Pony, Illustrious, NoobAI) for that library |
+| `enabledCivitaiCategories` | Civitai categories this library may browse |
 
 Fields also written to the sibling `library.json`:
 
@@ -258,9 +261,6 @@ Fields also written to the sibling `library.json`:
 | `civitaiImageBrowseFilters` | Images tab filters |
 | `civitaiVideoBrowseFilters` | Videos tab filters |
 | `hfBrowseFilters` | Hugging Face search filters |
-| `enabledArchitectures` | Base-model groups this library may browse |
-| `enabledSdxlFamilies` | SDXL families when the base model is SDXL |
-| `enabledCivitaiCategories` | Civitai categories this library may browse |
 | `validationPlatform` | ComfyUI or Stable Diffusion validation |
 | `civitaiOrigin` | `civitai.com` or `civitai.red` |
 
@@ -268,9 +268,10 @@ Per-library **datasets** are written next to the user’s folders, for example:
 
 | Location | Contents |
 | --- | --- |
-| Sibling `<wildcardsBasename>.wcm/library.json` | Archive / Maybe / Notify / marked-installed, LoRA download categories, generation prompt substitutions |
-| Same sibling `validation.json`, `backups/` | Validation cache, mutation backups |
-| Same sibling `cache/` | Paged Civitai catalog, slim AutoV2 index, hash-miss cache |
+| Sibling `<wildcardsBasename>.wcm/library.json` | One slot per library id (`byLibrary`): Archive / Maybe / Notify / marked-installed, LoRA download categories, generation prompt substitutions |
+| Same sibling `validation.json`, `backups/` | Validation cache, mutation backups, and `pre-migrate-<timestamp>/` copies taken before a format change |
+| Same sibling `cache/civitai-catalog/<libraryId>/` | That library’s paged Civitai catalog and AutoV2 index. Dirty pages flush within 500ms and again on quit |
+| Same sibling `cache/` | Hash-miss cache for the wildcards folder |
 | `<lora or checkpoint>/!.wcm/models.json` | Hashes, ratings, manual Civitai links |
 | `!Thumbnails/` under model roots | Cover-crop catalog thumbs (`w512-…`) plus full CDN bytes for new downloads (`full-…`) |
 | `<lora or checkpoint>/!.wcm/download-queue.json` | Persistent download queue |
@@ -279,8 +280,23 @@ Wildcards sidecars are **outside** the content root so ComfyUI Dynamic Prompts
 does not index them. Legacy in-tree `!.wcm` / `!Cache` under wildcards are
 moved to the sibling on launch (`wildcardsSidecarMigration.ts`).
 `libraryDataMigration.ts` also moves legacy AppData blobs into these sidecars
-(idempotent). Writes to `library.json` refuse to replace non-empty membership /
-category lists with empty in-memory snapshots (empty-clobber guard).
+(idempotent). Writes to `library.json` refuse to replace non-empty membership
+lists or LoRA download categories with empty in-memory snapshots
+(empty-clobber guard). An archive list that still has rows cannot
+save an empty category list over the one on disk.
+Browse, Archive, Maybe, and Notify are per library. Two libraries that share
+a wildcards folder still keep separate catalog directories
+(`cache/civitai-catalog/<libraryId>/`) and separate `byLibrary` slots in the
+one `library.json`. That file is not in AppData. Model-root `!.wcm` folders
+are hashes and ratings, not these lists. Builds before 0.9.3 kept one shared
+list and could replace it on save or quit, including writing categories empty
+while Archive still had rows. The first launch of 0.9.3 copies a version-1
+file into each library’s slot once. Before that rewrite, and before any later
+format change, the app copies the file to
+`backups/pre-migrate-<timestamp>/`. If the copy fails, the file is not
+rewritten. On startup the app also fills an empty Archive, Maybe, Notify, or
+LoRA category list from an older `library.json` still on disk. A shorter list
+never replaces a longer one.
 
 LoRA and checkpoint indexes (`loraService` / `checkpointService`) walk the
 configured roots with symlink-aware directory traversal (`modelFolderWalk`) so

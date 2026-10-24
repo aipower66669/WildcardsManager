@@ -912,8 +912,6 @@ function applyBrowseFilters(
   if (params.architectures?.length) {
     const ids = params.architectures as CivitaiArchitectureId[];
     filtered = filtered.filter((item) => {
-      // Prefer the card primary, but multi-arch models often list a newer Flux
-      // (etc.) as [0] while still having a library-matching version.
       if (matchesArchitectureFilter(item.baseModel, ids)) return true;
       return item.versionInstalls.some((row) =>
         matchesArchitectureFilter(row.baseModel, ids),

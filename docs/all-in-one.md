@@ -24,6 +24,7 @@ Links written as `syntax.md` or `user-guide.md#…` are paths inside the `docs/`
 | Test succeeds, Generation refuses, Last output empty | ComfyUI answers Test but Generation is rejected; Last output stays empty after a successful ComfyUI image |
 | LoRA file exists and something says missing | A LoRA exists but a warning or the loader says it is missing |
 | Slow open or a freeze | The library is slow to open |
+| Archive, Maybe, Notify, or LoRA categories disappeared | Troubleshooting: Archive, Maybe, Notify, or LoRA categories disappeared |
 | Closing the window versus quitting | Civitai browser; FAQ “Do downloads keep going if I leave the browser?” |
 | Direct answers | FAQ |
 | Rules an assistant must not soften | Information for LLM models |
@@ -43,6 +44,18 @@ Links written as `syntax.md` or `user-guide.md#…` are paths inside the `docs/`
 | Roadmap | `docs/roadmap.md` | Shipped work and later plans |
 | FAQ | `docs/FAQ.md` | Common questions and answers |
 | Information for LLM models | this file only | Compact rules for an assistant |
+
+---
+
+---
+
+---
+
+---
+
+---
+
+---
 
 ---
 
@@ -188,9 +201,11 @@ random expansion makes examples reproducible. Monte Carlo simulation answers
 ## Product principles
 
 1. **Local-first.** The selected folder is the canonical library. No account,
-   cloud service, or central database is required. Wildcards app lists/caches
-   travel as a sibling `<basename>.wcm/` folder; LoRA/checkpoint use in-tree
-   `!.wcm/` / `!Thumbnails/`.
+   cloud service, or central database is required. Archive, Maybe, Notify, and
+   LoRA categories travel in one sibling `<basename>.wcm/library.json` (one
+   block per library). Each library’s Civitai catalog is
+   `<basename>.wcm/cache/civitai-catalog/<library id>/`. Those files are not
+   in AppData. LoRA/checkpoint roots use in-tree `!.wcm/` / `!Thumbnails/`.
 2. **Explain before changing.** Mutating refactors show impact, affected files,
    and warnings before confirmation.
 3. **Reversible by default.** App writes use per-file atomic replace, attempt
@@ -231,7 +246,8 @@ Shipped today:
 - Civitai Images / Videos Download all with feed frontiers and Browse catch-up;
 - Library Manager (multiple libraries, path migration), LoRA training-series
   previews, LM Studio prompt assist, checkpoint ratings, blocked authors;
-- Per-library sidecars (wildcards sibling `.wcm/`; model-root `!.wcm` /
+- Per-library sidecars (one wildcards sibling `.wcm/library.json` with a
+  block per library, a catalog folder per library id, model-root `!.wcm` /
   `!Thumbnails`);
 - a deterministic, validated, SFW sample library.
 
@@ -334,11 +350,14 @@ em dash: `Library name — Prompts Library`, `Library name — Image Generation`
 `Library name — Checkpoints file manager`, or `Library name — Advanced Search`.
 
 The toolbar **Search** (magnifying glass) opens a quick launcher into the same
-search. Wildcards lists (Archive, Maybe, Notify, LoRA download categories) and
-caches live in a sibling `<wildcardsBasename>.wcm/` folder beside your wildcards
-root (not inside it). LoRA / checkpoint apps data use `!.wcm/` and
-`!Thumbnails/` next to those folders. Civitai community image downloads use a
-configured **images folder** (Settings) and an AppData download registry.
+search. Archive, Maybe, Notify, and LoRA download categories live in one
+sibling `<wildcardsBasename>.wcm/library.json` beside the wildcards root (not
+inside it, and not in AppData), with a separate block per library. Each
+library’s Civitai catalog is
+`<wildcardsBasename>.wcm/cache/civitai-catalog/<library id>/`. LoRA and
+checkpoint metadata use `!.wcm/` and `!Thumbnails/` next to those model
+folders. Civitai community image downloads use a configured **images folder**
+(Settings) and an AppData download registry.
 
 ### Civitai / updates extras
 
@@ -594,8 +613,17 @@ own wildcards root, model folders, Civitai site (`civitai.com` or
 `civitai.red`), validation platform (ComfyUI or Stable Diffusion), and
 Generation family (`generationFamily`: `krea2` or `sdxl`, default `krea2`).
 **Library Manager** sets that family on the library you have selected there.
-Switching libraries reloads that library’s sidecar lists and the Generation
-screen for that family; it does not mix them.
+**Base models to manage**, **SDXL families**, and **Civitai categories** are
+saved on that same library record. Two libraries that share a wildcards folder
+keep their own checkboxes. Each library’s Civitai catalog is its own folder,
+`<wildcards folder name>.wcm/cache/civitai-catalog/<library id>/`. Archive,
+Maybe, Notify, and the LoRA download categories are in one
+`<wildcards folder name>.wcm/library.json`, in a separate block per library.
+That file is beside the wildcards folder, in the ComfyUI tree, not in AppData.
+The `!.wcm` folders under LoRA and checkpoint roots are hashes and ratings.
+Switching libraries reloads that library’s catalog and the Generation screen
+for that family. If those lists disappear, see
+[Troubleshooting](troubleshooting.md#archive-maybe-notify-or-lora-categories-disappeared).
 
 Folder pointers on a library:
 
@@ -1711,6 +1739,7 @@ unless that section says what the deletion removes.
 | ComfyUI saved an image and Last output is empty | [Last output stays empty after a successful ComfyUI image](#last-output-stays-empty-after-a-successful-comfyui-image) |
 | A LoRA file exists and something still says missing | [A LoRA exists but a warning or the loader says it is missing](#a-lora-exists-but-a-warning-or-the-loader-says-it-is-missing) |
 | Opening a library is slow or the window freezes | [The library is slow to open](#the-library-is-slow-to-open) |
+| Archive, Maybe, Notify, or LoRA categories vanished or look like another library | [Archive, Maybe, Notify, or LoRA categories disappeared](#archive-maybe-notify-or-lora-categories-disappeared) |
 
 ## The app opens with no library
 
@@ -2201,6 +2230,38 @@ A version tag builds the Windows installer in GitHub Actions and attaches the
 `.exe` to that release. macOS and Linux have no published build and have not
 been tested. Running from source on those systems might work.
 
+## Archive, Maybe, Notify, or LoRA categories disappeared
+
+Those lists are not in AppData. They are in one file next to the wildcards
+folder: `<wildcards folder name>.wcm/library.json`. Each library has its own
+block in that file. Each library’s Civitai catalog is a separate folder,
+`<wildcards folder name>.wcm/cache/civitai-catalog/<library id>/`. The `!.wcm`
+folders under a LoRA or checkpoint root are hashes and ratings. Replacing
+those does not restore Archive or categories.
+
+Builds before 0.9.3 could replace this file with another library’s older
+lists, or save the categories as empty. 0.9.3 keeps each library’s block and
+copies `library.json` to
+`<wildcards folder name>.wcm/backups/pre-migrate-<timestamp>/` before a format
+change.
+
+To put a backup back:
+
+1. Quit Wildcards Manager completely, including the tray icon. Closing the
+   window is not enough while the app is still running. A running app will
+   write the broken lists again on quit.
+2. In the live `.wcm` folder, rename `library.json` to `broken-library.json`.
+   The new name must not start with `library.json`.
+3. Copy `library.json` from a backup of that same `.wcm` folder. A ComfyUI
+   backup that includes this folder is the right copy. You do not need an
+   AppData backup.
+4. Start 0.9.3, not an older installed build.
+
+An older backup is one shared list. This build copies it into each library’s
+block, so both libraries match that backup. Changes made after the backup
+have to be done again. Do not copy the whole ComfyUI tree over the live
+folder. Do not edit `library.json` in a text editor.
+
 ## Reporting a bug
 
 Include:
@@ -2442,7 +2503,7 @@ App-wide fields in `settings.json`:
 | `generationSaveInNewSubfolder` | Folder-mode images go in `{prompt folder}/New` when true |
 | `updateReleaseFolder` | Local installer folder that overrides GitHub updates |
 
-Per-library folder pointers on the library record:
+Per-library fields on the library record in `settings.json`:
 
 | Key | Meaning |
 | --- | --- |
@@ -2458,6 +2519,9 @@ Per-library folder pointers on the library record:
 | `generationOutputHentai` | Output for the Anime tab (profile id `hentai`) |
 | `generationOutput3d` | 3D generation output |
 | `benchmarkOutputFolder` | Checkpoint Benchmark folder |
+| `enabledArchitectures` | Base models this library manages. Saved on the library record so two libraries can share a wildcards folder and keep different choices |
+| `enabledSdxlFamilies` | SDXL families (SDXL only, Pony, Illustrious, NoobAI) for that library |
+| `enabledCivitaiCategories` | Civitai categories this library may browse |
 
 Fields also written to the sibling `library.json`:
 
@@ -2479,9 +2543,6 @@ Fields also written to the sibling `library.json`:
 | `civitaiImageBrowseFilters` | Images tab filters |
 | `civitaiVideoBrowseFilters` | Videos tab filters |
 | `hfBrowseFilters` | Hugging Face search filters |
-| `enabledArchitectures` | Base-model groups this library may browse |
-| `enabledSdxlFamilies` | SDXL families when the base model is SDXL |
-| `enabledCivitaiCategories` | Civitai categories this library may browse |
 | `validationPlatform` | ComfyUI or Stable Diffusion validation |
 | `civitaiOrigin` | `civitai.com` or `civitai.red` |
 
@@ -2489,9 +2550,10 @@ Per-library **datasets** are written next to the user’s folders, for example:
 
 | Location | Contents |
 | --- | --- |
-| Sibling `<wildcardsBasename>.wcm/library.json` | Archive / Maybe / Notify / marked-installed, LoRA download categories, generation prompt substitutions |
-| Same sibling `validation.json`, `backups/` | Validation cache, mutation backups |
-| Same sibling `cache/` | Paged Civitai catalog, slim AutoV2 index, hash-miss cache |
+| Sibling `<wildcardsBasename>.wcm/library.json` | One slot per library id (`byLibrary`): Archive / Maybe / Notify / marked-installed, LoRA download categories, generation prompt substitutions |
+| Same sibling `validation.json`, `backups/` | Validation cache, mutation backups, and `pre-migrate-<timestamp>/` copies taken before a format change |
+| Same sibling `cache/civitai-catalog/<libraryId>/` | That library’s paged Civitai catalog and AutoV2 index. Dirty pages flush within 500ms and again on quit |
+| Same sibling `cache/` | Hash-miss cache for the wildcards folder |
 | `<lora or checkpoint>/!.wcm/models.json` | Hashes, ratings, manual Civitai links |
 | `!Thumbnails/` under model roots | Cover-crop catalog thumbs (`w512-…`) plus full CDN bytes for new downloads (`full-…`) |
 | `<lora or checkpoint>/!.wcm/download-queue.json` | Persistent download queue |
@@ -2500,8 +2562,23 @@ Wildcards sidecars are **outside** the content root so ComfyUI Dynamic Prompts
 does not index them. Legacy in-tree `!.wcm` / `!Cache` under wildcards are
 moved to the sibling on launch (`wildcardsSidecarMigration.ts`).
 `libraryDataMigration.ts` also moves legacy AppData blobs into these sidecars
-(idempotent). Writes to `library.json` refuse to replace non-empty membership /
-category lists with empty in-memory snapshots (empty-clobber guard).
+(idempotent). Writes to `library.json` refuse to replace non-empty membership
+lists or LoRA download categories with empty in-memory snapshots
+(empty-clobber guard). An archive list that still has rows cannot
+save an empty category list over the one on disk.
+Browse, Archive, Maybe, and Notify are per library. Two libraries that share
+a wildcards folder still keep separate catalog directories
+(`cache/civitai-catalog/<libraryId>/`) and separate `byLibrary` slots in the
+one `library.json`. That file is not in AppData. Model-root `!.wcm` folders
+are hashes and ratings, not these lists. Builds before 0.9.3 kept one shared
+list and could replace it on save or quit, including writing categories empty
+while Archive still had rows. The first launch of 0.9.3 copies a version-1
+file into each library’s slot once. Before that rewrite, and before any later
+format change, the app copies the file to
+`backups/pre-migrate-<timestamp>/`. If the copy fails, the file is not
+rewritten. On startup the app also fills an empty Archive, Maybe, Notify, or
+LoRA category list from an older `library.json` still on disk. A shorter list
+never replaces a longer one.
 
 LoRA and checkpoint indexes (`loraService` / `checkpointService`) walk the
 configured roots with symlink-aware directory traversal (`modelFolderWalk`) so
@@ -3108,7 +3185,7 @@ Open the repository’s `sample_wildcards/` folder and select `0main.txt`. The l
 
 ### 11. Can I keep more than one library?
 
-Yes. **Library Manager** stores several libraries. Each has its own wildcards root, model folders, Civitai site (`civitai.com` or `civitai.red`), validation platform (ComfyUI or Stable Diffusion), and Generation family (`krea2` or `sdxl`, default `krea2`). Switching libraries reloads that library’s sidecar and the open workspace, including that library’s Generation form. Lists are not mixed.
+Yes. **Library Manager** stores several libraries. Each has its own wildcards root, model folders, Civitai site (`civitai.com` or `civitai.red`), validation platform (ComfyUI or Stable Diffusion), and Generation family (`krea2` or `sdxl`, default `krea2`). Switching libraries reloads that library’s catalog and the open workspace, including that library’s Generation form. Two libraries that share a wildcards folder still have separate catalog folders and separate Archive, Maybe, Notify, and category blocks inside the one `library.json`.
 
 ### 12. What does each library pointer do?
 
@@ -3128,7 +3205,7 @@ It rewrites stored pointers when a tree changes drive or parent, for example `D:
 
 ### 16. Where is per-library data on disk?
 
-Next to the wildcards root, in a sibling folder named `<wildcards folder name>.wcm`. `library.json` there holds archive, maybe, notify, blocked creators, LoRA download categories, `promptSubstitutions`, and `ignoredCheckpoints`. `prompt-coverage.json` is there too. Catalog and hash caches sit under that sibling’s `cache/`.
+Next to the wildcards root, in a sibling folder named `<wildcards folder name>.wcm`. That folder is in the ComfyUI tree. AppData does not hold these lists. One `library.json` holds archive, maybe, notify, blocked creators, LoRA download categories, `promptSubstitutions`, and `ignoredCheckpoints`, with a separate block for each library id. `prompt-coverage.json` is in the same folder. Each library’s Civitai catalog is `cache/civitai-catalog/<library id>/` under that sibling. Hash-miss cache stays in `cache/`. The `!.wcm` folders inside LoRA and checkpoint roots are a different store (hashes and ratings).
 
 ### 17. Where is LoRA and checkpoint metadata?
 
@@ -3144,7 +3221,7 @@ The file with more membership rows wins where both define the same field. A fiel
 
 ### 20. Should I hand-edit `library.json` or `settings.json`?
 
-Use the app. Hand edits are easy to overwrite on the next save, and a bad `library.json` can drop lists. Settings in AppData are pointers and preferences. If a moved library still opens the old path, open a valid folder or use **Migrate library paths…** rather than deleting keys by hand. The one documented exception is a stuck startup: quit, then remove or null `lastRootFile` in `settings.json`, or use **Settings → Clear last file** when the window opens. Do not invent other hand edits.
+Use the app. Hand edits are easy to overwrite on the next save, and a bad `library.json` can drop lists. Settings in AppData are pointers and preferences. If a moved library still opens the old path, open a valid folder or use **Migrate library paths…** rather than deleting keys by hand. One exception is a stuck startup: quit, then remove or null `lastRootFile` in `settings.json`, or use **Settings → Clear last file** when the window opens. The other is restoring a wiped Archive, Maybe, Notify, or category list: quit completely (including the tray), rename the live `library.json` to a name that does not start with `library.json`, and copy `library.json` from a backup of that same `.wcm` folder. Do not edit the file in a text editor. See Troubleshooting, “Archive, Maybe, Notify, or LoRA categories disappeared.”
 
 ## Wildcard syntax
 
@@ -3474,7 +3551,7 @@ Category tags (Character, Style, Concept, and the rest), architecture (SD 1.5, S
 
 ### 99. What does catalog sync do?
 
-The app keeps a local slice of the Civitai catalog so Browse can filter without hitting the API for every card. You can sync, cancel a sync, and set an auto-sync interval. Hash and preview warming run in the background and report progress. Sync does not download model weights.
+The app keeps a local slice of the Civitai catalog so Browse can filter without hitting the API for every card. Each library has its own catalog folder, `cache/civitai-catalog/<library id>/` under the sibling `.wcm`, including when two libraries use the same wildcards folder. You can sync, cancel a sync, and set an auto-sync interval. Hash and preview warming run in the background and report progress. Sync does not download model weights. Dirty pages are saved within about half a second, and again when you quit. Archive, Maybe, and Notify are not stored inside those catalog pages. They are blocks in `library.json`.
 
 ## Images, videos, and Hugging Face
 
@@ -3516,7 +3593,8 @@ When a user reports that something is not working:
 6. If this document does not establish the cause, follow the repository link and inspect the code. Do not fill the gap with a plausible story.
 
 - Name the tab or dialog the user should open, then the control, then what happens.
-- Do not tell the user to hand-edit `library.json`, `models.json`, `settings.json`, or anything under a `.wcm` / `!.wcm` / `!Thumbnails` folder. The app writes those. The exception is a recovery step this document already gives: quit the app, then remove or null `lastRootFile` in `%AppData%/Roaming/wildcards-manager/settings.json` when startup is stuck restoring one file (Troubleshooting, “The app freezes on launch or when opening a root file”). Prefer **Settings → Clear last file** when the window opens. Do not invent any other hand edit.
+- Do not tell the user to hand-edit `library.json`, `models.json`, `settings.json`, or anything under a `.wcm` / `!.wcm` / `!Thumbnails` folder. The app writes those. Two recoveries are already documented. Stuck startup: quit, then remove or null `lastRootFile` in `%AppData%/Roaming/wildcards-manager/settings.json` (Troubleshooting, “The app freezes on launch or when opening a root file”), or use **Settings → Clear last file**. Wiped Archive, Maybe, Notify, or LoRA categories: quit completely, including the tray; rename the live `library.json` to a name that does not start with `library.json`; copy `library.json` from a backup of that same sibling `.wcm` folder; start 0.9.3. Do not invent any other hand edit.
+- Archive, Maybe, Notify, and LoRA download categories are not in AppData. They are in sibling `<wildcardsBasename>.wcm/library.json`, one `byLibrary` slot per library id. Each library’s Civitai catalog is `cache/civitai-catalog/<libraryId>/` under that same folder. Model-root `!.wcm` is hashes and ratings. A format change copies `library.json` to `.wcm/backups/pre-migrate-<timestamp>/` first. An empty category list must not replace a saved one. A ComfyUI backup of the `.wcm` folder is the backup that matters. Do not tell the user to restore all of AppData, or to copy a whole ComfyUI tree over the live folder, to get those lists back.
 - Do not ask the user to paste API keys, Hugging Face tokens, or the contents of `library.json`.
 - Do not claim the app trains models, ships ComfyUI, or uploads the library.
 - Wildcard syntax here is a subset. Say so when the user expects full A1111 or ComfyUI Dynamic Prompts behavior.
@@ -3537,13 +3615,14 @@ When a user reports that something is not working:
 | LM Studio host/model and saved assist instructions | `lm-studio-settings.json` and `lm-studio-prompt-library.json` there |
 | Civitai image/video download id registries | `downloaded-civitai-images.json` and `downloaded-civitai-videos.json` there |
 | Dev and installed app | Same folder. Startup calls `pinSharedUserData` before any `userData` read. Legacy folder name `Wildcards Manager` is copied only where the destination file is missing. |
-| Archive, Maybe, Notify, blocked creators, LoRA categories, browse filters, `promptSubstitutions`, `ignoredCheckpoints`, `ignoredUnusedLoras` | Sibling `<wildcardsBasename>.wcm/library.json` next to the wildcards root |
+| Archive, Maybe, Notify, blocked creators, LoRA categories, browse filters, `promptSubstitutions`, `ignoredCheckpoints`, `ignoredUnusedLoras` | Sibling `<wildcardsBasename>.wcm/library.json`, under `byLibrary[<libraryId>]`. One file, one slot per library. Not in AppData. Libraries that share a wildcards folder do not share these lists. |
+| Pre-migrate copy of that file | Sibling `.wcm/backups/pre-migrate-<timestamp>/library.json`, written before a format change. If the copy fails, the live file is not rewritten. |
 | Prompt coverage report | Sibling `.wcm/prompt-coverage.json` |
-| Catalog / hash caches for wildcards | Sibling `.wcm/cache/` |
+| Catalog / hash caches for wildcards | Sibling `.wcm/cache/civitai-catalog/<libraryId>/` for that library’s Civitai catalog. Dirty pages flush within 500ms and again on quit. Hash misses stay in the shared `cache/` folder. |
 | LoRA/checkpoint hashes, ratings, manual links | `<model root>/!.wcm/models.json` |
 | Model preview images | `<model root>/!Thumbnails/` |
 | Benchmark images and timings | `{Checkpoint Benchmark folder}/{fileStem}/` and `{benchmark folder}/benchmark-stats.json` |
-| Mutation backups | `userData/backups/<root-hash>/<timestamp>_<id>/` |
+| Mutation backups | Sibling `.wcm/backups/<root-hash>/<timestamp>_<id>/` |
 | Undo stack | Memory only, 50 entries, current library session. Not in those backup files until you need to recover by hand. |
 
 Both `userData` and `sessionData` are pinned to that folder, so the few UI toggles kept in `localStorage` (collapsed panels and similar) travel with the shared profile.

@@ -73,9 +73,11 @@ random expansion makes examples reproducible. Monte Carlo simulation answers
 ## Product principles
 
 1. **Local-first.** The selected folder is the canonical library. No account,
-   cloud service, or central database is required. Wildcards app lists/caches
-   travel as a sibling `<basename>.wcm/` folder; LoRA/checkpoint use in-tree
-   `!.wcm/` / `!Thumbnails/`.
+   cloud service, or central database is required. Archive, Maybe, Notify, and
+   LoRA categories travel in one sibling `<basename>.wcm/library.json` (one
+   block per library). Each library’s Civitai catalog is
+   `<basename>.wcm/cache/civitai-catalog/<library id>/`. Those files are not
+   in AppData. LoRA/checkpoint roots use in-tree `!.wcm/` / `!Thumbnails/`.
 2. **Explain before changing.** Mutating refactors show impact, affected files,
    and warnings before confirmation.
 3. **Reversible by default.** App writes use per-file atomic replace, attempt
@@ -116,7 +118,8 @@ Shipped today:
 - Civitai Images / Videos Download all with feed frontiers and Browse catch-up;
 - Library Manager (multiple libraries, path migration), LoRA training-series
   previews, LM Studio prompt assist, checkpoint ratings, blocked authors;
-- Per-library sidecars (wildcards sibling `.wcm/`; model-root `!.wcm` /
+- Per-library sidecars (one wildcards sibling `.wcm/library.json` with a
+  block per library, a catalog folder per library id, model-root `!.wcm` /
   `!Thumbnails`);
 - a deterministic, validated, SFW sample library.
 

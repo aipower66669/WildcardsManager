@@ -69,6 +69,7 @@ import {
   readLibraryLocalPayload,
 } from './libraryLocalState.js';
 import { invalidateCivitaiMediaKnown } from './civitaiMediaKnownCache.js';
+import { migratePerLibraryCatalogs } from './perLibraryCatalogMigration.js';
 
 export type WindowState = {
   x: number;
@@ -1019,6 +1020,22 @@ function resolveOptionalDir(raw: unknown): string | null {
   return path.resolve(raw.trim());
 }
 
+/**
+ * Library ids whose settings.json record already has base-model, SDXL-family,
+ * and category choices. Those must not be replaced by library.json: that file
+ * is one per wildcards folder, so two libraries sharing a folder would
+ * otherwise load whichever library saved last.
+ */
+const modelFiltersSavedOnPointer = new Set<string>();
+
+function pointerHasModelFilters(row: Record<string, unknown>): boolean {
+  return (
+    Array.isArray(row.enabledArchitectures) &&
+    Array.isArray(row.enabledSdxlFamilies) &&
+    Array.isArray(row.enabledCivitaiCategories)
+  );
+}
+
 function parseLibraryConfig(
   raw: unknown,
   fallbackPlatform: ValidationPlatform = 'comfyui',
@@ -1139,10 +1156,19 @@ function parseLibraries(
   fallbackOrigin: CivitaiOrigin = DEFAULT_CIVITAI_ORIGIN,
 ): LibraryConfig[] {
   if (!Array.isArray(raw)) return [];
+  modelFiltersSavedOnPointer.clear();
   const out: LibraryConfig[] = [];
   const seen = new Set<string>();
   for (const item of raw) {
     const lib = parseLibraryConfig(item, fallbackPlatform, fallbackOrigin);
+    if (
+      lib &&
+      item &&
+      typeof item === 'object' &&
+      pointerHasModelFilters(item as Record<string, unknown>)
+    ) {
+      modelFiltersSavedOnPointer.add(lib.id);
+    }
     if (!lib || seen.has(lib.id)) continue;
     seen.add(lib.id);
     out.push(lib);
@@ -1482,11 +1508,31 @@ function readSettingsFromDisk(): Settings {
 }
 
 function hydrateLibrariesFromLocal(settings: Settings): Settings {
+  const idsByRoot = new Map<string, { root: string; ids: string[] }>();
+  for (const lib of settings.libraries ?? []) {
+    if (!lib.wildcardsRoot?.trim()) continue;
+    const key = path.resolve(lib.wildcardsRoot).toLowerCase();
+    const group = idsByRoot.get(key) ?? { root: lib.wildcardsRoot, ids: [] };
+    group.ids.push(lib.id);
+    idsByRoot.set(key, group);
+  }
+  for (const group of idsByRoot.values()) {
+    migratePerLibraryCatalogs(group.root, group.ids);
+  }
+
   const libraries = (settings.libraries ?? []).map((lib) => {
     if (!lib.wildcardsRoot?.trim()) return lib;
-    const payload = readLibraryLocalPayload(lib.wildcardsRoot);
-    return applyPayloadToLibrary(lib, payload);
+    const payload = readLibraryLocalPayload(lib.wildcardsRoot, lib.id);
+    const merged = applyPayloadToLibrary(lib, payload);
+    if (!modelFiltersSavedOnPointer.has(lib.id)) return merged;
+    return {
+      ...merged,
+      enabledArchitectures: lib.enabledArchitectures,
+      enabledSdxlFamilies: lib.enabledSdxlFamilies,
+      enabledCivitaiCategories: lib.enabledCivitaiCategories,
+    };
   });
+  modelFiltersSavedOnPointer.clear();
   const active =
     libraries.find((lib) => lib.id === settings.activeLibraryId) ??
     libraries[0];
@@ -1548,6 +1594,9 @@ function settingsForDisk(
       civitaiOrigin: lib.civitaiOrigin,
       validationPlatform: lib.validationPlatform,
       generationFamily: lib.generationFamily === 'sdxl' ? 'sdxl' : 'krea2',
+      enabledArchitectures: lib.enabledArchitectures,
+      enabledSdxlFamilies: lib.enabledSdxlFamilies,
+      enabledCivitaiCategories: lib.enabledCivitaiCategories,
     } as LibraryConfig;
   });
 

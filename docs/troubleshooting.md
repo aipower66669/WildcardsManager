@@ -18,6 +18,7 @@ unless that section says what the deletion removes.
 | ComfyUI saved an image and Last output is empty | [Last output stays empty after a successful ComfyUI image](#last-output-stays-empty-after-a-successful-comfyui-image) |
 | A LoRA file exists and something still says missing | [A LoRA exists but a warning or the loader says it is missing](#a-lora-exists-but-a-warning-or-the-loader-says-it-is-missing) |
 | Opening a library is slow or the window freezes | [The library is slow to open](#the-library-is-slow-to-open) |
+| Archive, Maybe, Notify, or LoRA categories vanished or look like another library | [Archive, Maybe, Notify, or LoRA categories disappeared](#archive-maybe-notify-or-lora-categories-disappeared) |
 
 ## The app opens with no library
 
@@ -507,6 +508,38 @@ launches the installer already in that folder.
 A version tag builds the Windows installer in GitHub Actions and attaches the
 `.exe` to that release. macOS and Linux have no published build and have not
 been tested. Running from source on those systems might work.
+
+## Archive, Maybe, Notify, or LoRA categories disappeared
+
+Those lists are not in AppData. They are in one file next to the wildcards
+folder: `<wildcards folder name>.wcm/library.json`. Each library has its own
+block in that file. Each library’s Civitai catalog is a separate folder,
+`<wildcards folder name>.wcm/cache/civitai-catalog/<library id>/`. The `!.wcm`
+folders under a LoRA or checkpoint root are hashes and ratings. Replacing
+those does not restore Archive or categories.
+
+Builds before 0.9.3 could replace this file with another library’s older
+lists, or save the categories as empty. 0.9.3 keeps each library’s block and
+copies `library.json` to
+`<wildcards folder name>.wcm/backups/pre-migrate-<timestamp>/` before a format
+change.
+
+To put a backup back:
+
+1. Quit Wildcards Manager completely, including the tray icon. Closing the
+   window is not enough while the app is still running. A running app will
+   write the broken lists again on quit.
+2. In the live `.wcm` folder, rename `library.json` to `broken-library.json`.
+   The new name must not start with `library.json`.
+3. Copy `library.json` from a backup of that same `.wcm` folder. A ComfyUI
+   backup that includes this folder is the right copy. You do not need an
+   AppData backup.
+4. Start 0.9.3, not an older installed build.
+
+An older backup is one shared list. This build copies it into each library’s
+block, so both libraries match that backup. Changes made after the backup
+have to be done again. Do not copy the whole ComfyUI tree over the live
+folder. Do not edit `library.json` in a text editor.
 
 ## Reporting a bug
 

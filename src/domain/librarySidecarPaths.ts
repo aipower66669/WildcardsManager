@@ -128,8 +128,24 @@ export function wildcardsCacheDir(wildcardsRoot: string): string {
   return path.join(wildcardsSidecarRoot(wildcardsRoot), WILDCARDS_CACHE_SUBDIR);
 }
 
-export function civitaiCatalogDir(wildcardsRoot: string): string {
-  return path.join(wildcardsCacheDir(wildcardsRoot), 'civitai-catalog');
+/** Filesystem segment for a library id inside the catalog directory. */
+export function catalogLibrarySegment(libraryId: string): string {
+  const safe = libraryId.trim().replace(/[^a-zA-Z0-9._-]+/g, '_');
+  return safe.slice(0, 120) || 'library';
+}
+
+/**
+ * Paged Civitai catalog for one library.
+ * Without `libraryId`, this is the legacy shared directory
+ * (`cache/civitai-catalog`) that the per-library migration reads once.
+ */
+export function civitaiCatalogDir(
+  wildcardsRoot: string,
+  libraryId?: string | null,
+): string {
+  const base = path.join(wildcardsCacheDir(wildcardsRoot), 'civitai-catalog');
+  if (!libraryId?.trim()) return base;
+  return path.join(base, catalogLibrarySegment(libraryId));
 }
 
 export function hashMissesPath(wildcardsRoot: string): string {

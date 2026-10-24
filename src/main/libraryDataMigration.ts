@@ -208,7 +208,11 @@ function migrateModelsJson(lib: LibraryConfig): void {
 
 function migrateLibraryPayload(lib: LibraryConfig): void {
   if (!lib.wildcardsRoot?.trim()) return;
-  writeLibraryLocalPayload(lib.wildcardsRoot, libraryConfigToPayload(lib));
+  writeLibraryLocalPayload(
+    lib.wildcardsRoot,
+    libraryConfigToPayload(lib),
+    lib.id,
+  );
 }
 
 function migrateValidation(lib: LibraryConfig): void {
@@ -333,7 +337,7 @@ export function bindActiveLibraryDataRoots(): void {
   // Catalog + hash-miss use getActiveLibrary() at read time; force catalog
   // remount when wildcards root changes.
   if (lib?.wildcardsRoot?.trim()) {
-    configureCatalogCacheRoot(civitaiCatalogDir(lib.wildcardsRoot));
+    configureCatalogCacheRoot(civitaiCatalogDir(lib.wildcardsRoot, lib.id));
     configureModelHashMissCacheRoot(path.dirname(hashMissesPath(lib.wildcardsRoot)));
   } else {
     configureCatalogCacheRoot(null);
@@ -362,6 +366,9 @@ export function runLibraryDataMigration(): {
   runWildcardsSiblingSidecarMigration();
 
   if (isLibraryDataMigrationDone()) {
+    // Hydrate splits a shared catalog into one directory and one library.json
+    // slot per library before the cache root is bound.
+    loadSettings();
     bindActiveLibraryDataRoots();
     return { migrated: false, skipped: true };
   }

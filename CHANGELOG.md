@@ -7,6 +7,23 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-10-24
+
+### Fixed
+
+- Archive, Maybe, Notify, and LoRA download categories are no longer wiped
+  when two libraries share a wildcards folder. Each library has its own
+  Civitai catalog directory. Those lists stay in one `library.json`, in a
+  separate block per library. They are not stored in AppData. Quit writes
+  that library’s catalog pages and its own lists. An empty category list
+  cannot replace categories already saved.
+- A format change copies `library.json` (and any catalog files it is about
+  to rewrite) into `<wildcardsBasename>.wcm/backups/pre-migrate-<timestamp>/`
+  before the rewrite. If that copy fails, the file is left as it is.
+- Library Manager base models, SDXL families, and Civitai categories are saved
+  on each library. A Krea 2 library no longer reloads the SDXL library’s
+  checkboxes when they share a wildcards folder.
+
 ### Changed
 
 - A version tag runs tests on Windows and Ubuntu, then builds the Windows
@@ -522,7 +539,8 @@ First public release.
 - Mutations validate supported extensions and use atomic replacement.
 - Ambiguous glob references are reported rather than silently rewritten.
 
-[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/aipower66669/WildcardsManager/compare/v0.9.0...v0.9.3
 [0.9.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/aipower66669/WildcardsManager/releases/tag/v0.7.0

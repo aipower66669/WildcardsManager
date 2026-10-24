@@ -12,7 +12,10 @@ import {
   modelPageIndex,
   prependIdsIntoChunks,
 } from '../domain/civitaiCatalogLayout.js';
-import { civitaiCatalogDir } from '../domain/librarySidecarPaths.js';
+import {
+  catalogLibrarySegment,
+  civitaiCatalogDir,
+} from '../domain/librarySidecarPaths.js';
 import {
   appendCatalogSearchHays,
   appendCatalogSearchMem,
@@ -176,10 +179,16 @@ export function configureCatalogCacheRoot(dir: string | null): void {
 
 function catalogRoot(): string {
   if (rootOverride) return rootOverride;
-  const wildcards = getActiveLibrary().wildcardsRoot;
-  if (wildcards?.trim()) return civitaiCatalogDir(wildcards);
-  // No library wildcards root yet — avoid writing into a shared AppData catalog.
-  return path.join(app.getPath('userData'), 'civitai-catalog-unbound');
+  const lib = getActiveLibrary();
+  if (lib.wildcardsRoot?.trim()) {
+    return civitaiCatalogDir(lib.wildcardsRoot, lib.id);
+  }
+  // No wildcards root yet — still one catalog per library, not one shared pile.
+  return path.join(
+    app.getPath('userData'),
+    'civitai-catalog-unbound',
+    catalogLibrarySegment(lib.id),
+  );
 }
 
 /** Catalog sidecar root (paged models, AutoV2 index, shelf summaries). */

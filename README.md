@@ -66,7 +66,7 @@ turning into a ComfyUI or A1111 plugin.
 | **Manage LoRA / checkpoint folders** | List installed models (follows folder symlinks/junctions); filters (used/unused, sidecars, Civitai match, missing hash); identity panel with AutoV2, size, folder preview, and Civitai cover; embedded Civitai model page; LoRA reverse-refs into wildcards plus in-panel editing; **training-step series** (`Name_000250` …) for unused ignore and compact pick snippets; **LoRA download category manager** (folder + wildcard + weights) from LoRA or Wildcard tabs, including **Set/Edit as Category** on a selected wildcard |
 | **Browse Civitai** | In-app browser for LoRAs, checkpoints, and **community Images and Videos**. **`civitai.com` = SFW catalog**; **`civitai.red` = NSFW catalog** (choose the site in Settings). Browse/search works without an API key; **many model downloads need an API key**. Detachable window; category/architecture/SDXL-family filters; **windowed catalog** with local search; Archive / Maybe / Notify; Installed via **AutoV2**; **persistent download queue** with Queued tab, pause/resume, **download console**; **LoRA download categories**; optional extra comment/prompt; **Shift+click Download**; Images: sort feeds, SFW/NSFW modes, tool filter, Download all (background + sort cycling), upload-time file dates |
 | **Browse Hugging Face** | In-app Hub search with persisted filters and a download queue |
-| **Keep library data with the library** | Per-library lists (Archive / Maybe / Notify / categories) and wildcards caches live in a sibling `<wildcardsBasename>.wcm/` folder (outside the ComfyUI-scanned tree); LoRA / checkpoint use `!.wcm/` and `!Thumbnails/` next to those roots; AppData stores path pointers and UI prefs only |
+| **Keep library data with the library** | Archive, Maybe, Notify, and LoRA categories live in one sibling `<wildcardsBasename>.wcm/library.json`, one block per library. Each library’s Civitai catalog is `<wildcardsBasename>.wcm/cache/civitai-catalog/<library id>/`. LoRA / checkpoint roots use their own `!.wcm/` and `!Thumbnails/`. AppData stores path pointers and UI prefs only |
 | **Update from inside the app** | Settings → App updates checks GitHub Releases when the folder is empty. Check for update only reports a newer installer. What's new and Install are separate buttons. A local `release/` folder overrides GitHub |
 | **Repair diagnostics** | Create missing targets, remove broken references, use `# NO VALIDATION` for intentional exceptions, and resolve SCC cycle groups with ranked fixes, impact estimates, reachability warnings, and before/after previews |
 | **Edit safely** | Always-on CodeMirror editor with autosave, live revalidation, highlighting/search for text/YAML/JSON, LoRA tag coloring, wildcard-key completion after `__`, context actions (open in graph / create / copy reference), or OS-default external editor; root-constrained atomic writes |
@@ -201,7 +201,7 @@ dumps (real LoRA trees, prompt folders, or model catalogs).
 
 ## Releases
 
-See the [release notes](RELEASE_NOTES.md) for **v0.9** and the
+See the [release notes](RELEASE_NOTES.md) for **v0.9.3** (Archive, Maybe, Notify, and LoRA categories stay with the library, not in AppData) and the
 [changelog](CHANGELOG.md) for the complete version history.
 
 ## License

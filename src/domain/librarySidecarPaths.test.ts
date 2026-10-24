@@ -2,6 +2,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   CACHE_DIR,
+  catalogLibrarySegment,
   THUMBNAILS_DIR,
   WCM_DIR,
   WILDCARDS_CACHE_SUBDIR,
@@ -70,6 +71,15 @@ describe('librarySidecarPaths', () => {
     expect(civitaiCatalogDir(root)).toBe(
       path.join(sidecar, WILDCARDS_CACHE_SUBDIR, 'civitai-catalog'),
     );
+    expect(civitaiCatalogDir(root, '11111111-2222-4333-8444-555555555555')).toBe(
+      path.join(
+        sidecar,
+        WILDCARDS_CACHE_SUBDIR,
+        'civitai-catalog',
+        '11111111-2222-4333-8444-555555555555',
+      ),
+    );
+    expect(catalogLibrarySegment('a/b')).toBe('a_b');
     expect(hashMissesPath(root)).toBe(
       path.join(sidecar, WILDCARDS_CACHE_SUBDIR, 'model-hash-misses.json'),
     );

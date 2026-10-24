@@ -9,6 +9,8 @@ import {
   readLibraryLocalPayload,
   type LibraryLocalPayload,
 } from './libraryLocalState.js';
+import { writeLibrarySlot } from './libraryLocalFile.js';
+import { migratePerLibraryCatalogs } from './perLibraryCatalogMigration.js';
 
 function basePayload(
   patch: Partial<LibraryLocalPayload> = {},
@@ -185,9 +187,122 @@ describe('readLibraryLocalPayload', () => {
       })}\n`,
     );
 
-    const payload = readLibraryLocalPayload(root);
+    const payload = readLibraryLocalPayload(root, 'lib-a');
     expect(payload?.promptSubstitutions).toEqual(rules);
     expect(payload?.archivedCivitaiModels).toHaveLength(2);
     expect(payload?.ignoredCheckpoints).toEqual(['old.safetensors']);
+  });
+
+  it('keeps a separate archive list and catalog for each library', () => {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'wcm-lib-'));
+    temps.push(parent);
+    const root = path.join(parent, 'wildcards');
+    fs.mkdirSync(root, { recursive: true });
+    const sharedCatalog = path.join(parent, 'wildcards.wcm', 'cache', 'civitai-catalog');
+    fs.mkdirSync(path.join(sharedCatalog, 'models'), { recursive: true });
+    fs.writeFileSync(path.join(sharedCatalog, 'meta.json'), '{"shared":true}\n');
+    fs.writeFileSync(
+      path.join(parent, 'wildcards.wcm', 'library.json'),
+      `${JSON.stringify({
+        version: 1,
+        archivedCivitaiModels: [{ origin: 'https://civitai.com', modelId: 7 }],
+        validationPlatform: 'comfyui',
+        civitaiOrigin: 'https://civitai.com',
+        enabledArchitectures: [],
+        enabledSdxlFamilies: [],
+        enabledCivitaiCategories: [],
+      })}\n`,
+    );
+
+    migratePerLibraryCatalogs(root, ['lib-a', 'lib-b']);
+
+    const backupRoot = path.join(parent, 'wildcards.wcm', 'backups');
+    const stamps = fs.readdirSync(backupRoot).filter((name) =>
+      name.startsWith('pre-migrate-'),
+    );
+    const libraryBackup = stamps
+      .map((name) => path.join(backupRoot, name, 'library.json'))
+      .find((file) => fs.existsSync(file));
+    expect(libraryBackup).toBeTruthy();
+    expect(fs.readFileSync(libraryBackup!, 'utf8')).toContain('"version":1');
+
+    expect(readLibraryLocalPayload(root, 'lib-a')?.archivedCivitaiModels).toEqual([
+      { origin: 'https://civitai.com', modelId: 7 },
+    ]);
+    expect(readLibraryLocalPayload(root, 'lib-b')?.archivedCivitaiModels).toEqual([
+      { origin: 'https://civitai.com', modelId: 7 },
+    ]);
+    expect(fs.existsSync(path.join(sharedCatalog, 'meta.json'))).toBe(false);
+    expect(
+      fs.readFileSync(
+        path.join(sharedCatalog, 'lib-a', 'meta.json'),
+        'utf8',
+      ),
+    ).toContain('shared');
+    expect(fs.existsSync(path.join(sharedCatalog, 'lib-b', 'models'))).toBe(true);
+
+    writeLibrarySlot(root, 'lib-a', {
+      ...basePayload(),
+      archivedCivitaiModels: [
+        { origin: 'https://civitai.com', modelId: 7 },
+        { origin: 'https://civitai.com', modelId: 8 },
+      ],
+    });
+
+    expect(readLibraryLocalPayload(root, 'lib-a')?.archivedCivitaiModels).toHaveLength(2);
+    expect(readLibraryLocalPayload(root, 'lib-b')?.archivedCivitaiModels).toHaveLength(1);
+    migratePerLibraryCatalogs(root, ['lib-a', 'lib-b']);
+    expect(readLibraryLocalPayload(root, 'lib-b')?.archivedCivitaiModels).toHaveLength(1);
+  });
+
+  it('restores model shelves from an older library.json when the current lists are empty', () => {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'wcm-lib-'));
+    temps.push(parent);
+    const root = path.join(parent, 'wildcards');
+    fs.mkdirSync(path.join(root, '!.wcm'), { recursive: true });
+    fs.mkdirSync(path.join(parent, 'wildcards.wcm'), { recursive: true });
+    fs.writeFileSync(
+      path.join(parent, 'wildcards.wcm', 'library.json'),
+      `${JSON.stringify({
+        version: 2,
+        byLibrary: {
+          'lib-a': {
+            version: 1,
+            archivedCivitaiModels: [],
+            maybeCivitaiModels: [],
+            civitaiWatchlist: [],
+            ignoredUnusedLoras: ['keep-me.safetensors'],
+          },
+        },
+      })}\n`,
+    );
+    fs.writeFileSync(
+      path.join(root, '!.wcm', 'library.json'),
+      `${JSON.stringify({
+        version: 1,
+        archivedCivitaiModels: [
+          { origin: 'https://civitai.com', modelId: 4 },
+          { origin: 'https://civitai.com', modelId: 5 },
+        ],
+        maybeCivitaiModels: [{ origin: 'https://civitai.com', modelId: 6 }],
+        civitaiWatchlist: [
+          {
+            origin: 'https://civitai.com',
+            modelId: 9,
+            modelName: 'notify',
+            type: 'LORA',
+            available: false,
+            addedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      })}\n`,
+    );
+
+    migratePerLibraryCatalogs(root, ['lib-a']);
+    const slot = readLibraryLocalPayload(root, 'lib-a');
+    expect(slot?.archivedCivitaiModels).toHaveLength(2);
+    expect(slot?.maybeCivitaiModels).toHaveLength(1);
+    expect(slot?.civitaiWatchlist).toHaveLength(1);
+    expect(slot?.ignoredUnusedLoras).toEqual(['keep-me.safetensors']);
   });
 });

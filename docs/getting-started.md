@@ -71,11 +71,14 @@ em dash: `Library name — Prompts Library`, `Library name — Image Generation`
 `Library name — Checkpoints file manager`, or `Library name — Advanced Search`.
 
 The toolbar **Search** (magnifying glass) opens a quick launcher into the same
-search. Wildcards lists (Archive, Maybe, Notify, LoRA download categories) and
-caches live in a sibling `<wildcardsBasename>.wcm/` folder beside your wildcards
-root (not inside it). LoRA / checkpoint apps data use `!.wcm/` and
-`!Thumbnails/` next to those folders. Civitai community image downloads use a
-configured **images folder** (Settings) and an AppData download registry.
+search. Archive, Maybe, Notify, and LoRA download categories live in one
+sibling `<wildcardsBasename>.wcm/library.json` beside the wildcards root (not
+inside it, and not in AppData), with a separate block per library. Each
+library’s Civitai catalog is
+`<wildcardsBasename>.wcm/cache/civitai-catalog/<library id>/`. LoRA and
+checkpoint metadata use `!.wcm/` and `!Thumbnails/` next to those model
+folders. Civitai community image downloads use a configured **images folder**
+(Settings) and an AppData download registry.
 
 ### Civitai / updates extras
 
