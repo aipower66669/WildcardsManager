@@ -12,7 +12,8 @@ import {
 } from './civitaiCatalogCache.js';
 import {
   collectInstalledModelIdsFromHashes,
-  mergePersistedInstalledIds,
+  keepLongerRows,
+  mergeDownloadedIds,
 } from '../domain/civitaiInstalledFromHashes.js';
 import type { CivitaiShelfSummariesDto, CivitaiShelfSummaryDto } from '../shared/contracts.js';
 import { getConfiguredCheckpointIndex } from './checkpointService.js';
@@ -55,9 +56,9 @@ function readStore(origin: string): DiskStore {
     if (raw?.version !== STORE_VERSION || !Array.isArray(raw.downloaded)) {
       return emptyStore(origin);
     }
-    if (raw.origin && raw.origin !== origin) {
-      return emptyStore(origin);
-    }
+    // A different origin string is not a reason to throw the rows away.
+    // The next save stamps the current origin. Discarding them here made
+    // Downloaded drop from the real count to 0 on the next shelf read.
     return {
       version: STORE_VERSION,
       origin,
@@ -131,7 +132,16 @@ function summariesForIds(
       continue;
     }
     const prior = persistById.get(id);
-    if (prior) out.push(prior);
+    // Keep the id even when this library's catalog page is not on disk yet.
+    // Dropping it made Archive, Maybe, and Downloaded show 0 while Browse
+    // re-downloaded an empty catalog.
+    out.push(
+      prior ?? {
+        id,
+        type: 'LORA',
+        tags: [],
+      },
+    );
   }
   return out;
 }
@@ -226,7 +236,7 @@ export function rememberDownloadedSummaries(
     if (!next || getCivitaiOrigin() !== origin) return;
     const store = readStore(origin);
     store.origin = origin;
-    store.downloaded = next;
+    store.downloaded = keepLongerRows(store.downloaded, next);
     writeStore(store);
   });
 }
@@ -255,7 +265,7 @@ export function listCivitaiShelfSummaries(): CivitaiShelfSummariesDto {
   const maybe = summariesForIds(origin, maybeIds, maybePersist);
 
   const live = collectLiveInstalledIds();
-  const downloadedIds = mergePersistedInstalledIds(
+  const downloadedIds = mergeDownloadedIds(
     store.downloaded.map((row) => row.id),
     live.ids,
     live.canShrink,
@@ -265,7 +275,7 @@ export function listCivitaiShelfSummaries(): CivitaiShelfSummariesDto {
   writeStore({
     version: STORE_VERSION,
     origin,
-    downloaded,
+    downloaded: keepLongerRows(store.downloaded, downloaded),
     archived,
     maybe,
   });

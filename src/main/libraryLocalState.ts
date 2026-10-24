@@ -24,6 +24,7 @@ export const LIBRARY_LOCAL_VERSION = 1 as const;
 type ArchivedCivitaiModel = {
   origin: CivitaiOrigin;
   modelId: number;
+  modelType?: 'LORA' | 'Checkpoint';
 };
 
 type ArchivedHfModel = {
@@ -41,6 +42,7 @@ type MarkedInstalledCivitaiVersion = {
 type MaybeCivitaiModel = {
   origin: CivitaiOrigin;
   modelId: number;
+  modelType?: 'LORA' | 'Checkpoint';
 };
 
 type WatchedCivitaiModel = {

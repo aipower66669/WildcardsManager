@@ -26,6 +26,15 @@ Before a format change, the app copies `library.json` to
 fails, it does not rewrite the file. An empty category list cannot replace a
 saved one.
 
+An empty catalog folder is not treated as the real catalog, and the shared
+catalog is not deleted until the library folder has the files. On launch,
+empty Archive and Maybe lists are filled from the longest copy in that
+pre-migrate backup or in a catalog `shelf-summaries.json`. Downloaded is not
+cut down just because a rebuilt catalog matches fewer on-disk hashes. A
+catalog index that lost its slice map is reattached to the slice folders
+still on disk. Quit completely, including the tray, and start this build so
+that repair can run. The window that is already open does not have it.
+
 ## If those lists were wiped
 
 Quit Wildcards Manager completely, including the tray icon. Closing the window

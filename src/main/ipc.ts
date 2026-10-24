@@ -154,6 +154,7 @@ import {
   listCivitaiShelfSummaries,
   markCivitaiModelInstalled,
   markCivitaiVersionInstalled,
+  markCivitaiVersionsInstalled,
   refreshCivitaiWatchlist,
   searchCivitaiModelCards,
   syncCatalogSlice,
@@ -2966,6 +2967,46 @@ export function registerIpc(): void {
         fileId: p.fileId,
         fileName: typeof p.fileName === 'string' ? p.fileName : undefined,
       });
+    },
+  );
+
+  ipcMain.handle(
+    IPC.civitaiMarkVersionsInstalled,
+    async (_e, params: unknown) => {
+      if (!params || typeof params !== 'object') {
+        throw new Error('Invalid mark-versions params');
+      }
+      const p = params as Record<string, unknown>;
+      if (typeof p.modelId !== 'number' || !Number.isFinite(p.modelId)) {
+        throw new Error('Invalid model id');
+      }
+      if (!Array.isArray(p.versions)) {
+        throw new Error('Invalid version list');
+      }
+      const versions: Array<{
+        versionId: number;
+        fileId: number;
+        fileName?: string;
+      }> = [];
+      for (const row of p.versions) {
+        if (!row || typeof row !== 'object') continue;
+        const item = row as Record<string, unknown>;
+        if (typeof item.versionId !== 'number' || !Number.isFinite(item.versionId)) {
+          continue;
+        }
+        if (typeof item.fileId !== 'number' || !Number.isFinite(item.fileId)) {
+          continue;
+        }
+        versions.push({
+          versionId: item.versionId,
+          fileId: item.fileId,
+          fileName: typeof item.fileName === 'string' ? item.fileName : undefined,
+        });
+      }
+      if (versions.length === 0) {
+        throw new Error('No versions to mark');
+      }
+      markCivitaiVersionsInstalled(p.modelId, versions);
     },
   );
 

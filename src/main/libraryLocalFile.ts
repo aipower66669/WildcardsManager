@@ -1,12 +1,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  catalogLibrarySegment,
+  civitaiCatalogDir,
   legacyWildcardsWcmDir,
   libraryJsonPath,
+  libraryShelfFile,
   wildcardsBackupsDir,
 } from '../domain/librarySidecarPaths.js';
+import { parseLoraDownloadCategories } from '../domain/loraDownloadCategory.js';
 import type { LibraryLocalPayload } from './libraryLocalState.js';
 import { atomicWriteFile, copyDirRecursive, readJsonFile } from './librarySidecarIo.js';
+import {
+  isLibrarySplitPointer,
+  libraryShelvesExist,
+  modelKindsInCatalog,
+  readLibraryShelfSlot,
+  readLoraCategoryFile,
+  writeLibraryShelfSlot,
+  writeLoraCategoryFile,
+  LIBRARY_SPLIT_VERSION,
+} from './libraryShelfFiles.js';
 
 const SLOT_VERSION = 1;
 
@@ -79,32 +93,141 @@ function mergeByLongerList(
   return next;
 }
 
-function payloadsInRaw(raw: unknown): LibraryLocalPayload[] {
-  if (isV2(raw)) return Object.values(raw.byLibrary).filter(isSlot);
-  if (isSlot(raw)) return [raw];
-  return [];
+type PayloadBuckets = {
+  shared: LibraryLocalPayload[];
+  scoped: Map<string, LibraryLocalPayload[]>;
+};
+
+function emptyBuckets(): PayloadBuckets {
+  return { shared: [], scoped: new Map() };
 }
 
-function extraLibraryJsonCopies(wildcardsRoot: string): LibraryLocalPayload[] {
+function addBucketPayload(
+  buckets: PayloadBuckets,
+  libraryId: string | null,
+  payload: LibraryLocalPayload,
+): void {
+  const id = libraryId?.trim() ?? '';
+  if (!id) {
+    buckets.shared.push(payload);
+    return;
+  }
+  const list = buckets.scoped.get(id) ?? [];
+  list.push(payload);
+  buckets.scoped.set(id, list);
+}
+
+/** A version-2 file stays with its library id. A version-1 file is shared. */
+function absorbLibraryRaw(buckets: PayloadBuckets, raw: unknown): void {
+  if (isV2(raw)) {
+    for (const [id, slot] of Object.entries(raw.byLibrary)) {
+      const payload = isSlot(slot) ? slot : payloadFromUnknown(slot);
+      if (payload) addBucketPayload(buckets, id, payload);
+    }
+    return;
+  }
+  if (isSlot(raw)) addBucketPayload(buckets, null, raw);
+}
+
+function shelfSummaryFiles(
+  wildcardsRoot: string,
+  libraryIds: readonly string[],
+): Array<{ libraryId: string | null; file: string }> {
+  const files: Array<{ libraryId: string | null; file: string }> = [
+    {
+      libraryId: null,
+      file: path.join(civitaiCatalogDir(wildcardsRoot), 'shelf-summaries.json'),
+    },
+  ];
+  for (const id of libraryIds) {
+    files.push({
+      libraryId: id,
+      file: path.join(civitaiCatalogDir(wildcardsRoot, id), 'shelf-summaries.json'),
+    });
+  }
+  return files;
+}
+
+/**
+ * Archive / Maybe rows cached for the tab badges. The membership lists in
+ * library.json are the source of truth; this is only a fallback when those
+ * lists were saved empty and a shelf file still has the ids.
+ */
+function shelfSummaryPayloads(
+  wildcardsRoot: string,
+  libraryIds: readonly string[],
+  buckets: PayloadBuckets,
+): void {
+  for (const source of shelfSummaryFiles(wildcardsRoot, libraryIds)) {
+    const file = source.file;
+    const raw = readJsonFile<{
+      origin?: string;
+      archived?: Array<{ id?: number }>;
+      maybe?: Array<{ id?: number }>;
+    }>(file);
+    if (!raw) continue;
+    const origin =
+      typeof raw.origin === 'string' && raw.origin.trim()
+        ? raw.origin.trim()
+        : 'https://civitai.com';
+    const entries = (rows: Array<{ id?: number }> | undefined) =>
+      (rows ?? [])
+        .map((row) => row?.id)
+        .filter((id): id is number => typeof id === 'number' && id > 0)
+        .map((modelId) => ({ origin, modelId }));
+    const archived = entries(raw.archived);
+    const maybe = entries(raw.maybe);
+    if (archived.length === 0 && maybe.length === 0) continue;
+    addBucketPayload(buckets, source.libraryId, {
+      version: SLOT_VERSION,
+      archivedCivitaiModels: archived,
+      maybeCivitaiModels: maybe,
+    } as LibraryLocalPayload);
+  }
+}
+
+/** Marks you set by hand. A short scrap must not block the real list. */
+const MANUAL_SHELF_KEYS = [
+  'archivedCivitaiModels',
+  'archivedCivitaiImages',
+  'archivedCivitaiVideos',
+  'maybeCivitaiModels',
+  'civitaiWatchlist',
+] as const satisfies ReadonlyArray<keyof LibraryLocalPayload>;
+
+/**
+ * 79 left in a shelf file is not a decision to un-archive thousands of cards.
+ * Replace only when the backup is several times longer.
+ */
+function shouldRestoreManualShelf(currentLen: number, bestLen: number): boolean {
+  if (bestLen <= currentLen) return false;
+  if (currentLen === 0) return true;
+  return bestLen >= currentLen * 5 && bestLen - currentLen >= 200;
+}
+
+function absorbLooseSidecars(buckets: PayloadBuckets, wildcardsRoot: string): void {
   const dir = path.dirname(libraryJsonPath(wildcardsRoot));
   let names: string[] = [];
   try {
     names = fs.readdirSync(dir);
   } catch {
-    return [];
+    return;
   }
-  const found: LibraryLocalPayload[] = [];
   for (const name of names) {
-    if (name === 'library.json') continue;
-    if (!name.startsWith('library.json')) continue;
-    const raw = readJsonFile<unknown>(path.join(dir, name));
-    found.push(...payloadsInRaw(raw));
+    const copy = name !== 'library.json' && name.startsWith('library.json');
+    const other =
+      name.endsWith('.json') &&
+      name !== 'library.json' &&
+      name !== 'validation.json' &&
+      name !== 'prompt-coverage.json';
+    if (!copy && !other) continue;
+    absorbLibraryRaw(buckets, readJsonFile<unknown>(path.join(dir, name)));
   }
-  return found;
 }
 
 function readEnvelope(wildcardsRoot: string): Envelope {
   const siblingRaw = readJsonFile<unknown>(libraryJsonPath(wildcardsRoot));
+  if (isLibrarySplitPointer(siblingRaw)) return { kind: 'empty' };
   if (isV2(siblingRaw)) {
     const byLibrary: Record<string, LibraryLocalPayload> = {};
     for (const [id, slot] of Object.entries(siblingRaw.byLibrary)) {
@@ -171,9 +294,12 @@ export function readLibrarySlot(
   libraryId?: string | null,
 ): LibraryLocalPayload | null {
   if (!wildcardsRoot?.trim()) return null;
+  const id = libraryId?.trim();
+  if (id && libraryShelvesExist(wildcardsRoot, id)) {
+    return readLibraryShelfSlot(wildcardsRoot, id);
+  }
   const env = readEnvelope(wildcardsRoot);
   if (env.kind === 'v2') {
-    const id = libraryId?.trim();
     if (!id) return null;
     return env.byLibrary[id] ?? null;
   }
@@ -186,22 +312,44 @@ export function writeLibrarySlot(
   wildcardsRoot: string,
   libraryId: string,
   payload: LibraryLocalPayload,
+  opts?: { replaceManualShelves?: boolean },
 ): void {
   const id = libraryId.trim();
   if (!wildcardsRoot.trim() || !id) return;
   const env = readEnvelope(wildcardsRoot);
-  const byLibrary = env.kind === 'v2' ? { ...env.byLibrary } : {};
-  const current = byLibrary[id];
+  const fromEnvelope =
+    env.kind === 'v2' ? env.byLibrary[id] : env.kind === 'v1' ? env.payload : null;
+  const existing = libraryShelvesExist(wildcardsRoot, id)
+    ? readLibraryShelfSlot(wildcardsRoot, id)
+    : fromEnvelope;
   const next: LibraryLocalPayload = { ...payload, version: SLOT_VERSION };
-  if (
-    current &&
-    listLen(next.loraDownloadCategories) === 0 &&
-    listLen(current.loraDownloadCategories) > 0
-  ) {
-    next.loraDownloadCategories = current.loraDownloadCategories;
+  if (existing) {
+    if (
+      listLen(next.loraDownloadCategories) === 0 &&
+      listLen(existing.loraDownloadCategories) > 0
+    ) {
+      next.loraDownloadCategories = existing.loraDownloadCategories;
+      if (!next.lastLoraDownloadCategoryId?.trim()) {
+        next.lastLoraDownloadCategoryId = existing.lastLoraDownloadCategoryId;
+      }
+    }
+    if (!opts?.replaceManualShelves) {
+      for (const key of MANUAL_SHELF_KEYS) {
+        if (shouldRestoreManualShelf(listLen(next[key]), listLen(existing[key]))) {
+          (next as Record<string, unknown>)[key] = existing[key];
+        }
+      }
+    }
   }
-  byLibrary[id] = next;
-  writeEnvelope(wildcardsRoot, byLibrary);
+  const prefsFile = libraryShelfFile(wildcardsRoot, id, 'library.json');
+  if (prefsEmbedCategories(prefsFile)) {
+    backupBeforeRewrite(
+      wildcardsRoot,
+      prefsFile,
+      path.join('libraries', catalogLibrarySegment(id), 'library.json'),
+    );
+  }
+  writeLibraryShelfSlot(wildcardsRoot, id, next);
 }
 
 /**
@@ -228,9 +376,9 @@ export function migrateLibraryFileToPerLibrary(
 }
 
 /**
- * Put back any longer Archive / Maybe / Notify list still sitting in an older
- * library.json (the previous file, a leftover temp write, or the legacy
- * in-tree file). Never replaces a longer list with a shorter one.
+ * Put back a longer Archive / Maybe / Notify list still in the live sidecar
+ * or the legacy in-tree file. Copies under `backups/` are not read.
+ * Never replaces a longer list with a shorter one.
  * The app runs this. Callers do not print the lists.
  */
 export function recoverLongerLibraryShelves(
@@ -241,29 +389,41 @@ export function recoverLongerLibraryShelves(
   const ids = [...new Set(libraryIds.map((id) => id.trim()).filter(Boolean))];
   if (ids.length === 0) return false;
   const env = readEnvelope(wildcardsRoot);
-  const candidates: LibraryLocalPayload[] = [
-    ...extraLibraryJsonCopies(wildcardsRoot),
-  ];
-  if (env.kind === 'v2') candidates.push(...Object.values(env.byLibrary));
-  if (env.kind === 'v1') candidates.push(env.payload);
-  const legacyRaw = readJsonFile<unknown>(
-    path.join(legacyWildcardsWcmDir(wildcardsRoot), 'library.json'),
+  const buckets = emptyBuckets();
+  absorbLooseSidecars(buckets, wildcardsRoot);
+  if (env.kind === 'v2') absorbLibraryRaw(buckets, { version: 2, byLibrary: env.byLibrary });
+  if (env.kind === 'v1') addBucketPayload(buckets, null, env.payload);
+  shelfSummaryPayloads(wildcardsRoot, ids, buckets);
+  absorbLibraryRaw(
+    buckets,
+    readJsonFile<unknown>(path.join(legacyWildcardsWcmDir(wildcardsRoot), 'library.json')),
   );
-  candidates.push(...payloadsInRaw(legacyRaw));
-  const best = mergeByLongerList(candidates);
-  if (!best) return false;
   const byLibrary: Record<string, LibraryLocalPayload> =
     env.kind === 'v2' ? { ...env.byLibrary } : {};
   let changed = false;
   for (const id of ids) {
-    const current = byLibrary[id] ?? {
+    const best = mergeByLongerList([
+      ...(buckets.scoped.get(id) ?? []),
+      ...buckets.shared,
+    ]);
+    if (!best) continue;
+    const fromShelves = libraryShelvesExist(wildcardsRoot, id)
+      ? readLibraryShelfSlot(wildcardsRoot, id)
+      : null;
+    const current = fromShelves ?? byLibrary[id] ?? {
       ...(env.kind === 'v1' ? env.payload : { version: SLOT_VERSION }),
       version: SLOT_VERSION,
     };
     const merged: LibraryLocalPayload = { ...current, version: SLOT_VERSION };
     for (const key of PROTECTED_LIST_KEYS) {
-      if (listLen(current[key]) > 0) continue;
-      if (listLen(best[key]) === 0) continue;
+      const currentLen = listLen(current[key]);
+      const bestLen = listLen(best[key]);
+      const manual = (MANUAL_SHELF_KEYS as readonly string[]).includes(key);
+      if (manual) {
+        if (!shouldRestoreManualShelf(currentLen, bestLen)) continue;
+      } else if (currentLen > 0 || bestLen === 0) {
+        continue;
+      }
       (merged as Record<string, unknown>)[key] = best[key];
       changed = true;
     }
@@ -271,6 +431,229 @@ export function recoverLongerLibraryShelves(
   }
   if (!changed) return false;
   backupBeforeRewrite(wildcardsRoot, libraryJsonPath(wildcardsRoot), 'library.json');
-  writeEnvelope(wildcardsRoot, byLibrary);
+  for (const id of ids) {
+    const slot = byLibrary[id];
+    if (slot) writeLibrarySlot(wildcardsRoot, id, slot);
+  }
   return true;
+}
+
+function payloadFromUnknown(value: unknown): LibraryLocalPayload | null {
+  if (isSlot(value)) return value;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const row = value as LibraryLocalPayload & { split?: unknown };
+  if (
+    row.version === LIBRARY_LOCAL_FILE_VERSION ||
+    row.version === LIBRARY_SPLIT_VERSION ||
+    row.split === true
+  ) {
+    return null;
+  }
+  const hasList = PROTECTED_LIST_KEYS.some((key) => listLen(row[key]) > 0);
+  if (!hasList) return null;
+  return { ...row, version: SLOT_VERSION };
+}
+
+function preferLongerSlot(
+  left: LibraryLocalPayload | null,
+  right: LibraryLocalPayload | null,
+): LibraryLocalPayload | null {
+  if (!left) return right;
+  if (!right) return left;
+  const next: LibraryLocalPayload = { ...left, version: SLOT_VERSION };
+  for (const key of PROTECTED_LIST_KEYS) {
+    if (listLen(right[key]) > listLen(next[key])) {
+      (next as Record<string, unknown>)[key] = right[key];
+    }
+  }
+  return next;
+}
+
+/**
+ * Upgrade a combined `library.json` into per-library shelf files and leave a
+ * pointer behind. The first launch of this build runs it. A pointer means it
+ * already ran. Safe to run again.
+ */
+export function splitLibraryShelves(
+  wildcardsRoot: string | null | undefined,
+  libraryIds: readonly string[],
+): boolean {
+  if (!wildcardsRoot?.trim()) return false;
+  const ids = [...new Set(libraryIds.map((id) => id.trim()).filter(Boolean))];
+  const file = libraryJsonPath(wildcardsRoot);
+  const raw = readJsonFile<unknown>(file);
+  if (isV2(raw)) {
+    for (const id of Object.keys(raw.byLibrary)) {
+      const trimmed = id.trim();
+      if (trimmed && !ids.includes(trimmed)) ids.push(trimmed);
+    }
+  }
+  if (ids.length === 0) return false;
+  if (isLibrarySplitPointer(raw)) return false;
+  const required = new Set<string>();
+  if (isV2(raw)) {
+    for (const [id, slot] of Object.entries(raw.byLibrary)) {
+      if (payloadFromUnknown(slot)) required.add(id.trim());
+    }
+  } else if (payloadFromUnknown(raw)) {
+    for (const id of ids) required.add(id);
+  }
+  if (fs.existsSync(file)) {
+    backupBeforeRewrite(wildcardsRoot, file, 'library.json');
+  }
+  const written = new Set<string>();
+  for (const id of ids) {
+    const fromEnvelope = isV2(raw)
+      ? payloadFromUnknown(raw.byLibrary[id])
+      : payloadFromUnknown(raw);
+    const fromShelves = libraryShelvesExist(wildcardsRoot, id)
+      ? readLibraryShelfSlot(wildcardsRoot, id)
+      : null;
+    const slot = preferLongerSlot(fromEnvelope, fromShelves);
+    if (!slot) continue;
+    const wanted = new Set<number>();
+    for (const row of [
+      ...(slot.archivedCivitaiModels ?? []),
+      ...(slot.maybeCivitaiModels ?? []),
+      ...(slot.markedInstalledCivitaiModels ?? []),
+      ...(slot.civitaiWatchlist ?? []),
+      ...(slot.civitaiRecentlyUnlocked ?? []),
+    ]) {
+      if (row.modelId > 0) wanted.add(row.modelId);
+    }
+    const origin = slot.civitaiOrigin?.trim() || 'https://civitai.com';
+    const catalog = civitaiCatalogDir(wildcardsRoot, id);
+    const kinds = modelKindsInCatalog(catalog, origin, wanted);
+    if (kinds.size === 0) {
+      const other =
+        origin === 'https://civitai.red' ? 'https://civitai.com' : 'https://civitai.red';
+      for (const [modelId, kind] of modelKindsInCatalog(catalog, other, wanted)) {
+        kinds.set(modelId, kind);
+      }
+    }
+    const checkpoints = new Set<number>();
+    for (const [modelId, kind] of kinds) {
+      if (kind === 'Checkpoint') checkpoints.add(modelId);
+    }
+    writeLibraryShelfSlot(wildcardsRoot, id, slot, checkpoints);
+    written.add(id);
+  }
+  if ([...required].some((id) => !written.has(id))) return written.size > 0;
+  if (written.size === 0) return false;
+  atomicWriteFile(
+    file,
+    `${JSON.stringify({ version: LIBRARY_SPLIT_VERSION, split: true })}\n`,
+  );
+  console.log(`[library] split shelf files for ${written.size} libraries`);
+  return true;
+}
+
+type CategorySnap = {
+  categories: NonNullable<LibraryLocalPayload['loraDownloadCategories']>;
+  lastId?: string;
+};
+
+function categorySnapOf(value: unknown): CategorySnap | null {
+  if (!value || typeof value !== 'object') return null;
+  const row = value as LibraryLocalPayload;
+  const categories = parseLoraDownloadCategories(row.loraDownloadCategories);
+  const lastId =
+    typeof row.lastLoraDownloadCategoryId === 'string'
+      ? row.lastLoraDownloadCategoryId.trim()
+      : '';
+  if (categories.length === 0 && !lastId) return null;
+  return { categories, ...(lastId ? { lastId } : {}) };
+}
+
+function preferLongerCategories(best: CategorySnap, snap: CategorySnap | null): CategorySnap {
+  if (!snap) return best;
+  if (snap.categories.length > best.categories.length) return snap;
+  if (best.categories.length === 0 && snap.lastId && !best.lastId) return snap;
+  return best;
+}
+
+function categorySnapForLibrary(
+  raw: unknown,
+  libraryId: string,
+  allowShared: boolean,
+): CategorySnap | null {
+  if (isV2(raw)) return categorySnapOf(raw.byLibrary[libraryId]);
+  if (!allowShared || isLibrarySplitPointer(raw)) return null;
+  return categorySnapOf(raw);
+}
+
+function prefsEmbedCategories(file: string): boolean {
+  const raw = readJsonFile<Record<string, unknown>>(file);
+  if (!raw) return false;
+  return (
+    Object.prototype.hasOwnProperty.call(raw, 'loraDownloadCategories') ||
+    Object.prototype.hasOwnProperty.call(raw, 'lastLoraDownloadCategoryId')
+  );
+}
+
+/**
+ * Move LoRA categories out of each library's prefs `library.json` into
+ * `categories.json`. A missing file is filled from that library's live
+ * preferences file or combined `library.json`. Copies under `backups/` are
+ * not read. An existing file stays as it is. Safe to run again.
+ */
+export function migrateLoraCategoryFiles(
+  wildcardsRoot: string | null | undefined,
+  libraryIds: readonly string[],
+): void {
+  if (!wildcardsRoot?.trim()) return;
+  const ids = [...new Set(libraryIds.map((id) => id.trim()).filter(Boolean))];
+  const envelope = readJsonFile<unknown>(libraryJsonPath(wildcardsRoot));
+  if (isV2(envelope)) {
+    for (const id of Object.keys(envelope.byLibrary)) {
+      const trimmed = id.trim();
+      if (trimmed && !ids.includes(trimmed)) ids.push(trimmed);
+    }
+  }
+  for (const id of ids) {
+    const prefsFile = libraryShelfFile(wildcardsRoot, id, 'library.json');
+    const current = readLoraCategoryFile(wildcardsRoot, id);
+    const fromPrefs = categorySnapOf(readJsonFile<unknown>(prefsFile));
+    const needsSource =
+      !current || (current.loraDownloadCategories.length === 0 && fromPrefs);
+    if (needsSource) {
+      let best: CategorySnap = {
+        categories: current?.loraDownloadCategories ?? [],
+        ...(current?.lastLoraDownloadCategoryId
+          ? { lastId: current.lastLoraDownloadCategoryId }
+          : {}),
+      };
+      best = preferLongerCategories(best, fromPrefs);
+      best = preferLongerCategories(
+        best,
+        categorySnapForLibrary(envelope, id, best.categories.length === 0),
+      );
+      if (best.categories.length === 0) {
+        best = preferLongerCategories(
+          best,
+          categorySnapForLibrary(envelope, id, true),
+        );
+      }
+      writeLoraCategoryFile(wildcardsRoot, id, {
+        loraDownloadCategories: best.categories,
+        lastLoraDownloadCategoryId: best.lastId,
+      });
+      if (best.categories.length > 0) {
+        console.log(
+          `[library] ${best.categories.length} LoRA categories in categories.json`,
+        );
+      }
+    }
+    if (!prefsEmbedCategories(prefsFile)) continue;
+    backupBeforeRewrite(
+      wildcardsRoot,
+      prefsFile,
+      path.join('libraries', catalogLibrarySegment(id), 'library.json'),
+    );
+    const raw = readJsonFile<Record<string, unknown>>(prefsFile);
+    if (!raw) continue;
+    delete raw.loraDownloadCategories;
+    delete raw.lastLoraDownloadCategoryId;
+    atomicWriteFile(prefsFile, `${JSON.stringify(raw)}\n`);
+  }
 }

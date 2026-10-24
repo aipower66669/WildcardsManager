@@ -12,7 +12,15 @@ library/
   collections.yaml        -> keys declared inside the document
 
 library.wcm/              -> sibling app-data folder (not scanned by ComfyUI DP)
-  library.json            -> per-library lists, download categories, prompt substitutions
+  library.json            -> pointer after the shelf split
+  libraries/<library id>/ -> that library’s shelf files
+    library.json          -> filters, prompt substitutions
+    categories.json       -> LoRA download categories
+    civitai-loras.json
+    civitai-checkpoints.json
+    civitai-images.json
+    civitai-videos.json
+    huggingface.json
   validation.json
   prompt-coverage.json    -> Prompts Coverage simulation report
   backups/
@@ -49,9 +57,18 @@ Generation family (`generationFamily`: `krea2` or `sdxl`, default `krea2`).
 saved on that same library record. Two libraries that share a wildcards folder
 keep their own checkboxes. Each library’s Civitai catalog is its own folder,
 `<wildcards folder name>.wcm/cache/civitai-catalog/<library id>/`. Archive,
-Maybe, Notify, and the LoRA download categories are in one
-`<wildcards folder name>.wcm/library.json`, in a separate block per library.
-That file is beside the wildcards folder, in the ComfyUI tree, not in AppData.
+Maybe, Notify, and the LoRA download categories are in
+`<wildcards folder name>.wcm/libraries/<library id>/`. Civitai LoRAs,
+checkpoints, images, and videos are separate files, and Hugging Face has its
+own file. Filters and prompt substitutions stay in that folder’s
+`library.json`. LoRA download categories are `categories.json` in the same
+folder. The `.wcm/library.json` beside the wildcards folder is a pointer. The
+first launch after an upgrade copies the old combined file into `backups/`
+and writes these shelf files. The same launch copies LoRA categories out of
+the preferences file into `categories.json`, after copying that preferences
+file to `backups/pre-migrate-<timestamp>/libraries/<library id>/`. Later
+launches leave them alone and do not open `backups/`. Those files
+are in the ComfyUI tree, not in AppData.
 The `!.wcm` folders under LoRA and checkpoint roots are hashes and ratings.
 Switching libraries reloads that library’s catalog and the Generation screen
 for that family. If those lists disappear, see
@@ -549,9 +566,11 @@ In **Settings → Civitai → Site**, pick the catalog that matches what you wan
 | Site | Catalog |
 | --- | --- |
 | **civitai.com** | SFW-oriented catalog — prefer this for work-safe browsing |
-| **civitai.red** | NSFW catalog — use when you intentionally want mature models |
+| **civitai.red** | NSFW catalog. Browse lists mature models only. Safe models are left out |
 
 The site choice controls which API and account the app talks to for **models**.
+On **civitai.red**, Browse does not list models Civitai marks safe. The
+**Include NSFW** checkbox does not add those models to a red library.
 The Images tab has its own **SFW only / SFW + NSFW / NSFW only** content filter.
 
 #### API key (browse vs download)
@@ -660,7 +679,17 @@ defaults as opening the dialog and confirming immediately (preferred
 non–early-access file, last category, default weights — no extra
 comment/prompt).
 
-Checkpoints keep a folder-only picker (no wildcard append).
+**Mark as Downloaded** in that dialog does not transfer a file. The card’s
+download button, and each version row’s download button, still download.
+When more than one version can be downloaded, Mark as Downloaded asks
+**This version** or **All current versions**. Early-access versions are left
+out. A version published later stays unmarked. One downloadable version is
+marked immediately, with no extra choice.
+
+Checkpoints keep a folder-only picker (no wildcard append). The list is the
+subfolders of the checkpoint folder, including folder junctions. `!.wcm`,
+`!Cache`, and `!Thumbnails` are not destinations. Checkpoint files that sit
+in the root of that folder are not categories.
 
 When a category is used, the LoRA snippet looks like:
 

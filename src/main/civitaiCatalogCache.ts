@@ -169,6 +169,7 @@ export function configureCatalogCacheRoot(dir: string | null): void {
   sliceIdCache.clear();
   catalogReady = false;
   autoV2CatalogIndex = null;
+  modelIdsOnDiskCache = null;
   autoV2IndexDirty = false;
   if (autoV2IndexSaveTimer) {
     clearTimeout(autoV2IndexSaveTimer);
@@ -217,6 +218,33 @@ function readJsonFile<T>(file: string): T | null {
   }
 }
 
+/**
+ * A wiped meta.json drops `slices` to `{}` while the slice folders are still
+ * on disk. Point the keys at those folders again so Browse does not start a
+ * new download over a catalog that is already there.
+ */
+function relinkOrphanSlices(meta: CatalogRootMeta): boolean {
+  const slicesRoot = path.join(catalogRoot(), 'slices');
+  if (!fs.existsSync(slicesRoot)) return false;
+  let dirs: fs.Dirent[] = [];
+  try {
+    dirs = fs.readdirSync(slicesRoot, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  let changed = false;
+  for (const dir of dirs) {
+    if (!dir.isDirectory()) continue;
+    const sliceMeta = readJsonFile<SliceDiskMeta>(
+      path.join(slicesRoot, dir.name, 'meta.json'),
+    );
+    if (!sliceMeta?.sliceKey || meta.slices[sliceMeta.sliceKey]) continue;
+    meta.slices[sliceMeta.sliceKey] = dir.name;
+    changed = true;
+  }
+  return changed;
+}
+
 /** Load or create the v1 catalog root (paged models + slice id indexes). */
 function ensureCatalogReady(): void {
   if (catalogReady) return;
@@ -231,7 +259,11 @@ function ensureCatalogReady(): void {
       (CATALOG_CACHE_LEGACY_VERSIONS as readonly number[]).includes(
         raw.version,
       ));
-  if (versionOk && raw?.slices) {
+  const hadSlices =
+    versionOk &&
+    !!raw?.slices &&
+    Object.keys(raw.slices).length > 0;
+  if (hadSlices && raw?.slices) {
     rootMeta = {
       version: CATALOG_CACHE_VERSION,
       slices: raw.slices,
@@ -240,13 +272,15 @@ function ensureCatalogReady(): void {
     if (raw.version !== CATALOG_CACHE_VERSION) {
       persistRootMeta();
     }
-  } else {
-    rootMeta = {
-      version: CATALOG_CACHE_VERSION,
-      slices: {},
-    };
-    persistRootMeta();
+    return;
   }
+  rootMeta = {
+    version: CATALOG_CACHE_VERSION,
+    slices:
+      raw?.slices && typeof raw.slices === 'object' ? { ...raw.slices } : {},
+  };
+  const relinked = relinkOrphanSlices(rootMeta);
+  if (relinked || !versionOk || !raw?.slices) persistRootMeta();
 }
 
 function ensureRootMeta(): CatalogRootMeta {
@@ -312,6 +346,14 @@ function readIdChunk(sliceKey: string, chunkIndex: number): number[] {
   return raw.filter((id) => typeof id === 'number' && Number.isFinite(id));
 }
 
+/** `push(...huge)` throws once the list is tens of thousands of ids. */
+function appendInChunks(target: number[], items: readonly number[]): void {
+  const size = 4000;
+  for (let i = 0; i < items.length; i += size) {
+    target.push(...items.slice(i, i + size));
+  }
+}
+
 function writeIdChunk(
   sliceKey: string,
   chunkIndex: number,
@@ -355,6 +397,32 @@ function loadAllSliceIds(sliceKey: string): number[] {
 function getSliceIdCache(sliceKey: string) {
   loadAllSliceIds(sliceKey);
   return sliceIdCache.get(sliceKey)!;
+}
+
+/**
+ * Drop ids that fail `keep`. Rewrites the slice index. Model pages stay.
+ * Returns how many ids were removed.
+ */
+export function retainCatalogSliceIds(
+  sliceKey: string,
+  keep: (id: number) => boolean,
+): number {
+  ensureCatalogReady();
+  const entry = getSliceIdCache(sliceKey);
+  const next: number[] = [];
+  for (const id of entry.ids) {
+    if (keep(id)) next.push(id);
+  }
+  const removed = entry.ids.length - next.length;
+  if (removed === 0) return 0;
+  entry.ids = next;
+  entry.known.clear();
+  for (const id of next) entry.known.add(id);
+  entry.meta.idCount = next.length;
+  invalidateCatalogSearchIndex(sliceKey);
+  clearSliceHayFiles(sliceDir(sliceKey));
+  persistSliceIds(sliceKey);
+  return removed;
 }
 
 /** Known-id set for sync — loads id index only, never card JSON pages. */
@@ -679,6 +747,61 @@ function tryLoadAutoV2IndexFromDisk(): Map<string, AutoV2IndexRef> | null {
   } catch {
     return null;
   }
+}
+
+let modelIdsOnDiskCache: number[] | null = null;
+
+/** Ids already stored in `models/`, used when the slice index was wiped. */
+function modelIdsOnDisk(): number[] {
+  if (modelIdsOnDiskCache) return modelIdsOnDiskCache;
+  const ids = new Set<number>();
+  const hostDir = path.join(catalogRoot(), 'models');
+  let hosts: string[] = [];
+  try {
+    hosts = fs.readdirSync(hostDir);
+  } catch {
+    return [];
+  }
+  for (const host of hosts) {
+    const dir = path.join(hostDir, host);
+    let names: string[] = [];
+    try {
+      names = fs.readdirSync(dir).filter((name) => name.endsWith('.json'));
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      const raw = readJsonFile<Record<string, { id?: number }>>(
+        path.join(dir, name),
+      );
+      if (!raw || typeof raw !== 'object') continue;
+      for (const row of Object.values(raw)) {
+        const id = row?.id;
+        if (typeof id === 'number' && Number.isFinite(id) && id > 0) ids.add(id);
+      }
+    }
+  }
+  modelIdsOnDiskCache = [...ids].sort((a, b) => a - b);
+  return modelIdsOnDiskCache;
+}
+
+/**
+ * Slice folders can be missing while model pages are still on disk. Putting
+ * those ids back stops Browse from downloading the catalog again from zero.
+ * Returns the slice id count after the attempt.
+ */
+export function seedEmptyCatalogSlice(sliceKey: string): number {
+  ensureCatalogReady();
+  const current = getCatalogSliceStats(sliceKey);
+  if (current.idCount > 0) return current.idCount;
+  const ids = modelIdsOnDisk();
+  if (ids.length === 0) return 0;
+  updateCatalogSlice(sliceKey, {
+    appendIds: ids,
+    exhausted: true,
+    lastSyncedAt: new Date(0).toISOString(),
+  });
+  return getCatalogSliceStats(sliceKey).idCount;
 }
 
 let autoV2IndexSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1383,7 +1506,7 @@ export function updateCatalogSlice(
     }
     if (more.length) {
       const before = entry.ids.length;
-      entry.ids.push(...more);
+      appendInChunks(entry.ids, more);
       idsChanged = true;
       if (typeof update.exhausted === 'boolean') {
         entry.meta.exhausted = update.exhausted;

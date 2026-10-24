@@ -6546,6 +6546,38 @@ label.field select {
   margin-left: auto;
 }
 
+.civitai-mark-downloaded-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.civitai-mark-scope {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 280px;
+  padding: 10px 12px;
+  border: 1px solid #3a4454;
+  border-radius: 10px;
+  background: #161b22;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+}
+
+.civitai-mark-scope p {
+  margin: 0;
+}
+
+.civitai-mark-scope-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .civitai-mark-downloaded-btn {
   display: inline-flex;
   align-items: center;

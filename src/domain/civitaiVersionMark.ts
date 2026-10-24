@@ -9,6 +9,37 @@ export type VersionMark = {
   fileName?: string;
 };
 
+/**
+ * Version/file rows to record for “All current versions”.
+ * Early-access rows are omitted. A version that is not in `picks` is not marked.
+ */
+export function versionMarksForCurrentPicks(
+  picks: Array<{
+    versionId: number;
+    fileId?: number | null;
+    fileName?: string | null;
+    earlyAccess?: boolean;
+  }>,
+): VersionMark[] {
+  const out: VersionMark[] = [];
+  const seen = new Set<string>();
+  for (const pick of picks) {
+    if (pick.earlyAccess) continue;
+    if (!Number.isFinite(pick.versionId)) continue;
+    const versionId = Math.round(pick.versionId);
+    const fileId =
+      typeof pick.fileId === 'number' && Number.isFinite(pick.fileId)
+        ? Math.round(pick.fileId)
+        : 0;
+    const fileName = pick.fileName?.trim() || undefined;
+    const key = `${versionId}:${fileId}:${(fileName ?? '').toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ versionId, fileId, fileName });
+  }
+  return out;
+}
+
 export function versionFileIsMarkedInstalled(
   marks: VersionMark[],
   versionId: number,

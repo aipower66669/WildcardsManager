@@ -50,7 +50,7 @@ Important files:
 - `src/main/libraryService.ts` — authorized root and filesystem operations.
 - `src/main/mutationService.ts` — grouped writes, backups, undo/redo.
 - `src/main/refactorService.ts` — pure-plan-to-mutation orchestration.
-- `src/main/libraryLocalState.ts` — sibling `<basename>.wcm/library.json`.
+- `src/main/libraryLocalState.ts` and `src/main/libraryShelfFiles.ts` — per-library shelf files under sibling `<basename>.wcm/libraries/<library id>/`, including `categories.json`. `.wcm/library.json` is a pointer after the split.
 - `src/main/libraryDataMigration.ts` — AppData → folder-sidecar migration.
 - `src/main/wildcardsSidecarMigration.ts` — in-tree `!.wcm`/`!Cache` → sibling.
 - `src/domain/librarySidecarPaths.ts` — wildcards sibling `.wcm` + model-root

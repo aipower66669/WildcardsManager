@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { versionFileIsMarkedInstalled } from './civitaiVersionMark.js';
+import {
+  versionFileIsMarkedInstalled,
+  versionMarksForCurrentPicks,
+} from './civitaiVersionMark.js';
 
 describe('versionFileIsMarkedInstalled', () => {
   const marks = [
@@ -45,6 +48,50 @@ describe('versionFileIsMarkedInstalled', () => {
         null,
         'lustifyNSFWCheckpoint_v10Krea2.safetensors',
       ),
+    ).toBe(false);
+  });
+});
+
+describe('versionMarksForCurrentPicks', () => {
+  const picks = [
+    {
+      versionId: 1,
+      fileId: 10,
+      fileName: 'a.safetensors',
+      earlyAccess: false,
+    },
+    {
+      versionId: 1,
+      fileId: 11,
+      fileName: 'a.txt',
+      earlyAccess: false,
+    },
+    {
+      versionId: 2,
+      fileId: 20,
+      fileName: 'gated.safetensors',
+      earlyAccess: true,
+    },
+    {
+      versionId: 1,
+      fileId: 10,
+      fileName: 'a.safetensors',
+      earlyAccess: false,
+    },
+  ];
+
+  it('marks each current file and skips early access', () => {
+    expect(versionMarksForCurrentPicks(picks)).toEqual([
+      { versionId: 1, fileId: 10, fileName: 'a.safetensors' },
+      { versionId: 1, fileId: 11, fileName: 'a.txt' },
+    ]);
+  });
+
+  it('does not include a version that is not in the list', () => {
+    const marks = versionMarksForCurrentPicks(picks);
+    expect(marks.some((mark) => mark.versionId === 99)).toBe(false);
+    expect(
+      versionFileIsMarkedInstalled(marks, 99, 1, 'tomorrow.safetensors'),
     ).toBe(false);
   });
 });

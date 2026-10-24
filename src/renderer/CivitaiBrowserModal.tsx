@@ -70,6 +70,7 @@ import {
 } from '../domain/civitaiBaseModels';
 import { CivitaiImagesPanel } from './CivitaiImagesPanel';
 import { isEarlyAccessActive } from '../domain/civitaiEarlyAccess';
+import { versionMarksForCurrentPicks } from '../domain/civitaiVersionMark';
 import {
   CIVITAI_MODEL_CATEGORY_PRESETS,
   categoryIdFromTags,
@@ -263,6 +264,30 @@ function preferDownloadPick(
     picks[0] ??
     null
   );
+}
+
+function markDownloadedPayloads(picks: CivitaiModelDownloadPickDto[]): Array<{
+  versionId: number;
+  fileId: number;
+  fileName: string;
+  label: string;
+}> {
+  return versionMarksForCurrentPicks(picks).map((mark) => {
+    const pick = picks.find(
+      (row) =>
+        !row.earlyAccess &&
+        row.versionId === mark.versionId &&
+        row.fileId === mark.fileId &&
+        row.fileName.trim().toLowerCase() ===
+          (mark.fileName ?? '').toLowerCase(),
+    );
+    return {
+      versionId: mark.versionId,
+      fileId: mark.fileId,
+      fileName: mark.fileName ?? pick?.fileName ?? '',
+      label: pick?.label ?? mark.fileName ?? `Version ${mark.versionId}`,
+    };
+  });
 }
 
 /**
@@ -652,6 +677,19 @@ function matchesCardOrVersionArchitecture(
   );
 }
 
+/** Shelf rows loaded before their catalog page has no base model yet. */
+function cardHasBaseModelEvidence(item: {
+  baseModel?: string;
+  versionInstalls?: ReadonlyArray<{ baseModel?: string }>;
+  versionBaseModels?: ReadonlyArray<string>;
+}): boolean {
+  if (item.baseModel?.trim()) return true;
+  if ((item.versionBaseModels ?? []).some((value) => value.trim())) return true;
+  return (item.versionInstalls ?? []).some((row) =>
+    Boolean(resolveVersionBaseModel(row)?.trim()),
+  );
+}
+
 function filterVersionInstallsForContext(
   rows: CivitaiModelCardDto['versionInstalls'],
   architectures: CivitaiArchitectureIdDto[],
@@ -727,12 +765,13 @@ function matchesTabChipFilters(
   return (
     matchesModelType(item.type, type) &&
     matchesCardCategory(item.tags, category, enabledCivitaiCategories) &&
-    matchesCardOrVersionArchitecture(
-      item,
-      architectures,
-      sdxlFamily,
-      enabledSdxlFamilies,
-    )
+    (!cardHasBaseModelEvidence(item) ||
+      matchesCardOrVersionArchitecture(
+        item,
+        architectures,
+        sdxlFamily,
+        enabledSdxlFamilies,
+      ))
   );
 }
 
@@ -2062,11 +2101,21 @@ export function CivitaiBrowserModal({
       setTabListReady((prev) =>
         prev.downloaded ? prev : { ...prev, downloaded: true },
       );
-      setShelfSummaries((prev) => ({
-        archived: prev?.archived ?? [],
-        maybe: prev?.maybe ?? [],
-        downloaded: cards.map(cardToShelfSummary),
-      }));
+      setShelfSummaries((prev) => {
+        const prevDownloaded = prev?.downloaded ?? [];
+        const nextDownloaded = cards.map(cardToShelfSummary);
+        // A hash scan that runs before the catalog index is loaded returns
+        // nothing. That must not replace the count already on screen.
+        const downloaded =
+          nextDownloaded.length >= prevDownloaded.length
+            ? nextDownloaded
+            : prevDownloaded;
+        return {
+          archived: prev?.archived ?? [],
+          maybe: prev?.maybe ?? [],
+          downloaded,
+        };
+      });
       // Version-row API hydrate is not required for membership or counts.
       // Only fill thin rows when the Downloaded tab is open (max 8).
       if (tabRef.current !== 'downloaded') return;
@@ -3168,21 +3217,25 @@ export function CivitaiBrowserModal({
     await startDownload(downloadTarget, opts);
   };
 
-  const markVersionDownloaded = async (pick: {
-    versionId: number;
-    fileId: number;
-    fileName: string;
-    label: string;
-  }) => {
+  const markVersionDownloaded = async (
+    picks: Array<{
+      versionId: number;
+      fileId: number;
+      fileName: string;
+      label: string;
+    }>,
+  ) => {
     const target = downloadTarget;
-    if (!target) return;
+    if (!target || picks.length === 0) return;
     setDownloadTarget(null);
     try {
-      await window.wcm.civitai.markVersionInstalled({
+      await window.wcm.civitai.markVersionsInstalled({
         modelId: target.id,
-        versionId: pick.versionId,
-        fileId: pick.fileId,
-        fileName: pick.fileName,
+        versions: picks.map((pick) => ({
+          versionId: pick.versionId,
+          fileId: pick.fileId,
+          fileName: pick.fileName,
+        })),
       });
       let card: CivitaiModelCardDto;
       try {
@@ -3220,7 +3273,9 @@ export function CivitaiBrowserModal({
         localPatchesRef.current.delete(target.id);
       }
       flashStatusNotice(
-        `Marked ${target.name} · ${pick.label} as downloaded.`,
+        picks.length === 1
+          ? `Marked ${target.name} · ${picks[0]!.label} as downloaded.`
+          : `Marked ${picks.length} versions of ${target.name} as downloaded.`,
       );
       void loadDownloaded();
     } catch (e) {
@@ -4323,12 +4378,13 @@ export function CivitaiBrowserModal({
         matchesModelType(item.type, type) &&
         matchesCardQuery(item, query) &&
         matchesCardCategory(item.tags, category, enabledCivitaiCategories) &&
-        matchesCardOrVersionArchitecture(
-          item,
-          architectures,
-          sdxlFamily,
-          enabledSdxlFamilies,
-        ),
+        (!cardHasBaseModelEvidence(item) ||
+          matchesCardOrVersionArchitecture(
+            item,
+            architectures,
+            sdxlFamily,
+            enabledSdxlFamilies,
+          )),
     );
     const sorted = sortCardsByLocalSort(filtered, sort);
     return sortCardsWithUpdatesFirst(
@@ -4368,12 +4424,13 @@ export function CivitaiBrowserModal({
             matchesModelType(item.type, type) &&
             matchesCardQuery(item, query) &&
             matchesCardCategory(item.tags, category, enabledCivitaiCategories) &&
-            matchesCardOrVersionArchitecture(
-              item,
-              architectures,
-              sdxlFamily,
-              enabledSdxlFamilies,
-            ),
+            (!cardHasBaseModelEvidence(item) ||
+              matchesCardOrVersionArchitecture(
+                item,
+                architectures,
+                sdxlFamily,
+                enabledSdxlFamilies,
+              )),
         ),
         sort,
       ),
@@ -4398,12 +4455,13 @@ export function CivitaiBrowserModal({
             matchesModelType(item.type, type) &&
             matchesCardQuery(item, query) &&
             matchesCardCategory(item.tags, category, enabledCivitaiCategories) &&
-            matchesCardOrVersionArchitecture(
-              item,
-              architectures,
-              sdxlFamily,
-              enabledSdxlFamilies,
-            ),
+            (!cardHasBaseModelEvidence(item) ||
+              matchesCardOrVersionArchitecture(
+                item,
+                architectures,
+                sdxlFamily,
+                enabledSdxlFamilies,
+              )),
         ),
         sort,
       ),
@@ -5230,14 +5288,20 @@ export function CivitaiBrowserModal({
 
           {tab === 'browse' ? (
             <div className="civitai-filters">
-                <label title="Civitai still returns mature models either way; this used to blank their cover images">
-                  <input
-                    type="checkbox"
-                    checked={nsfw}
-                    onChange={(e) => setNsfw(e.target.checked)}
-                  />{' '}
-                  Include NSFW
-                </label>
+                {origin === 'https://civitai.red' ? (
+                  <span title="This library uses civitai.red. Browse lists mature models only.">
+                    Mature only
+                  </span>
+                ) : (
+                  <label title="Civitai still returns mature models either way; this used to blank their cover images">
+                    <input
+                      type="checkbox"
+                      checked={nsfw}
+                      onChange={(e) => setNsfw(e.target.checked)}
+                    />{' '}
+                    Include NSFW
+                  </label>
+                )}
                 <label>
                   <input
                     type="checkbox"
@@ -5842,7 +5906,7 @@ export function CivitaiBrowserModal({
             editMode={editingQueueModelId != null}
             onCancel={closeDownloadModal}
             onConfirm={(opts) => void confirmDownload(opts)}
-            onMarkDownloaded={(pick) => void markVersionDownloaded(pick)}
+            onMarkDownloaded={(picks) => void markVersionDownloaded(picks)}
           />
         ) : null}
         {previewDownloader}
@@ -5938,7 +6002,7 @@ export function CivitaiBrowserModal({
           editMode={editingQueueModelId != null}
           onCancel={closeDownloadModal}
           onConfirm={(opts) => void confirmDownload(opts)}
-          onMarkDownloaded={(pick) => void markVersionDownloaded(pick)}
+          onMarkDownloaded={(picks) => void markVersionDownloaded(picks)}
         />
       ) : null}
       {previewDownloader}
@@ -6255,12 +6319,14 @@ function CivitaiDownloadModal({
   editMode?: boolean;
   onCancel: () => void;
   onConfirm: (opts: DownloadConfirmOpts) => void;
-  onMarkDownloaded: (pick: {
-    versionId: number;
-    fileId: number;
-    fileName: string;
-    label: string;
-  }) => void;
+  onMarkDownloaded: (
+    picks: Array<{
+      versionId: number;
+      fileId: number;
+      fileName: string;
+      label: string;
+    }>,
+  ) => void;
 }) {
   const { modalStyle, dragging, headerPointerProps } = useDraggableModal();
   const isLora = target.typeHint === 'LORA';
@@ -6341,6 +6407,7 @@ function CivitaiDownloadModal({
     () => instantOptions.picks.length === 0,
   );
   const [fullOptionsLoaded, setFullOptionsLoaded] = useState(false);
+  const [markScopeOpen, setMarkScopeOpen] = useState(false);
 
   const applyOptions = useCallback(
     (opts: CivitaiModelDownloadOptionsDto) => {
@@ -6457,6 +6524,10 @@ function CivitaiDownloadModal({
     downloadOptions?.picks.find((p) => p.key === pickKey) ??
     downloadOptions?.picks[0] ??
     null;
+  const markableVersions = useMemo(
+    () => markDownloadedPayloads(downloadOptions.picks),
+    [downloadOptions.picks],
+  );
 
   const createCategory = async () => {
     const trimmed = newCategory.trim();
@@ -7030,27 +7101,90 @@ function CivitaiDownloadModal({
             {err ? <p className="error-inline">{err}</p> : null}
           </div>
           <footer className="modal-foot civitai-download-foot">
-            <button
-              type="button"
-              className="civitai-mark-downloaded-btn"
-              title={
-                selectedPick
-                  ? `Mark “${selectedPick.label}” as already downloaded (no file transfer)`
-                  : 'Pick a version / variant first'
-              }
-              disabled={!selectedPick || selectedPick.earlyAccess || busy}
-              onClick={() => {
-                if (!selectedPick || selectedPick.earlyAccess) return;
-                onMarkDownloaded({
-                  versionId: selectedPick.versionId,
-                  fileId: selectedPick.fileId,
-                  fileName: selectedPick.fileName,
-                  label: selectedPick.label,
-                });
-              }}
-            >
-              <CheckCircle2 size={15} /> Mark as Downloaded
-            </button>
+            <div className="civitai-mark-downloaded-wrap">
+              {markScopeOpen ? (
+                <div
+                  className="civitai-mark-scope"
+                  role="group"
+                  aria-label="Mark as downloaded"
+                >
+                  <p>Mark as downloaded</p>
+                  <div className="civitai-mark-scope-actions">
+                    <button
+                      type="button"
+                      disabled={
+                        !selectedPick || selectedPick.earlyAccess || busy
+                      }
+                      title={
+                        selectedPick?.earlyAccess
+                          ? 'That version is still early access'
+                          : selectedPick
+                            ? selectedPick.label
+                            : 'Pick a version first'
+                      }
+                      onClick={() => {
+                        if (!selectedPick || selectedPick.earlyAccess) return;
+                        setMarkScopeOpen(false);
+                        onMarkDownloaded([
+                          {
+                            versionId: selectedPick.versionId,
+                            fileId: selectedPick.fileId,
+                            fileName: selectedPick.fileName,
+                            label: selectedPick.label,
+                          },
+                        ]);
+                      }}
+                    >
+                      This version
+                    </button>
+                    <button
+                      type="button"
+                      disabled={markableVersions.length === 0 || busy}
+                      onClick={() => {
+                        if (markableVersions.length === 0) return;
+                        setMarkScopeOpen(false);
+                        onMarkDownloaded(markableVersions);
+                      }}
+                    >
+                      All current versions ({markableVersions.length})
+                    </button>
+                  </div>
+                  <p className="hint">
+                    Marks the versions listed now. A version published later
+                    stays unmarked.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setMarkScopeOpen(false)}
+                    disabled={busy}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="civitai-mark-downloaded-btn"
+                title={
+                  markableVersions.length > 1
+                    ? 'Mark this version, or every version listed now, as already downloaded'
+                    : markableVersions.length === 1
+                      ? `Mark “${markableVersions[0]!.label}” as already downloaded (no file transfer)`
+                      : 'No downloadable version to mark'
+                }
+                disabled={markableVersions.length === 0 || busy}
+                onClick={() => {
+                  if (markableVersions.length === 0) return;
+                  if (markableVersions.length === 1) {
+                    onMarkDownloaded(markableVersions);
+                    return;
+                  }
+                  setMarkScopeOpen(true);
+                }}
+              >
+                <CheckCircle2 size={15} /> Mark as Downloaded
+              </button>
+            </div>
             <div className="modal-foot-end">
               <button type="button" onClick={onCancel} disabled={busy}>
                 Cancel

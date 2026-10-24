@@ -27,6 +27,7 @@ import {
   dedupeDownloadPicks,
   dedupeFilesByName,
   hashesForVersionInstallMatch,
+  everyListedDownloadableVersionInstalled,
   hasNewerVersionUpdate,
   isLatestVersionLocallyInstalled,
   readFileSizeKB,
@@ -76,6 +77,7 @@ import {
   collectAutoV2HashesFromVersions,
 } from '../domain/modelHash.js';
 import { CATALOG_PAGE_SIZE } from '../domain/civitaiCatalogLayout.js';
+import { civitaiRedKeepsModel } from '../domain/civitaiNsfw.js';
 import { startModelHashWarm } from './modelHashWarm.js';
 import { prioritizeActiveLibraryPreviews } from './modelFilesService.js';
 import {
@@ -88,8 +90,10 @@ import {
   insertCachedModelsIfAbsent,
   getAutoV2CatalogIndex,
   listSliceIdsWindow,
+  retainCatalogSliceIds,
   flushDirtyModelPagesSync,
   patchCachedModel,
+  seedEmptyCatalogSlice,
   updateCatalogSlice,
   type CachedCivitaiModel,
 } from './civitaiCatalogCache.js';
@@ -124,9 +128,11 @@ import {
   listCivitaiWatchlist,
   listCivitaiRecentlyUnlocked,
   listMarkedInstalledCivitaiModels,
+  listMarkedInstalledCivitaiVersions,
   listMaybeCivitaiModels,
   markCivitaiModelInstalled,
   markCivitaiVersionInstalled,
+  markCivitaiVersionsInstalled,
   purgeAvailableCivitaiWatchlistEntries,
   recordCivitaiRecentlyUnlocked,
   dismissCivitaiRecentlyUnlocked,
@@ -138,7 +144,7 @@ import {
 import { clearShelvesForNotifyUnlock } from './civitaiArchivePolicy.js';
 import {
   collectInstalledModelIdsFromHashes,
-  mergePersistedInstalledIds,
+  mergeDownloadedIds,
 } from '../domain/civitaiInstalledFromHashes.js';
 import {
   collectLiveInstalledIds,
@@ -479,9 +485,13 @@ function overlayCardFields(
   );
   const fileInstalled = localInstallMatches.length > 0;
   const markedInstalled = isCivitaiModelMarkedInstalled(base.id);
+  // Version marks cover the rows that exist now. One missing row (including a
+  // version published later) keeps the card downloadable. A card with no
+  // version rows still follows a version mark recorded against the model.
   const versionMarkedInstalled =
-    versionInstalls.some((v) => v.installed) ||
-    isCivitaiModelVersionMarkedInstalled(base.id);
+    versionInstalls.length > 0
+      ? everyListedDownloadableVersionInstalled(versionInstalls)
+      : isCivitaiModelVersionMarkedInstalled(base.id);
   const installed = fileInstalled || markedInstalled || versionMarkedInstalled;
   // Download affordance: any scoped non-EA weight still missing locally.
   // Thin catalog caches often omit per-version baseModel; if there are no
@@ -943,6 +953,9 @@ function applyBrowseFilters(
       }
     }
   }
+  if (getCivitaiOrigin() === 'https://civitai.red') {
+    filtered = filtered.filter((item) => civitaiRedKeepsModel(item.nsfw));
+  }
   const enabledCategories = getActiveLibrary()
     .enabledCivitaiCategories as CivitaiModelCategoryId[];
   if (params.category) {
@@ -1030,6 +1043,19 @@ function deferBrowseBackgroundWork(
   }, 800);
 }
 
+const redSlicesPruned = new Set<string>();
+
+/** Drop safe models from a civitai.red slice once per process. */
+function pruneRedBrowseSlice(sliceKey: string, origin: string): void {
+  if (origin !== 'https://civitai.red' || redSlicesPruned.has(sliceKey)) return;
+  redSlicesPruned.add(sliceKey);
+  retainCatalogSliceIds(sliceKey, (id) => {
+    const model = getCachedModel(origin, id);
+    if (!model) return true;
+    return civitaiRedKeepsModel(model.nsfw);
+  });
+}
+
 export async function getCatalogSlice(
   params: CivitaiBrowseCatalogParams,
 ): Promise<CivitaiCatalogSliceDto> {
@@ -1053,6 +1079,7 @@ export async function getCatalogSlice(
     architectures,
     query: '',
   });
+  pruneRedBrowseSlice(catalogSliceKey, origin);
   const requestOffset = Math.max(0, Math.floor(params.offset ?? 0));
   const stats = getCatalogSliceStats(catalogSliceKey);
   // Per-category chips report that tag’s sync slice. “All” is complete only
@@ -1318,6 +1345,8 @@ async function syncTaggedCategorySlice(opts: {
     architectures,
     query: '',
   });
+  pruneRedBrowseSlice(allSliceKey, origin);
+  pruneRedBrowseSlice(dataSliceKey, origin);
 
   let stats = getCatalogSliceStats(dataSliceKey);
   if (
@@ -1391,6 +1420,12 @@ async function syncTaggedCategorySlice(opts: {
       opts.sync.lastPageReceived = result.items.length;
 
       const pageIds = result.items.map((m) => m.id);
+      const indexIds =
+        origin === 'https://civitai.red'
+          ? result.items
+              .filter((model) => civitaiRedKeepsModel(Boolean(model.nsfw)))
+              .map((model) => model.id)
+          : pageIds;
       const allKnown =
         pageIds.length > 0 && pageIds.every((id) => knownIds.has(id));
 
@@ -1410,7 +1445,7 @@ async function syncTaggedCategorySlice(opts: {
 
       const newIds: number[] = [];
       const seenNew = new Set<number>();
-      for (const id of pageIds) {
+      for (const id of indexIds) {
         if (knownIds.has(id) || seenNew.has(id)) continue;
         seenNew.add(id);
         newIds.push(id);
@@ -1565,6 +1600,12 @@ export async function syncCatalogSlice(
 
   const requested = params.mode ?? 'auto';
   const force = Boolean(params.force);
+  // A wiped All index can be rebuilt from model pages already on disk.
+  // Category slices must not inherit every model id — that call also overflowed
+  // the stack once the page store was large.
+  if (reportCategory == null) {
+    seedEmptyCatalogSlice(reportSliceKey);
+  }
 
   // Avoid a “Checking for new models…” flash when every category is within the
   // idle tip-check interval (and none still need a fill backfill).
@@ -2110,10 +2151,13 @@ export async function listInstalledCivitaiCards(): Promise<CivitaiModelCardDto[]
   for (const entry of listMarkedInstalledCivitaiModels()) {
     if (entry.modelId > 0) liveIds.push(entry.modelId);
   }
+  for (const entry of listMarkedInstalledCivitaiVersions()) {
+    if (entry.modelId > 0) liveIds.push(entry.modelId);
+  }
   const persistedRows = listPersistedDownloadedSummaries();
   const persistById = new Map(persistedRows.map((row) => [row.id, row]));
   const live = collectLiveInstalledIds();
-  const ids = mergePersistedInstalledIds(
+  const ids = mergeDownloadedIds(
     persistedRows.map((row) => row.id),
     [...new Set(liveIds)],
     live.canShrink &&
@@ -2188,6 +2232,7 @@ export async function listInstalledCivitaiCards(): Promise<CivitaiModelCardDto[]
 export {
   markCivitaiModelInstalled,
   markCivitaiVersionInstalled,
+  markCivitaiVersionsInstalled,
   unmarkCivitaiModelInstalled,
 };
 

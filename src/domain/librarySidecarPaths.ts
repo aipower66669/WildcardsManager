@@ -111,6 +111,30 @@ export function libraryJsonPath(wildcardsRoot: string): string {
   return path.join(wildcardsSidecarRoot(wildcardsRoot), 'library.json');
 }
 
+/** One library's shelf files. Lists are not stored together. */
+export function libraryShelfDir(wildcardsRoot: string, libraryId: string): string {
+  return path.join(
+    wildcardsSidecarRoot(wildcardsRoot),
+    'libraries',
+    catalogLibrarySegment(libraryId),
+  );
+}
+
+export function libraryShelfFile(
+  wildcardsRoot: string,
+  libraryId: string,
+  name:
+    | 'library.json'
+    | 'civitai-loras.json'
+    | 'civitai-checkpoints.json'
+    | 'civitai-images.json'
+    | 'civitai-videos.json'
+    | 'huggingface.json'
+    | 'categories.json',
+): string {
+  return path.join(libraryShelfDir(wildcardsRoot, libraryId), name);
+}
+
 export function validationJsonPath(wildcardsRoot: string): string {
   return path.join(wildcardsSidecarRoot(wildcardsRoot), 'validation.json');
 }

@@ -251,11 +251,11 @@ Fields also written to the sibling `library.json`:
 | `archivedHfModels` | Shelved Hugging Face repos |
 | `maybeCivitaiModels` | Maybe list |
 | `markedInstalledCivitaiModels` | Manually marked installed models |
-| `markedInstalledCivitaiVersions` | Manually marked installed versions |
+| `markedInstalledCivitaiVersions` | Version/file rows marked downloaded. A version published later is not covered. Marking these rows does not mark the whole model |
 | `civitaiWatchlist` | Notify me |
 | `civitaiRecentlyUnlocked` | Unlocked early-access models kept in Browse |
 | `blockedCivitaiCreators` | Hidden creators |
-| `loraDownloadCategories` | Named LoRA download destinations |
+| `loraDownloadCategories` | Named LoRA download destinations (`categories.json`) |
 | `lastCivitaiDownloadCategory` | Last category per model type |
 | `civitaiBrowseFilters` | Model browse filters |
 | `civitaiImageBrowseFilters` | Images tab filters |
@@ -268,7 +268,12 @@ Per-library **datasets** are written next to the user’s folders, for example:
 
 | Location | Contents |
 | --- | --- |
-| Sibling `<wildcardsBasename>.wcm/library.json` | One slot per library id (`byLibrary`): Archive / Maybe / Notify / marked-installed, LoRA download categories, generation prompt substitutions |
+| Sibling `<wildcardsBasename>.wcm/library.json` | Pointer only, after the shelf split. Older builds kept every list for every library in this one file |
+| `<wildcardsBasename>.wcm/libraries/<libraryId>/library.json` | That library’s filters and other preferences |
+| `…/categories.json` | That library’s LoRA download categories and the last chosen category |
+| `…/civitai-loras.json`, `…/civitai-checkpoints.json` | That library’s Civitai Archive, Maybe, Notify, and marked-installed rows for that model type |
+| `…/civitai-images.json`, `…/civitai-videos.json` | That library’s archived image ids and archived video ids |
+| `…/huggingface.json` | That library’s archived and downloaded Hugging Face repos |
 | Same sibling `validation.json`, `backups/` | Validation cache, mutation backups, and `pre-migrate-<timestamp>/` copies taken before a format change |
 | Same sibling `cache/civitai-catalog/<libraryId>/` | That library’s paged Civitai catalog and AutoV2 index. Dirty pages flush within 500ms and again on quit |
 | Same sibling `cache/` | Hash-miss cache for the wildcards folder |
@@ -286,17 +291,30 @@ lists or LoRA download categories with empty in-memory snapshots
 save an empty category list over the one on disk.
 Browse, Archive, Maybe, and Notify are per library. Two libraries that share
 a wildcards folder still keep separate catalog directories
-(`cache/civitai-catalog/<libraryId>/`) and separate `byLibrary` slots in the
-one `library.json`. That file is not in AppData. Model-root `!.wcm` folders
+(`cache/civitai-catalog/<libraryId>/`) and separate shelf files under
+`libraries/<libraryId>/`. Those files are not in AppData. A save of archived
+images rewrites only the image file. LoRA, checkpoint, video, and Hugging Face
+lists stay in their own files. On upgrade, the first launch runs
+`splitLibraryShelves` from `migratePerLibraryCatalogs` (startup
+`loadSettings`). It copies the old `library.json` into
+`backups/pre-migrate-<timestamp>/`, writes one shelf folder per library id
+found in that file, and replaces `library.json` with a pointer. A later
+launch sees the pointer and does not split again. The same startup runs
+`migrateLoraCategoryFiles`. When `categories.json` is missing, it copies the
+list still in that library’s live preferences file or combined `library.json`.
+If the preferences file still contains those categories, it is copied to
+`backups/pre-migrate-<timestamp>/libraries/<library id>/library.json` first.
+An existing `categories.json` is left as it is, so one library’s list is not
+copied onto another. Startup does not open `backups/`. Those copies stay
+untouched until you put one back by hand. Model-root `!.wcm` folders
 are hashes and ratings, not these lists. Builds before 0.9.3 kept one shared
 list and could replace it on save or quit, including writing categories empty
 while Archive still had rows. The first launch of 0.9.3 copies a version-1
 file into each library’s slot once. Before that rewrite, and before any later
 format change, the app copies the file to
 `backups/pre-migrate-<timestamp>/`. If the copy fails, the file is not
-rewritten. On startup the app also fills an empty Archive, Maybe, Notify, or
-LoRA category list from an older `library.json` still on disk. A shorter list
-never replaces a longer one.
+rewritten. A short save cannot replace a longer list already in the live
+shelf files.
 
 LoRA and checkpoint indexes (`loraService` / `checkpointService`) walk the
 configured roots with symlink-aware directory traversal (`modelFolderWalk`) so

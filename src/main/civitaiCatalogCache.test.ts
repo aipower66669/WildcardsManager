@@ -19,6 +19,7 @@ import {
   getCachedModel,
   getCatalogSliceStats,
   insertCachedModelsIfAbsent,
+  seedEmptyCatalogSlice,
   invalidateAutoV2CatalogIndex,
   listCachedModelsForSliceWindow,
   updateCatalogSlice,
@@ -64,6 +65,50 @@ describe('civitaiCatalogCache', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
+  it('relinks slice folders when meta.json lost its slice map', () => {
+    const sliceKey = 'origin|LORA';
+    const dirName = 'orphanslice';
+    fs.mkdirSync(path.join(root, 'slices', dirName), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'slices', dirName, 'meta.json'),
+      `${JSON.stringify({
+        sliceKey,
+        exhausted: true,
+        nextCursor: null,
+        idCount: 2,
+        idChunkCount: 1,
+      })}\n`,
+    );
+    fs.writeFileSync(
+      path.join(root, 'slices', dirName, 'ids-0000.json'),
+      `${JSON.stringify([11, 12])}\n`,
+    );
+    fs.writeFileSync(
+      path.join(root, 'meta.json'),
+      `${JSON.stringify({ version: 1, slices: {} })}\n`,
+    );
+    configureCatalogCacheRoot(root);
+    expect(getCatalogSliceStats(sliceKey).idCount).toBe(2);
+  });
+
+  it('rebuilds an empty slice from model pages already on disk', () => {
+    fs.mkdirSync(path.join(root, 'models', 'civitai.com'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'models', 'civitai.com', '0.json'),
+      `${JSON.stringify({
+        '11': { id: 11 },
+        '12': { id: 12 },
+      })}\n`,
+    );
+    fs.writeFileSync(
+      path.join(root, 'meta.json'),
+      `${JSON.stringify({ version: 1, slices: {} })}\n`,
+    );
+    configureCatalogCacheRoot(root);
+    expect(seedEmptyCatalogSlice('kept')).toBe(2);
+    expect(getCatalogSliceStats('kept').exhausted).toBe(true);
+  });
+
   it('stores models on separate pages by id band', () => {
     const origin = 'https://civitai.com';
     insertCachedModelsIfAbsent([
@@ -91,7 +136,7 @@ describe('civitaiCatalogCache', () => {
       architectures: ['sdxl'],
       query: '',
     });
-    const ids = Array.from({ length: 2500 }, (_, i) => i + 1);
+    const ids = Array.from({ length: 5000 }, (_, i) => i + 1);
     insertCachedModelsIfAbsent(ids.map((id) => sampleModel(id)));
     flushDirtyModelPagesSync();
     updateCatalogSlice(sliceKey, {
@@ -101,7 +146,7 @@ describe('civitaiCatalogCache', () => {
     });
 
     const stats = getCatalogSliceStats(sliceKey);
-    expect(stats.idCount).toBe(2500);
+    expect(stats.idCount).toBe(5000);
     expect(stats.nextCursor).toBe('abc');
     expect(catalogSliceHasModel(sliceKey, 1)).toBe(true);
     expect(catalogSliceHasModel(sliceKey, 99999)).toBe(false);
@@ -112,7 +157,7 @@ describe('civitaiCatalogCache', () => {
     const sliceDir = fs.readdirSync(path.join(root, 'slices'));
     expect(sliceDir.length).toBe(1);
     const files = fs.readdirSync(path.join(root, 'slices', sliceDir[0]!));
-    expect(files.filter((f) => f.startsWith('ids-')).length).toBe(3);
+    expect(files.filter((f) => f.startsWith('ids-')).length).toBe(5);
   });
 
   it('indexes every autoV2Hashes entry into the catalog Map', () => {

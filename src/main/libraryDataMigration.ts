@@ -366,8 +366,9 @@ export function runLibraryDataMigration(): {
   runWildcardsSiblingSidecarMigration();
 
   if (isLibraryDataMigrationDone()) {
-    // Hydrate splits a shared catalog into one directory and one library.json
-    // slot per library before the cache root is bound.
+    // Hydrate splits a shared catalog into one directory per library, then
+    // splits a combined library.json into shelf files and moves LoRA
+    // categories into categories.json, before the cache root is bound.
     loadSettings();
     bindActiveLibraryDataRoots();
     return { migrated: false, skipped: true };

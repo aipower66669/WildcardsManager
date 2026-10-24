@@ -633,6 +633,8 @@ const api: WcmDesktopApi = {
       ipcRenderer.invoke(IPC.civitaiMarkInstalled, modelId),
     markVersionInstalled: (params) =>
       ipcRenderer.invoke(IPC.civitaiMarkVersionInstalled, params),
+    markVersionsInstalled: (params) =>
+      ipcRenderer.invoke(IPC.civitaiMarkVersionsInstalled, params),
     unmarkInstalled: (modelId) =>
       ipcRenderer.invoke(IPC.civitaiUnmarkInstalled, modelId),
     watchModel: (params) => ipcRenderer.invoke(IPC.civitaiWatchModel, params),

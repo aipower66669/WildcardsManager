@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   collectInstalledModelIdsFromHashes,
+  keepLongerRows,
+  mergeDownloadedIds,
   mergePersistedInstalledIds,
 } from './civitaiInstalledFromHashes.js';
 
@@ -44,5 +46,27 @@ describe('mergePersistedInstalledIds', () => {
 
   it('keeps persist when a complete flag is set but live is empty', () => {
     expect(mergePersistedInstalledIds([1, 2], [], true)).toEqual([1, 2]);
+  });
+});
+
+describe('keepLongerRows', () => {
+  it('keeps the saved downloaded rows when a later scan is empty', () => {
+    expect(
+      keepLongerRows(
+        [
+          { id: 1, type: 'LORA' },
+          { id: 2, type: 'LORA' },
+        ],
+        [],
+      ).map((row) => row.id),
+    ).toEqual([1, 2]);
+  });
+});
+
+describe('mergeDownloadedIds', () => {
+  it('keeps the saved list when a rebuilt catalog matches fewer files', () => {
+    expect(
+      mergeDownloadedIds([1, 2, 3, 4], [2, 9], true).sort((a, b) => a - b),
+    ).toEqual([1, 2, 3, 4, 9]);
   });
 });

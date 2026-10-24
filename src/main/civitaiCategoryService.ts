@@ -4,6 +4,8 @@ import {
   isSafeCategoryRelativePath,
   sanitizeDownloadCategoryName,
 } from '../domain/civitaiCategory.js';
+import { isLibraryUtilityDirName } from '../domain/librarySidecarPaths.js';
+import { direntIsDirectory } from './modelFolderWalk.js';
 import type { CivitaiModelTypeDto } from '../shared/contracts.js';
 import {
   getLastCivitaiDownloadCategory,
@@ -46,22 +48,29 @@ export function resolveDownloadCategoryDir(
   return resolved;
 }
 
+/** Subfolders a checkpoint can download into. Junctions count. Utility dirs do not. */
+export function listDownloadCategoryDirNames(rootFolder: string): string[] {
+  const categories: string[] = [];
+  let entries: fs.Dirent[] = [];
+  try {
+    entries = fs.readdirSync(rootFolder, { withFileTypes: true });
+  } catch {
+    return categories;
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith('.') || isLibraryUtilityDirName(entry.name)) continue;
+    if (!direntIsDirectory(path.join(rootFolder, entry.name), entry)) continue;
+    categories.push(entry.name);
+  }
+  categories.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  return categories;
+}
+
 export function listDownloadCategories(
   type: CivitaiModelTypeDto,
 ): CivitaiDownloadCategoryInfo {
   const rootFolder = modelRootFolder(type);
-  const categories: string[] = [];
-
-  try {
-    for (const entry of fs.readdirSync(rootFolder, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-      categories.push(entry.name);
-    }
-  } catch {
-    // Unreadable folder — treat as empty category list.
-  }
-
-  categories.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const categories = listDownloadCategoryDirNames(rootFolder);
 
   const last = getLastCivitaiDownloadCategory(type);
   const lastCategory =

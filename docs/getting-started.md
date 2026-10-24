@@ -71,10 +71,14 @@ em dash: `Library name — Prompts Library`, `Library name — Image Generation`
 `Library name — Checkpoints file manager`, or `Library name — Advanced Search`.
 
 The toolbar **Search** (magnifying glass) opens a quick launcher into the same
-search. Archive, Maybe, Notify, and LoRA download categories live in one
-sibling `<wildcardsBasename>.wcm/library.json` beside the wildcards root (not
-inside it, and not in AppData), with a separate block per library. Each
-library’s Civitai catalog is
+search. Archive, Maybe, Notify, and LoRA download categories live in
+`<wildcardsBasename>.wcm/libraries/<library id>/` beside the wildcards root
+(not inside it, and not in AppData). Civitai LoRAs, checkpoints, images, and
+videos are separate files, and Hugging Face has its own file. LoRA download
+categories are `categories.json` in that same folder. The first launch
+after an upgrade copies the old combined `library.json` to
+`backups/pre-migrate-<timestamp>/` and splits it. Later launches leave those
+files alone and do not open `backups/`. Each library’s Civitai catalog is
 `<wildcardsBasename>.wcm/cache/civitai-catalog/<library id>/`. LoRA and
 checkpoint metadata use `!.wcm/` and `!Thumbnails/` next to those model
 folders. Civitai community image downloads use a configured **images folder**

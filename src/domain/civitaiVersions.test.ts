@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   dedupeDownloadPicks,
+  everyListedDownloadableVersionInstalled,
   dedupeFilesByName,
   fileSnapshotsFromModelVersions,
   formatVersionVariantLabel,
@@ -375,5 +376,46 @@ describe('installFlagsForVersions', () => {
         },
       ]).notifyEarlyAccess,
     ).toBe(true);
+  });
+});
+
+describe('everyListedDownloadableVersionInstalled', () => {
+  it('is true only when every current downloadable version is installed', () => {
+    expect(
+      everyListedDownloadableVersionInstalled([
+        { installed: true },
+        { installed: true, earlyAccess: false },
+        { installed: false, earlyAccess: true },
+      ]),
+    ).toBe(true);
+  });
+
+  it('is false when one current version is still missing', () => {
+    expect(
+      everyListedDownloadableVersionInstalled([
+        { installed: true },
+        { installed: false },
+      ]),
+    ).toBe(false);
+  });
+
+  it('is false when a later version is added unmarked', () => {
+    const today = [{ installed: true }, { installed: true }];
+    expect(everyListedDownloadableVersionInstalled(today)).toBe(true);
+    expect(
+      everyListedDownloadableVersionInstalled([
+        ...today,
+        { installed: false },
+      ]),
+    ).toBe(false);
+  });
+
+  it('is false when nothing can be downloaded yet', () => {
+    expect(everyListedDownloadableVersionInstalled([])).toBe(false);
+    expect(
+      everyListedDownloadableVersionInstalled([
+        { installed: false, earlyAccess: true },
+      ]),
+    ).toBe(false);
   });
 });

@@ -117,7 +117,7 @@ Site**):
 | Site | Meaning |
 | --- | --- |
 | **civitai.com** | SFW-oriented catalog |
-| **civitai.red** | NSFW catalog |
+| **civitai.red** | NSFW catalog. Browse is mature models only |
 
 Use the site that matches the content you want. Browse/search does not need an
 API key. **Downloads often do:** if a creator requires login, download fails with
@@ -346,10 +346,10 @@ file](#the-app-freezes-on-launch-or-when-opening-a-root-file). Leave
 
 ## Archive / Maybe / Notify lists disappeared or look empty
 
-Those lists are stored per wildcards root in the sibling
-`<basename>.wcm/library.json` (not inside the wildcards folder, and not in
-AppData). Each library is separate — copying another library’s file overwrites
-the wrong tree. After upgrading, let the app finish its one-time migrations
+Those lists are per library in `<basename>.wcm/libraries/<library id>/`
+(not inside the wildcards folder, and not in AppData). Copying one library’s
+folder over another overwrites the wrong lists. After upgrading, let the app
+finish its one-time migrations
 (AppData → sidecars, and in-tree `!.wcm`/`!Cache` → sibling `.wcm`), then
 restart. If a running older build and a newer build both write settings, prefer
 quitting all instances before restoring from backup.
@@ -511,35 +511,45 @@ been tested. Running from source on those systems might work.
 
 ## Archive, Maybe, Notify, or LoRA categories disappeared
 
-Those lists are not in AppData. They are in one file next to the wildcards
-folder: `<wildcards folder name>.wcm/library.json`. Each library has its own
-block in that file. Each library’s Civitai catalog is a separate folder,
+Those lists are not in AppData. Each library has its own folder next to the
+wildcards folder: `<wildcards folder name>.wcm/libraries/<library id>/`.
+Civitai LoRAs, checkpoints, images, and videos are separate files there, and
+Hugging Face has its own file. LoRA download categories are
+`categories.json` in that folder. `library.json` in the `.wcm` folder is only a
+pointer. Each library’s Civitai catalog is
 `<wildcards folder name>.wcm/cache/civitai-catalog/<library id>/`. The `!.wcm`
 folders under a LoRA or checkpoint root are hashes and ratings. Replacing
 those does not restore Archive or categories.
 
-Builds before 0.9.3 could replace this file with another library’s older
-lists, or save the categories as empty. 0.9.3 keeps each library’s block and
-copies `library.json` to
-`<wildcards folder name>.wcm/backups/pre-migrate-<timestamp>/` before a format
-change.
+Builds before 0.9.3 could replace one combined file with another library’s
+older lists, or save the categories as empty. Upgrading runs the split on
+the first launch: each library’s lists move into their own files, and
+`library.json` is copied to
+`<wildcards folder name>.wcm/backups/pre-migrate-<timestamp>/` first. If that
+copy fails, the combined file is left as it is. The next launch sees the
+pointer and does not split again. The same launch moves LoRA categories
+into `categories.json`. If they were still inside the preferences
+`library.json`, that file is copied to
+`backups/pre-migrate-<timestamp>/libraries/<library id>/` first. Saving
+archived images rewrites only `civitai-images.json`. The app does not open
+`backups/` on startup. A file left there does not come back by itself.
 
 To put a backup back:
 
 1. Quit Wildcards Manager completely, including the tray icon. Closing the
    window is not enough while the app is still running. A running app will
    write the broken lists again on quit.
-2. In the live `.wcm` folder, rename `library.json` to `broken-library.json`.
-   The new name must not start with `library.json`.
-3. Copy `library.json` from a backup of that same `.wcm` folder. A ComfyUI
-   backup that includes this folder is the right copy. You do not need an
-   AppData backup.
-4. Start 0.9.3, not an older installed build.
+2. Restore the shelf files under `libraries/<library id>/`, or put the
+   combined `library.json` from `backups/pre-migrate-<timestamp>/` back in
+   the `.wcm` folder. The restored name must be `library.json`.
+3. Start the updated app. The first launch migrates a combined
+   `library.json`. A build from before the shelf split does not read the
+   shelf files.
 
 An older backup is one shared list. This build copies it into each library’s
-block, so both libraries match that backup. Changes made after the backup
-have to be done again. Do not copy the whole ComfyUI tree over the live
-folder. Do not edit `library.json` in a text editor.
+shelf files. Changes made after the backup have to be done again. Do not copy
+the whole ComfyUI tree over the live folder. Do not edit these files in a
+text editor.
 
 ## Reporting a bug
 

@@ -50,7 +50,7 @@ Open the repository’s `sample_wildcards/` folder and select `0main.txt`. The l
 
 ### 11. Can I keep more than one library?
 
-Yes. **Library Manager** stores several libraries. Each has its own wildcards root, model folders, Civitai site (`civitai.com` or `civitai.red`), validation platform (ComfyUI or Stable Diffusion), and Generation family (`krea2` or `sdxl`, default `krea2`). Switching libraries reloads that library’s catalog and the open workspace, including that library’s Generation form. Two libraries that share a wildcards folder still have separate catalog folders and separate Archive, Maybe, Notify, and category blocks inside the one `library.json`.
+Yes. **Library Manager** stores several libraries. Each has its own wildcards root, model folders, Civitai site (`civitai.com` or `civitai.red`), validation platform (ComfyUI or Stable Diffusion), and Generation family (`krea2` or `sdxl`, default `krea2`). Switching libraries reloads that library’s catalog and the open workspace, including that library’s Generation form. Two libraries that share a wildcards folder still have separate catalog folders and separate shelf files under `.wcm/libraries/<library id>/`.
 
 ### 12. What does each library pointer do?
 
@@ -70,7 +70,7 @@ It rewrites stored pointers when a tree changes drive or parent, for example `D:
 
 ### 16. Where is per-library data on disk?
 
-Next to the wildcards root, in a sibling folder named `<wildcards folder name>.wcm`. That folder is in the ComfyUI tree. AppData does not hold these lists. One `library.json` holds archive, maybe, notify, blocked creators, LoRA download categories, `promptSubstitutions`, and `ignoredCheckpoints`, with a separate block for each library id. `prompt-coverage.json` is in the same folder. Each library’s Civitai catalog is `cache/civitai-catalog/<library id>/` under that sibling. Hash-miss cache stays in `cache/`. The `!.wcm` folders inside LoRA and checkpoint roots are a different store (hashes and ratings).
+Next to the wildcards root, in a sibling folder named `<wildcards folder name>.wcm`. That folder is in the ComfyUI tree. AppData does not hold these lists. Each library has `libraries/<library id>/` with `civitai-loras.json`, `civitai-checkpoints.json`, `civitai-images.json`, `civitai-videos.json`, `huggingface.json`, and `categories.json` (LoRA download categories). Filters, `promptSubstitutions`, and `ignoredCheckpoints` are in that folder’s `library.json`. The `.wcm/library.json` file is a pointer. The first launch of an upgraded app copies categories into `categories.json` and backs up the preferences file first. `prompt-coverage.json` is in the `.wcm` folder. Each library’s Civitai catalog is `cache/civitai-catalog/<library id>/` under that sibling. Hash-miss cache stays in `cache/`. The `!.wcm` folders inside LoRA and checkpoint roots are a different store (hashes and ratings).
 
 ### 17. Where is LoRA and checkpoint metadata?
 
@@ -86,7 +86,7 @@ The file with more membership rows wins where both define the same field. A fiel
 
 ### 20. Should I hand-edit `library.json` or `settings.json`?
 
-Use the app. Hand edits are easy to overwrite on the next save, and a bad `library.json` can drop lists. Settings in AppData are pointers and preferences. If a moved library still opens the old path, open a valid folder or use **Migrate library paths…** rather than deleting keys by hand. One exception is a stuck startup: quit, then remove or null `lastRootFile` in `settings.json`, or use **Settings → Clear last file** when the window opens. The other is restoring a wiped Archive, Maybe, Notify, or category list: quit completely (including the tray), rename the live `library.json` to a name that does not start with `library.json`, and copy `library.json` from a backup of that same `.wcm` folder. Do not edit the file in a text editor. See Troubleshooting, “Archive, Maybe, Notify, or LoRA categories disappeared.”
+Use the app. Hand edits are easy to overwrite on the next save, and a bad shelf file can drop lists. Settings in AppData are pointers and preferences. If a moved library still opens the old path, open a valid folder or use **Migrate library paths…** rather than deleting keys by hand. One exception is a stuck startup: quit, then remove or null `lastRootFile` in `settings.json`, or use **Settings → Clear last file** when the window opens. The other is restoring a wiped Archive, Maybe, Notify, or category list: quit completely (including the tray), then restore that library’s files under `.wcm/libraries/<library id>/`, or put the combined `library.json` back from `backups/pre-migrate-<timestamp>/`. Leaving that copy inside `backups/` does nothing: startup does not open that folder. Do not edit the files in a text editor. Start the updated app and let the first launch migrate the file you put back. See Troubleshooting, “Archive, Maybe, Notify, or LoRA categories disappeared.”
 
 ## Wildcard syntax
 
@@ -364,7 +364,7 @@ Yes. It reads the editor draft, not a separate copy on disk. Apply writes into t
 
 ### 86. Which Civitai site should I pick?
 
-**Settings → Civitai → Site**. `civitai.com` is the SFW-oriented catalog. `civitai.red` is the NSFW catalog. The choice selects the API and the account for **models**. Images and Videos have their own **SFW only / SFW + NSFW / NSFW only** filter. Create the API key on the same site you selected.
+**Settings → Civitai → Site**. `civitai.com` is the SFW-oriented catalog. `civitai.red` is the NSFW catalog, and its Browse lists mature models only. The choice selects the API and the account for **models**. Images and Videos have their own **SFW only / SFW + NSFW / NSFW only** filter. Create the API key on the same site you selected.
 
 ### 87. Do I need an API key to browse?
 
@@ -380,7 +380,7 @@ It hides that model from Browse. Open **Archive** to unarchive or to download so
 
 ### 90. What is Maybe?
 
-A holding list for models you might want later, separate from Archive and from Notify. It is stored in that library’s `library.json`.
+A holding list for models you might want later, separate from Archive and from Notify. It is stored in that library’s `civitai-loras.json` or `civitai-checkpoints.json`.
 
 ### 91. What is Notify me?
 
@@ -416,7 +416,7 @@ Category tags (Character, Style, Concept, and the rest), architecture (SD 1.5, S
 
 ### 99. What does catalog sync do?
 
-The app keeps a local slice of the Civitai catalog so Browse can filter without hitting the API for every card. Each library has its own catalog folder, `cache/civitai-catalog/<library id>/` under the sibling `.wcm`, including when two libraries use the same wildcards folder. You can sync, cancel a sync, and set an auto-sync interval. Hash and preview warming run in the background and report progress. Sync does not download model weights. Dirty pages are saved within about half a second, and again when you quit. Archive, Maybe, and Notify are not stored inside those catalog pages. They are blocks in `library.json`.
+The app keeps a local slice of the Civitai catalog so Browse can filter without hitting the API for every card. Each library has its own catalog folder, `cache/civitai-catalog/<library id>/` under the sibling `.wcm`, including when two libraries use the same wildcards folder. You can sync, cancel a sync, and set an auto-sync interval. Hash and preview warming run in the background and report progress. Sync does not download model weights. Dirty pages are saved within about half a second, and again when you quit. Archive, Maybe, and Notify are not stored inside those catalog pages. They are that library’s shelf files under `.wcm/libraries/<library id>/`.
 
 ## Images, videos, and Hugging Face
 

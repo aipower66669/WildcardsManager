@@ -307,6 +307,7 @@ export const IPC = {
   civitaiListShelfSummaries: 'wcm:civitai:listShelfSummaries',
   civitaiMarkInstalled: 'wcm:civitai:markInstalled',
   civitaiMarkVersionInstalled: 'wcm:civitai:markVersionInstalled',
+  civitaiMarkVersionsInstalled: 'wcm:civitai:markVersionsInstalled',
   civitaiUnmarkInstalled: 'wcm:civitai:unmarkInstalled',
   civitaiWatchModel: 'wcm:civitai:watchModel',
   civitaiUnwatchModel: 'wcm:civitai:unwatchModel',
@@ -3709,6 +3710,17 @@ export type WcmDesktopApi = {
       versionId: number;
       fileId: number;
       fileName?: string;
+    }): Promise<void>;
+    /**
+     * Mark the versions listed now. Does not cover a version added later.
+     */
+    markVersionsInstalled(params: {
+      modelId: number;
+      versions: Array<{
+        versionId: number;
+        fileId: number;
+        fileName?: string;
+      }>;
     }): Promise<void>;
     unmarkInstalled(modelId: number): Promise<void>;
     watchModel(params: {

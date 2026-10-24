@@ -45,3 +45,36 @@ export function mergePersistedInstalledIds(
   }
   return [...out];
 }
+
+/**
+ * Hash matches against a half-built catalog are a subset of the saved
+ * Downloaded list. Shrinking to that subset dropped models that are still
+ * on disk. Shrink only when the live match is at least as long as the
+ * saved list (files actually left the folder).
+ */
+/** A shorter scan must not replace a longer saved Downloaded list. */
+export function keepLongerRows<T extends { id: number }>(
+  existing: readonly T[],
+  incoming: readonly T[],
+): T[] {
+  if (incoming.length >= existing.length) return [...incoming];
+  const byId = new Map<number, T>();
+  for (const row of existing) {
+    if (Number.isFinite(row.id) && row.id > 0) byId.set(row.id, row);
+  }
+  for (const row of incoming) {
+    if (!Number.isFinite(row.id) || row.id <= 0 || byId.has(row.id)) continue;
+    byId.set(row.id, row);
+  }
+  return [...byId.values()];
+}
+
+export function mergeDownloadedIds(
+  persisted: readonly number[],
+  live: readonly number[],
+  folderFullyHashed: boolean,
+): number[] {
+  const shrink =
+    folderFullyHashed && live.length > 0 && live.length >= persisted.length;
+  return mergePersistedInstalledIds(persisted, live, shrink);
+}

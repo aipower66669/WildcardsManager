@@ -82,6 +82,8 @@ export type WindowState = {
 export type ArchivedCivitaiModel = {
   origin: CivitaiOrigin;
   modelId: number;
+  /** Which shelf file this row belongs in. Omitted on older saves. */
+  modelType?: 'LORA' | 'Checkpoint';
 };
 
 /** Shelved Civitai community image (Browse hide). */
@@ -109,6 +111,7 @@ export type MarkedInstalledCivitaiVersion = {
 export type MaybeCivitaiModel = {
   origin: CivitaiOrigin;
   modelId: number;
+  modelType?: 'LORA' | 'Checkpoint';
 };
 
 /** Creator whose Browse cards are hidden for this library / origin. */
@@ -510,7 +513,11 @@ function parseArchivedCivitaiModels(raw: unknown): ArchivedCivitaiModel[] {
   const seen = new Set<string>();
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
-    const row = item as { origin?: unknown; modelId?: unknown };
+    const row = item as {
+      origin?: unknown;
+      modelId?: unknown;
+      modelType?: unknown;
+    };
     if (typeof row.modelId !== 'number' || !Number.isFinite(row.modelId)) {
       continue;
     }
@@ -521,7 +528,11 @@ function parseArchivedCivitaiModels(raw: unknown): ArchivedCivitaiModel[] {
     const key = `${origin}:${modelId}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ origin, modelId });
+    const modelType =
+      row.modelType === 'LORA' || row.modelType === 'Checkpoint'
+        ? row.modelType
+        : undefined;
+    out.push(modelType ? { origin, modelId, modelType } : { origin, modelId });
   }
   return out.sort(
     (a, b) => a.origin.localeCompare(b.origin) || a.modelId - b.modelId,
@@ -2959,7 +2970,12 @@ export function archiveCivitaiModels(
     mem.maybe.delete(id);
     if (mem.archived.has(id)) continue;
     mem.archived.add(id);
-    additions.push({ origin, modelId: id });
+    const browseType = getActiveLibrary().civitaiBrowseFilters?.type;
+    const modelType =
+      browseType === 'LORA' || browseType === 'Checkpoint' ? browseType : undefined;
+    additions.push(
+      modelType ? { origin, modelId: id, modelType } : { origin, modelId: id },
+    );
     archivedCount += 1;
   }
   const maybe = listMaybeCivitaiModels().filter((m) => !idSet.has(m.modelId));
@@ -3242,49 +3258,57 @@ export function isCivitaiModelVersionMarkedInstalled(modelId: number): boolean {
   return listMarkedInstalledCivitaiVersions().some((m) => m.modelId === id);
 }
 
-export function markCivitaiVersionInstalled(opts: {
-  modelId: number;
-  versionId: number;
-  fileId: number;
-  fileName?: string | null;
-}): MarkedInstalledCivitaiVersion[] {
+/**
+ * Record version/file rows as downloaded. Does not mark the model itself, so a
+ * version that is not in this list stays unmarked.
+ */
+export function markCivitaiVersionsInstalled(
+  modelId: number,
+  versions: Array<{
+    versionId: number;
+    fileId: number;
+    fileName?: string | null;
+  }>,
+): MarkedInstalledCivitaiVersion[] {
   const origin = getCivitaiOrigin();
-  const modelId = Math.round(opts.modelId);
-  const versionId = Math.round(opts.versionId);
-  const fileId = Math.round(opts.fileId);
-  const fileName = opts.fileName?.trim() || undefined;
-  const key = markedVersionKey(modelId, versionId, fileId);
+  const mid = Math.round(modelId);
   const mem = membershipForOrigin(origin);
-  const current = listMarkedInstalledCivitaiVersions();
-  const existingIdx = current.findIndex(
-    (m) =>
-      m.modelId === modelId &&
-      m.versionId === versionId &&
-      (m.fileId === fileId ||
-        (fileName &&
-          m.fileName?.trim().toLowerCase() === fileName.toLowerCase())),
-  );
-  if (existingIdx >= 0) {
-    const prev = current[existingIdx]!;
-    if (!prev.fileName && fileName) {
-      const next = current.map((m, i) =>
-        i === existingIdx ? { ...m, fileName } : m,
-      );
-      patchActiveLibrary(
-        { markedInstalledCivitaiVersions: next },
-        { flushImmediate: true },
-      );
-      markCivitaiModelInstalled(modelId);
-      return next;
+  let current = listMarkedInstalledCivitaiVersions();
+  let changed = false;
+  for (const raw of versions) {
+    if (!Number.isFinite(raw.versionId) || !Number.isFinite(raw.fileId)) {
+      continue;
     }
-    markCivitaiModelInstalled(modelId);
-    return current;
+    const versionId = Math.round(raw.versionId);
+    const fileId = Math.round(raw.fileId);
+    const fileName = raw.fileName?.trim() || undefined;
+    const existingIdx = current.findIndex(
+      (m) =>
+        m.modelId === mid &&
+        m.versionId === versionId &&
+        (m.fileId === fileId ||
+          (fileName &&
+            m.fileName?.trim().toLowerCase() === fileName.toLowerCase())),
+    );
+    if (existingIdx >= 0) {
+      const prev = current[existingIdx]!;
+      if (!prev.fileName && fileName) {
+        current = current.map((m, i) =>
+          i === existingIdx ? { ...m, fileName } : m,
+        );
+        changed = true;
+      }
+      continue;
+    }
+    mem.markedInstalledVersions.add(markedVersionKey(mid, versionId, fileId));
+    current = [
+      ...current,
+      { origin, modelId: mid, versionId, fileId, fileName },
+    ];
+    changed = true;
   }
-  mem.markedInstalledVersions.add(key);
-  const next = [
-    ...current,
-    { origin, modelId, versionId, fileId, fileName },
-  ].sort(
+  if (!changed) return current;
+  const next = [...current].sort(
     (a, b) =>
       a.origin.localeCompare(b.origin) ||
       a.modelId - b.modelId ||
@@ -3295,10 +3319,16 @@ export function markCivitaiVersionInstalled(opts: {
     { markedInstalledCivitaiVersions: next },
     { flushImmediate: true },
   );
-  // Also mark the model so Browse “Hide downloaded” works even when AutoV2
-  // rematch lags or Civitai’s published hashes omit the local file.
-  markCivitaiModelInstalled(modelId);
   return next;
+}
+
+export function markCivitaiVersionInstalled(opts: {
+  modelId: number;
+  versionId: number;
+  fileId: number;
+  fileName?: string | null;
+}): MarkedInstalledCivitaiVersion[] {
+  return markCivitaiVersionsInstalled(opts.modelId, [opts]);
 }
 
 export function listCivitaiWatchlist(): WatchedCivitaiModel[] {

@@ -485,6 +485,20 @@ export function hasNewerVersionUpdate(
   return false;
 }
 
+/**
+ * True when every version the card can download right now is installed.
+ * Early-access rows are skipped. No downloadable row means false, so a
+ * version added later that is not installed is not treated as done.
+ */
+export function everyListedDownloadableVersionInstalled(
+  rows: Array<{ installed: boolean; earlyAccess?: boolean }>,
+): boolean {
+  const downloadable = rows.filter((row) => !row.earlyAccess);
+  return (
+    downloadable.length > 0 && downloadable.every((row) => row.installed)
+  );
+}
+
 /** Update / Notify chrome for the versions visible on the current base-model chip. */
 export function installFlagsForVersions(
   rows: VersionInstallRow[],
