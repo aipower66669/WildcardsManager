@@ -51,6 +51,9 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
   iteration count). v0.9 also stores `generationFamily` per library (`krea2`
   or `sdxl`). SDXL, Pony, and Illustrious share one checkpoint graph: VAE
   override, CLIP skip (default 2), upscaler, scale factor, and hires denoise.
+  v0.10 adds Browse family chips (All, SDXL, Pony, Illustrious, NoobAI) and
+  keeps each library’s enabled families, base models, and Civitai categories
+  on that library. **+N new** counts the open family and category.
   Sampler and Scheduler show the Comfy name, underscores included. Generation
   parameters and Options are saved per library and per style.
 - **Civitai Images and Videos** browse/download/archive + background Download
@@ -58,7 +61,8 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - **Library Manager** with multiple libraries, per-style generation output
   roots, a per-library generation family (Krea 2 or SDXL), checkpoint
   benchmark folder, LoRA training library, and path migration when a tree
-  moves (documented in v0.7; family in v0.9).
+  moves (documented in v0.7; family in v0.9; Browse families and per-library
+  shelves in v0.10).
 - **LM Studio** prompt assist on the wildcard editor (local server; writes only
   after you apply a proposal).
 - Checkpoint half-star ratings; blocked Civitai authors.

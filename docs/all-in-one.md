@@ -47,18 +47,6 @@ Links written as `syntax.md` or `user-guide.md#…` are paths inside the `docs/`
 
 ---
 
----
-
----
-
----
-
----
-
----
-
----
-
 <!-- source: docs/README.md -->
 
 # Documentation
@@ -104,7 +92,7 @@ what you are trying to do.
   examples for diagnostics.
 - [`screenshot.png`](screenshot.png) — README image; replace with a better
   capture without changing links.
-- [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) — current public release (v0.9)
+- [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) — current public release (v0.10)
   overview, installation, and known limitations.
 - [`../CHANGELOG.md`](../CHANGELOG.md) — version-by-version notable changes.
 - [`../LICENSE.md`](../LICENSE.md) — software and sample-library licenses.
@@ -174,8 +162,10 @@ download categories append snippets to a chosen wildcard; Shift+click reuses
 the last category. A **Search** tab covers wildcards and model filenames; a
 **Prompts** tab manages prompt folders; a **Generation** tab drives ComfyUI
 from typed prompts or `!gen.txt` folders. Each library is Krea 2 or SDXL.
-SDXL, Pony, and Illustrious share one checkpoint graph with a replaceable
-VAE, CLIP skip, and a hires pass.
+Browse on an SDXL library filters Pony, Illustrious, NoobAI, and plain SDXL
+separately. Those families, the base models, and the Civitai categories are
+stored on that library. SDXL, Pony, and Illustrious share one checkpoint graph
+with a replaceable VAE, CLIP skip, and a hires pass.
 
 ### Diagnose and repair
 
@@ -382,8 +372,9 @@ folders. Civitai community image downloads use a configured **images folder**
 
 The app queues ComfyUI. It does not ship a ComfyUI install. Two sample graphs
 are in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/): Krea 2, and one checkpoint
-graph for SDXL, Pony, and Illustrious. Another architecture needs a graph you
-adapt in ComfyUI before you save it. The
+graph for SDXL, Pony, and Illustrious. Civitai Browse on an SDXL library also
+has family chips for Pony, Illustrious, NoobAI, and plain SDXL. Another
+architecture needs a graph you adapt in ComfyUI before you save it. The
 [user guide](user-guide.md#install-the-nodes-and-the-sample-graph) names every
 extra pack, with links.
 
@@ -1183,6 +1174,14 @@ Images) **images folder** under **Settings → Library**, before downloading.
 - Browse filters (persisted): site category tags (Character, Style, Concept, …),
   architecture (SD 1.5, SDXL, Flux, Krea 2, WAN/Video, Other), hide installed,
   only new, only possible matches.
+- While Browse is open, a tip-check looks for newer models. **+N new** counts
+  models that belong on the filters you have open: this base model, this SDXL
+  family chip, and this category. Those cards are placed at the front of the
+  grid, and the grid jumps to the top when the count is not zero. Pony, Illustrious,
+  NoobAI, and plain SDXL each have their own count. Models for another family
+  stay in the catalog and show when that family chip is selected. Category
+  chips work the same way. Installed, archived, Maybe, and Notify stay off
+  Browse.
 - Early-access models: **Notify me** moves them to the **Notify me** tab
   (hidden from Browse). Countdown labels refresh about once a minute. Use
   **Check availability** there; when unlocked they show as available so you can
@@ -1300,8 +1299,12 @@ from the analysis root. The wildcard editor fills the height under the file
 actions. When the node and the graph are clear, **No issues on this node**,
 **All issues (0)**, **Graph is valid**, and **Refresh** share one line. When
 either list has issues, that list grows under the editor and scrolls once it
-reaches about half the panel, so the editor stays at least that tall. Use
-**Refresh** to re-scan without changing the selected node or graph focus.
+reaches about half the panel, so the editor stays at least that tall. Fixing
+one issue removes that row in one update. The other issues stay listed. The
+list does not redraw every issue and then drop the fixed one. The buttons on
+an issue (create, cycle break, fix series, categorize, ignore) run that same
+refresh after the fix. **Refresh** re-scans the whole graph and the LoRA
+folder without changing the selected node or graph focus.
 
 | Code | Meaning |
 | --- | --- |
@@ -2864,7 +2867,7 @@ WildcardsManager-<version>-<os>-<arch>.<ext>
 ```
 
 Local `npm run dist` / `dist:win` / `dist:mac` / `dist:linux` **auto-increment
-the patch** (`0.9.0` → `0.9.1`) before building so in-app **Check for update**
+the patch** (`0.10.0` → `0.10.1`) before building so in-app **Check for update**
 sees a newer installer, then **delete older** `WildcardsManager-*` artifacts in
 `release/` (keeps only the current version’s `.exe` / `.blockmap` / etc.). CI
 skips the bump (`GITHUB_ACTIONS` / `CI`) so tagged releases keep the version
@@ -2904,8 +2907,8 @@ Before tagging:
 5. create and push the tag:
 
    ```powershell
-   git tag v0.9.0
-   git push origin v0.9.0
+   git tag v0.10.0
+   git push origin v0.10.0
    ```
 
 `CHANGELOG.md` is the permanent version history and follows Keep a Changelog.
@@ -3003,6 +3006,9 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
   iteration count). v0.9 also stores `generationFamily` per library (`krea2`
   or `sdxl`). SDXL, Pony, and Illustrious share one checkpoint graph: VAE
   override, CLIP skip (default 2), upscaler, scale factor, and hires denoise.
+  v0.10 adds Browse family chips (All, SDXL, Pony, Illustrious, NoobAI) and
+  keeps each library’s enabled families, base models, and Civitai categories
+  on that library. **+N new** counts the open family and category.
   Sampler and Scheduler show the Comfy name, underscores included. Generation
   parameters and Options are saved per library and per style.
 - **Civitai Images and Videos** browse/download/archive + background Download
@@ -3010,7 +3016,8 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
 - **Library Manager** with multiple libraries, per-style generation output
   roots, a per-library generation family (Krea 2 or SDXL), checkpoint
   benchmark folder, LoRA training library, and path migration when a tree
-  moves (documented in v0.7; family in v0.9).
+  moves (documented in v0.7; family in v0.9; Browse families and per-library
+  shelves in v0.10).
 - **LM Studio** prompt assist on the wildcard editor (local server; writes only
   after you apply a proposal).
 - Checkpoint half-star ratings; blocked Civitai authors.
@@ -3246,7 +3253,7 @@ Open the repository’s `sample_wildcards/` folder and select `0main.txt`. The l
 
 ### 11. Can I keep more than one library?
 
-Yes. **Library Manager** stores several libraries. Each has its own wildcards root, model folders, Civitai site (`civitai.com` or `civitai.red`), validation platform (ComfyUI or Stable Diffusion), and Generation family (`krea2` or `sdxl`, default `krea2`). Switching libraries reloads that library’s catalog and the open workspace, including that library’s Generation form. Two libraries that share a wildcards folder still have separate catalog folders and separate shelf files under `.wcm/libraries/<library id>/`.
+Yes. **Library Manager** stores several libraries. Each has its own wildcards root, model folders, Civitai site (`civitai.com` or `civitai.red`), validation platform (ComfyUI or Stable Diffusion), Generation family (`krea2` or `sdxl`, default `krea2`), base models, SDXL families, and Civitai categories. Switching libraries reloads that library’s catalog and the open workspace, including that library’s Generation form. Two libraries that share a wildcards folder still have separate catalog folders and separate shelf files under `.wcm/libraries/<library id>/`.
 
 ### 12. What does each library pointer do?
 
@@ -3608,7 +3615,7 @@ Yes. **Detach** opens a separate window and the app reopens it detached next tim
 
 ### 98. How do browse filters work?
 
-Category tags (Character, Style, Concept, and the rest), architecture (SD 1.5, SDXL, Flux, Krea 2, WAN/Video, Other), hide installed, only new, and only possible matches are remembered per library. Card width is remembered. Covers are cached as cropped thumbs; new downloads can also keep a full-size file under `!Thumbnails/`.
+Category tags (Character, Style, Concept, and the rest), architecture (SD 1.5, SDXL, Flux, Krea 2, WAN/Video, Other), and — when the base model is SDXL — family (All, SDXL, Pony, Illustrious, NoobAI) are remembered per library. **+N new** counts models for the chip you have open. Hide installed, only new, and only possible matches are remembered too. Card width is remembered. Covers are cached as cropped thumbs; new downloads can also keep a full-size file under `!Thumbnails/`.
 
 ### 99. What does catalog sync do?
 
@@ -3762,6 +3769,8 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 ## Civitai and Hugging Face
 
 - Model API host is per library: `civitai.com` (SFW-oriented) or `civitai.red` (NSFW). A `civitai.red` library’s Browse lists mature models only; models the API marks safe are left out of that index. **Include NSFW** does not add them. Images/Videos content filter is separate: SFW only / SFW + NSFW / NSFW only.
+- Package version in this tree is **0.10.0**. Generation family is `krea2` or `sdxl`. Browse SDXL families are All, SDXL, Pony, Illustrious, and NoobAI, enabled per library (`enabledSdxlFamilies`). NoobAI is a Browse family. It uses the SDXL generation graph when that library’s family is SDXL. There is no separate NoobAI workflow file.
+- Browse tip-check **+N new** counts models that match the open Browse filters (base model, SDXL family chip, and category). Those cards are placed at the front and the grid scrolls to the top when the count is non-zero. Pony, Illustrious, NoobAI, and plain SDXL each have their own count. Models for another family stay in the catalog and show when that family chip is selected. Category chips work the same way. Installed, archived, Maybe, and Notify stay off Browse.
 - Browse works without an API key. Downloads often 401 without a key created on the same site.
 - Model tabs: Browse, Queued, Downloaded, Maybe, Archive, Notify me. **Archive shown** archives on-screen cards only.
 - Notify me is early access. Countdown refresh is about once a minute.
@@ -3786,6 +3795,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 
 ## Edits and history
 
+- Fixing one wildcard issue removes that row from the details list in one update. The other issues stay listed. The list does not redraw every issue and then drop the fixed one. Issue buttons (create, cycle break, fix series, categorize, ignore) run the same refresh after the fix. Refresh re-scans the whole graph and unused LoRAs.
 - Editor disk write is Save only.
 - Editor context menu **Comment** inserts `# ` at column 0 of each line in the selection (or the caret line). **Uncomment** removes one leading `#` and the single space after it, after any leading spaces. A trimmed line that starts with `#` is a comment.
 - Clicking a `missing_file` issue opens the editor search filled with that `__name__` token. Search marks every match. `Esc` closes the panel.

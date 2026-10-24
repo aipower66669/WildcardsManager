@@ -2346,6 +2346,7 @@ export function registerIpc(): void {
       type,
       query: typeof p.query === 'string' ? p.query : undefined,
       architectures: parseArchitectures(p.architectures),
+      sdxlFamily: parseSdxlFamily(p.sdxlFamily),
       category: parseCategory(p.category),
       mode:
         p.mode === 'fill' || p.mode === 'incremental' || p.mode === 'auto'

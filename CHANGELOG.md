@@ -7,6 +7,42 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-25
+
+### Added
+
+- Civitai Browse on an SDXL library has family chips: **All**, **SDXL**,
+  **Pony**, **Illustrious**, and **NoobAI**. Library Manager enables those
+  families on that library. **+N new** counts models for the base model,
+  family chip, and category you have open. Those cards go to the front of
+  that grid. Models for another family stay in the catalog and show when
+  that chip is selected.
+- **Mark as Downloaded** asks **This version** or **All current versions**
+  when a card lists more than one downloadable version. Early access is left
+  out of All. A version published later stays unmarked. The card’s download
+  button and each version row still download.
+
+### Changed
+
+- Each library keeps its own base models, SDXL families, Civitai categories,
+  Civitai catalog, Archive, Maybe, Notify, LoRA download categories, filters,
+  and Generation form. Two libraries that share a wildcards folder do not
+  share those lists.
+- Those lists live in `<wildcards folder name>.wcm/libraries/<library id>/`.
+  Civitai LoRAs, checkpoints, images, and videos are separate files, Hugging
+  Face has its own file, and LoRA download categories are `categories.json`.
+  The first launch after an upgrade copies the old combined `library.json`
+  into `backups/pre-migrate-<timestamp>/` before it writes the shelf files.
+  If that copy fails, the file is left as it is.
+- Generation is still **Krea 2** or **SDXL** per library. SDXL, Pony, and
+  Illustrious share one checkpoint graph (replaceable VAE, CLIP skip, hires).
+  NoobAI is a Browse family on that SDXL library.
+
+### Fixed
+
+- Fixing one wildcard issue removes that row in one update. The details list
+  does not redraw every issue and then drop the fixed one.
+
 ## [0.9.3] - 2026-10-24
 
 ### Fixed
@@ -539,7 +575,8 @@ First public release.
 - Mutations validate supported extensions and use atomic replacement.
 - Ambiguous glob references are reported rather than silently rewritten.
 
-[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/aipower66669/WildcardsManager/compare/v0.9.0...v0.9.3
 [0.9.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.7.0...v0.8.0

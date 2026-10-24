@@ -10,12 +10,13 @@ import {
   chunkModelIds,
   idChunkFileName,
   modelPageIndex,
-  prependIdsIntoChunks,
+  promoteIdsToFront,
 } from '../domain/civitaiCatalogLayout.js';
 import {
   catalogLibrarySegment,
   civitaiCatalogDir,
 } from '../domain/librarySidecarPaths.js';
+import { unionModelTags } from '../domain/civitaiModelCategories.js';
 import {
   appendCatalogSearchHays,
   appendCatalogSearchMem,
@@ -112,6 +113,11 @@ export type CatalogSliceState = {
   /** Resume cursor while still filling this slice. */
   nextCursor?: string | null;
   lastSyncedAt?: string;
+  /**
+   * How many prepended ids were not already in that prefix.
+   * Browse uses this so “+N new” matches cards that moved to the front.
+   */
+  surfaced?: number;
 };
 
 export type CatalogSliceKeyParts = {
@@ -129,6 +135,8 @@ type SliceDiskMeta = {
   lastSyncedAt?: string;
   idCount: number;
   idChunkCount: number;
+  /** Newest tip page last applied for this slice. Skips reordering All again. */
+  tipPageIds?: number[];
 };
 
 type CatalogRootMeta = {
@@ -330,6 +338,9 @@ function readSliceMeta(sliceKey: string): SliceDiskMeta {
     nextCursor: typeof raw.nextCursor === 'string' ? raw.nextCursor : null,
     lastSyncedAt:
       typeof raw.lastSyncedAt === 'string' ? raw.lastSyncedAt : undefined,
+    tipPageIds: Array.isArray(raw.tipPageIds)
+      ? raw.tipPageIds.filter((id) => typeof id === 'number' && Number.isFinite(id))
+      : undefined,
     idCount: Math.max(0, Number(raw.idCount) || 0),
     idChunkCount: Math.max(0, Number(raw.idChunkCount) || 0),
   };
@@ -618,6 +629,7 @@ export function getCatalogSliceStats(sliceKey: string): {
   exhausted: boolean;
   nextCursor: string | null;
   lastSyncedAt?: string;
+  tipPageIds?: number[];
 } {
   ensureCatalogReady();
   const cached = sliceIdCache.get(sliceKey);
@@ -627,6 +639,7 @@ export function getCatalogSliceStats(sliceKey: string): {
       exhausted: cached.meta.exhausted,
       nextCursor: cached.meta.nextCursor,
       lastSyncedAt: cached.meta.lastSyncedAt,
+      tipPageIds: cached.meta.tipPageIds,
     };
   }
   const meta = readSliceMeta(sliceKey);
@@ -635,6 +648,7 @@ export function getCatalogSliceStats(sliceKey: string): {
     exhausted: meta.exhausted,
     nextCursor: meta.nextCursor,
     lastSyncedAt: meta.lastSyncedAt,
+    tipPageIds: meta.tipPageIds,
   };
 }
 
@@ -1232,6 +1246,13 @@ export function insertCachedModelsIfAbsent(
       if (incomingPublished && incomingPublished !== existing.publishedAt) {
         next = { ...next, publishedAt: incomingPublished };
       }
+      const tags = unionModelTags(next.tags, model.tags);
+      if (
+        tags.length !== next.tags.length ||
+        tags.some((tag, index) => tag !== next.tags[index])
+      ) {
+        next = { ...next, tags };
+      }
       if (next !== existing) {
         page.models[key] = { ...next, updatedAt: now };
         page.dirty = true;
@@ -1467,6 +1488,8 @@ export function updateCatalogSlice(
     exhausted?: boolean;
     nextCursor?: string | null;
     lastSyncedAt?: string;
+    /** Remember the Newest page so a later check does not reorder All again. */
+    tipPageIds?: number[];
   },
 ): CatalogSliceState {
   ensureCatalogReady();
@@ -1474,17 +1497,13 @@ export function updateCatalogSlice(
   const known = entry.known;
   let idsChanged = false;
 
+  let surfaced = 0;
   if (update.prependIds?.length) {
-    const fresh: number[] = [];
-    for (const id of update.prependIds) {
-      if (known.has(id)) continue;
-      known.add(id);
-      fresh.push(id);
-    }
-    if (fresh.length) {
-      const chunks = chunkModelIds(entry.ids);
-      const nextChunks = prependIdsIntoChunks(chunks, fresh);
-      entry.ids = nextChunks.flat();
+    const promoted = promoteIdsToFront(entry.ids, update.prependIds);
+    surfaced = promoted.surfaced;
+    if (surfaced > 0) {
+      for (const id of promoted.ids) known.add(id);
+      entry.ids = promoted.ids;
       invalidateCatalogSearchIndex(sliceKey);
       // Hay files are ordered with ids — rebuild on next search.
       clearSliceHayFiles(sliceDir(sliceKey));
@@ -1527,6 +1546,7 @@ export function updateCatalogSlice(
         exhausted: entry.meta.exhausted,
         nextCursor: entry.meta.nextCursor,
         lastSyncedAt: entry.meta.lastSyncedAt,
+        surfaced: more.length,
       };
     }
   }
@@ -1539,6 +1559,9 @@ export function updateCatalogSlice(
   }
   if (update.lastSyncedAt) {
     entry.meta.lastSyncedAt = update.lastSyncedAt;
+  }
+  if (update.tipPageIds) {
+    entry.meta.tipPageIds = update.tipPageIds;
   }
 
   entry.meta.idCount = entry.ids.length;
@@ -1554,6 +1577,7 @@ export function updateCatalogSlice(
     exhausted: entry.meta.exhausted,
     nextCursor: entry.meta.nextCursor,
     lastSyncedAt: entry.meta.lastSyncedAt,
+    surfaced,
   };
 }
 

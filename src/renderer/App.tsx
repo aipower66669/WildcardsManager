@@ -86,10 +86,18 @@ import {
   type LoraWildcardBufferOp,
 } from '../domain/loraDownloadCategory';
 import {
+  LOCAL_SYNTAX_ISSUE_CODES,
   graphRelationshipFingerprint,
   localWildcardSyntaxIssues,
   mergeLocalSyntaxIssues,
 } from '../domain/parseRefs';
+import {
+  FILE_CHECK_ISSUE_CODES,
+  analysisAfterFileEdit,
+  issueIdentity,
+  nodeIdsForFile,
+  remainingGraphIssues,
+} from '../domain/remainingGraphIssues';
 import type {
   AbsorbPreviewDto,
   AnalysisResultDto,
@@ -241,6 +249,11 @@ type FlushDraftOptions = {
    * Graph refresh after save is driven by outgoing-ref fingerprint changes.
    */
   rebuild?: boolean;
+  /**
+   * When false, a ref-changing save does not publish analysis.
+   * The caller applies one finished issue list instead of a full-list flash.
+   */
+  publishGraph?: boolean;
 };
 
 /** Keep typing snappy — avoid full-app work on every keystroke. */
@@ -720,6 +733,27 @@ type ExpandTarget =
       checkpoint: string;
     };
 
+/** Swap library-wide LoRA warnings without touching syntax or missing-file rows. */
+function analysisWithUnusedLoras(
+  analysis: AnalysisResultDto,
+  unused: IssueDto[],
+): AnalysisResultDto {
+  const kept = analysis.issues.filter(
+    (issue) =>
+      issue.code !== 'unused_lora' && issue.code !== 'duplicate_lora_hash',
+  );
+  const issues = [...kept, ...unused];
+  return {
+    ...analysis,
+    issues,
+    stats: {
+      ...analysis.stats,
+      warningCount: issues.filter((issue) => issue.severity === 'warning').length,
+      errorCount: issues.filter((issue) => issue.severity === 'error').length,
+    },
+  };
+}
+
 export function App() {
   const [root, setRoot] = useState<string | null>(null);
   const [files, setFiles] = useState<FileEntryDto[]>([]);
@@ -825,6 +859,8 @@ export function App() {
   const [validationText, setValidationText] = useState('');
   const [liveValidation, setLiveValidation] =
     useState<LiveValidation | null>(null);
+  const liveValidationRef = useRef<LiveValidation | null>(null);
+  liveValidationRef.current = liveValidation;
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const autosaveDraftRef = useRef<AutosaveDraft | null>(null);
   const editTextRef = useRef('');
@@ -833,6 +869,10 @@ export function App() {
   const validatedSnapshotRef = useRef<{ path: string; text: string } | null>(
     null,
   );
+  /** Last editor buffer whose full graph issue list was rebuilt. */
+  const issuesSyncedRef = useRef<{ path: string; text: string } | null>(null);
+  const graphSyncRef = useRef(0);
+  const graphSyncPendingRef = useRef<string | null>(null);
   const flushDraftRef = useRef<
     (options?: FlushDraftOptions) => Promise<void>
   >(async () => {});
@@ -1953,30 +1993,9 @@ export function App() {
   }, [workspaceTab, loraCategoryManager.open, categorizeLoraIssue]);
 
   const applyUnusedLoraIssues = useCallback((unused: IssueDto[]) => {
-    setAnalysis((current) => {
-      if (!current) return current;
-      const kept = current.issues.filter(
-        (issue) =>
-          issue.code !== 'unused_lora' &&
-          issue.code !== 'duplicate_lora_hash',
-      );
-      const issues = [...kept, ...unused];
-      const warningCount = issues.filter(
-        (issue) => issue.severity === 'warning',
-      ).length;
-      const errorCount = issues.filter(
-        (issue) => issue.severity === 'error',
-      ).length;
-      return {
-        ...current,
-        issues,
-        stats: {
-          ...current.stats,
-          warningCount,
-          errorCount,
-        },
-      };
-    });
+    setAnalysis((current) =>
+      current ? analysisWithUnusedLoras(current, unused) : current,
+    );
   }, []);
 
   const refreshUnusedLoras = useCallback(
@@ -1998,68 +2017,66 @@ export function App() {
   const refreshGraphIssues = useCallback(async () => {
     const analysisRoot = rootFileRef.current;
     if (!analysisRoot || issuesRefreshingRef.current) return;
+    graphSyncRef.current += 1;
+    graphSyncPendingRef.current = null;
     issuesRefreshingRef.current = true;
     setIssuesRefreshing(true);
     setError(null);
     try {
-      await flushDraftRef.current({ rebuild: false });
-      const [nextAnalysis, keys] = await Promise.all([
-        window.wcm.analyze.fromFile(analysisRoot),
-        window.wcm.library.listWildcardKeys(),
-      ]);
-      setAnalysis(nextAnalysis);
-      setSelectedNodeId((current) =>
-        current && nextAnalysis.nodes.some((node) => node.id === current)
-          ? current
-          : nextAnalysis.rootNodeId,
-      );
-      setWildcardKeys(keys);
-      void loadRefStats();
+      await flushDraftRef.current({ rebuild: false, publishGraph: false });
+      if (rootFileRef.current !== analysisRoot) return;
 
       const openPath =
         autosaveDraftRef.current?.relativePath ??
         fileContent?.relativePath ??
         null;
-      const openText =
-        autosaveDraftRef.current?.text ?? editTextRef.current;
+      const openText = autosaveDraftRef.current?.text ?? editTextRef.current;
 
-      // Always rescan unused LoRAs (fresh folder walk). Do not gate on an open
-      // editor — a new unreferenced file is a library-wide issue.
+      // Gather the graph, the open file, and unused LoRAs before touching the
+      // list. Publishing the graph first, or marking validation pending, drew
+      // every hidden row and then removed them again.
+      const analysisPromise = window.wcm.analyze.fromFile(analysisRoot);
+      const keysPromise = window.wcm.library.listWildcardKeys();
+      const validatePromise = openPath
+        ? window.wcm.analyze.validateFile(openPath, openText)
+        : Promise.resolve(null);
+      const unusedPromise = window.wcm.analyze.refreshUnusedLoras(
+        openPath ?? undefined,
+        openPath ? openText : undefined,
+      );
+      const [nextAnalysis, keys, validated, unused] = await Promise.all([
+        analysisPromise,
+        keysPromise,
+        validatePromise.catch(() => null),
+        unusedPromise.catch(() => null),
+      ]);
+      if (rootFileRef.current !== analysisRoot) return;
+
+      const merged =
+        unused != null
+          ? analysisWithUnusedLoras(nextAnalysis, unused)
+          : nextAnalysis;
+      setAnalysis(merged);
+      setSelectedNodeId((current) =>
+        current && merged.nodes.some((node) => node.id === current)
+          ? current
+          : merged.rootNodeId,
+      );
+      setWildcardKeys(keys);
+      void loadRefStats();
+
       if (openPath) {
-        setLiveValidation((current) => ({
-          relativePath: openPath,
-          issues: current?.relativePath === openPath ? current.issues : [],
-          pending: true,
-        }));
-        try {
-          const [issues, unused] = await Promise.all([
-            window.wcm.analyze.validateFile(openPath, openText),
-            window.wcm.analyze.refreshUnusedLoras(openPath, openText),
-          ]);
+        issuesSyncedRef.current = { path: openPath, text: openText };
+        if (validated) {
           const openKey = openPath.replace(/\.(txt|ya?ml|json)$/i, '');
           setLiveValidation({
             relativePath: openPath,
-            // Prefer renderer syntax for brace/$$ codes — main may lag a rebuild.
             issues: mergeLocalSyntaxIssues(
-              issues,
+              validated,
               localWildcardSyntaxIssues(openText, openKey),
             ),
             pending: false,
           });
-          applyUnusedLoraIssues(unused);
-        } catch {
-          setLiveValidation((current) =>
-            current?.relativePath === openPath
-              ? { ...current, pending: false }
-              : current,
-          );
-        }
-      } else {
-        try {
-          const unused = await window.wcm.analyze.refreshUnusedLoras();
-          applyUnusedLoraIssues(unused);
-        } catch {
-          // Unused-LoRA refresh is best-effort; graph analysis already ran.
         }
       }
     } catch (err) {
@@ -2068,7 +2085,7 @@ export function App() {
       issuesRefreshingRef.current = false;
       setIssuesRefreshing(false);
     }
-  }, [applyUnusedLoraIssues, fileContent?.relativePath, loadRefStats]);
+  }, [fileContent?.relativePath, loadRefStats]);
 
   const loraIndexHintIssues = useMemo(() => {
     return [
@@ -2230,7 +2247,12 @@ export function App() {
         didSave &&
         graphRelationshipFingerprint(textBeforeSave) !==
           graphRelationshipFingerprint(draft.savedText);
-      if (didSave && analysisRoot && refsChanged) {
+      if (
+        didSave &&
+        analysisRoot &&
+        refsChanged &&
+        options.publishGraph !== false
+      ) {
         try {
           const [nextAnalysis, keys] = await Promise.all([
             window.wcm.analyze.fromFile(analysisRoot),
@@ -2300,6 +2322,8 @@ export function App() {
     }
 
     void (async () => {
+      graphSyncRef.current += 1;
+      graphSyncPendingRef.current = null;
       const previousDraft = autosaveDraftRef.current;
       if (previousDraft) await flushDraft(previousDraft, { rebuild: true });
       if (cancelled) return;
@@ -2337,6 +2361,10 @@ export function App() {
         };
         autosaveDraftRef.current = draft;
         validatedSnapshotRef.current = null;
+        issuesSyncedRef.current = content.unsaved
+          ? null
+          : { path: content.relativePath, text: content.text };
+        graphSyncPendingRef.current = null;
         editTextRef.current = content.text;
         setFileContent(content);
         setEditText(content.text);
@@ -2386,42 +2414,122 @@ export function App() {
 
     // Already IPC-validated this exact buffer — keep results, still show
     // current local syntax (in case of a race with an older IPC response).
+    // A snapshot with no stored rows must not replace the graph list with
+    // syntax-only; that cleared every remaining error until Refresh.
     const already =
       validatedSnapshotRef.current?.path === path &&
       validatedSnapshotRef.current?.text === text;
-    if (already) {
-      setLiveValidation((current) => ({
+    const currentLive = liveValidationRef.current;
+    const hasLiveForFile = currentLive?.relativePath === path;
+    if (already && hasLiveForFile && currentLive) {
+      setLiveValidation({
         relativePath: path,
-        issues:
-          current?.relativePath === path
-            ? mergeLocalSyntaxIssues(current.issues, syntax)
-            : syntax,
+        issues: mergeLocalSyntaxIssues(currentLive.issues, syntax),
         pending: false,
-      }));
+      });
+      setAnalysis((current) =>
+        current
+          ? analysisAfterFileEdit(
+              current,
+              key,
+              syntax,
+              LOCAL_SYNTAX_ISSUE_CODES,
+            )
+          : current,
+      );
       return;
     }
 
     let cancelled = false;
-    setLiveValidation((current) => ({
-      relativePath: path,
-      issues:
-        current?.relativePath === path
-          ? mergeLocalSyntaxIssues(current.issues, syntax)
-          : syntax,
-      pending: true,
-    }));
+    if (hasLiveForFile && currentLive) {
+      const mergedSyntax = mergeLocalSyntaxIssues(currentLive.issues, syntax);
+      setLiveValidation({
+        relativePath: path,
+        issues: mergedSyntax,
+        pending: true,
+      });
+      setAnalysis((current) =>
+        current
+          ? analysisAfterFileEdit(
+              current,
+              key,
+              syntax,
+              LOCAL_SYNTAX_ISSUE_CODES,
+            )
+          : current,
+      );
+    }
+
+    const previousSync = issuesSyncedRef.current;
+    const graphDirty =
+      previousSync?.path !== path || previousSync?.text !== text;
+    // Rebuild the graph only when wildcard links changed. A prose or syntax
+    // fix still drops its own row below, without a full graph rebuild.
+    const refsChanged =
+      previousSync?.path !== path ||
+      graphRelationshipFingerprint(previousSync?.text ?? '') !==
+        graphRelationshipFingerprint(text);
+    const syncKey = `${path}\0${text}`;
+    if (refsChanged && graphSyncPendingRef.current !== syncKey) {
+      graphSyncPendingRef.current = syncKey;
+      const token = ++graphSyncRef.current;
+      void window.wcm.analyze
+        .fromContent(path, text)
+        .then((next) => {
+          if (token !== graphSyncRef.current) return;
+          if (editTextRef.current !== text) {
+            graphSyncPendingRef.current = null;
+            return;
+          }
+          issuesSyncedRef.current = { path, text };
+          graphSyncPendingRef.current = null;
+          const live = liveValidationRef.current;
+          const reconciled =
+            live && live.relativePath === path && !live.pending
+              ? analysisAfterFileEdit(
+                  next,
+                  key,
+                  live.issues,
+                  FILE_CHECK_ISSUE_CODES,
+                )
+              : next;
+          setAnalysis(reconciled);
+          setSelectedNodeId((current) =>
+            current && reconciled.nodes.some((node) => node.id === current)
+              ? current
+              : reconciled.rootNodeId,
+          );
+        })
+        .catch(() => {
+          if (token === graphSyncRef.current) graphSyncPendingRef.current = null;
+        });
+    }
 
     void window.wcm.analyze
       .validateFile(path, text)
       .then((issues) => {
         if (cancelled) return;
+        if (editTextRef.current !== text) return;
         validatedSnapshotRef.current = { path, text };
+        const merged = mergeLocalSyntaxIssues(issues, syntax);
         setLiveValidation({
           relativePath: path,
           // Keep instant local brace/$$ syntax authoritative over IPC (stale main).
-          issues: mergeLocalSyntaxIssues(issues, syntax),
+          issues: merged,
           pending: false,
         });
+        setAnalysis((current) =>
+          current
+            ? analysisAfterFileEdit(
+                current,
+                key,
+                merged,
+                FILE_CHECK_ISSUE_CODES,
+              )
+            : current,
+        );
+        if (!refsChanged) issuesSyncedRef.current = { path, text };
+        if (graphDirty) void refreshUnusedLoras(path, text);
       })
       .catch(() => {
         if (cancelled) return;
@@ -2445,6 +2553,7 @@ export function App() {
     selectedFileEntry?.key,
     selectedFileEntry?.relativePath,
     selectedNode?.id,
+    refreshUnusedLoras,
   ]);
 
   // Apply a queued jump-to-line once the matching file source is loaded.
@@ -2475,14 +2584,24 @@ export function App() {
         setSaveStatus('saved');
         const key = draft.relativePath.replace(/\.(txt|ya?ml|json)$/i, '');
         const syntax = localWildcardSyntaxIssues(text, key);
-        setLiveValidation((current) => ({
-          relativePath: draft.relativePath,
-          issues:
-            current?.relativePath === draft.relativePath
-              ? mergeLocalSyntaxIssues(current.issues, syntax)
-              : syntax,
-          pending: false,
-        }));
+        setLiveValidation((current) => {
+          if (current?.relativePath !== draft.relativePath) return current;
+          return {
+            relativePath: draft.relativePath,
+            issues: mergeLocalSyntaxIssues(current.issues, syntax),
+            pending: false,
+          };
+        });
+        setAnalysis((current) =>
+          current
+            ? analysisAfterFileEdit(
+                current,
+                key,
+                syntax,
+                LOCAL_SYNTAX_ISSUE_CODES,
+              )
+            : current,
+        );
         return;
       }
       draft.text = text;
@@ -2505,17 +2624,24 @@ export function App() {
         localSyntaxTimerRef.current = null;
         const key = draft.relativePath.replace(/\.(txt|ya?ml|json)$/i, '');
         const syntax = localWildcardSyntaxIssues(text, key);
-        setLiveValidation((current) => ({
-          relativePath: draft.relativePath,
-          issues:
-            current?.relativePath === draft.relativePath
-              ? mergeLocalSyntaxIssues(current.issues, syntax)
-              : syntax,
-          pending:
-            current?.relativePath === draft.relativePath
-              ? current.pending
-              : false,
-        }));
+        setLiveValidation((current) => {
+          if (current?.relativePath !== draft.relativePath) return current;
+          return {
+            relativePath: draft.relativePath,
+            issues: mergeLocalSyntaxIssues(current.issues, syntax),
+            pending: current.pending,
+          };
+        });
+        setAnalysis((current) =>
+          current
+            ? analysisAfterFileEdit(
+                current,
+                key,
+                syntax,
+                LOCAL_SYNTAX_ISSUE_CODES,
+              )
+            : current,
+        );
       }, LOCAL_SYNTAX_DEBOUNCE_MS);
 
       if (validationTimerRef.current !== null) {
@@ -2823,6 +2949,7 @@ export function App() {
         if (root) {
           await openRoot(root, result.parentRelativePath);
         }
+        await refreshGraphIssues();
         return;
       }
       const created = await window.wcm.file.create(relativePath, '');
@@ -2830,8 +2957,16 @@ export function App() {
       setCreateInitialPath('');
       flashNotice(`Created ${created}`);
       if (root) await openRoot(root, created);
+      await refreshGraphIssues();
     },
-    [createDescendantParent, flashNotice, openRoot, root, syncOpenDraftFromDisk],
+    [
+      createDescendantParent,
+      flashNotice,
+      openRoot,
+      refreshGraphIssues,
+      root,
+      syncOpenDraftFromDisk,
+    ],
   );
 
   const runRename = useCallback(
@@ -2965,9 +3100,10 @@ export function App() {
         `Removed ${result.totalOccurrences} reference${result.totalOccurrences === 1 ? '' : 's'} ` +
           `to __${result.referenceName}__ from ${result.editedFiles} file${result.editedFiles === 1 ? '' : 's'}.`,
       );
-      await refresh();
+      await refresh({ light: true });
+      await refreshGraphIssues();
     },
-    [flashNotice, refresh],
+    [flashNotice, refresh, refreshGraphIssues],
   );
 
   const runSimulation = useCallback(async () => {
@@ -3576,14 +3712,26 @@ export function App() {
         await window.wcm.ui.ignoreUnusedLora(
           paths.length > 1 ? paths : paths[0]!,
         );
-        const nextAnalysis = await window.wcm.analyze.fromFile(rootFile);
-        setAnalysis(nextAnalysis);
-        setSelectedNodeId((current) =>
-          current && nextAnalysis.nodes.some((node) => node.id === current)
-            ? current
-            : nextAnalysis.rootNodeId,
-        );
+        const removedId = issueIdentity(issue);
         setIgnoreLoraIssue(null);
+        setAnalysis((current) => {
+          if (!current) return current;
+          const issues = current.issues.filter(
+            (row) => issueIdentity(row) !== removedId,
+          );
+          if (issues.length === current.issues.length) return current;
+          return {
+            ...current,
+            issues,
+            stats: {
+              ...current.stats,
+              warningCount: issues.filter((row) => row.severity === 'warning')
+                .length,
+              errorCount: issues.filter((row) => row.severity === 'error')
+                .length,
+            },
+          };
+        });
         const label = unusedLoraIssueLabel(issue);
         flashNotice(
           paths.length > 1
@@ -3626,12 +3774,13 @@ export function App() {
               ? `Categorized ${paths.length} LoRA(s) → ${result.wildcardRelativePath}`
               : `Moved ${paths.length} LoRA(s); reference already present in ${result.wildcardRelativePath}`,
         );
-        await refresh();
+        await refresh({ light: true });
+        await refreshGraphIssues();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
     },
-    [flashNotice, refresh, rootFile],
+    [flashNotice, refresh, refreshGraphIssues, rootFile],
   );
 
   const copyUnusedLoraRef = useCallback(
@@ -3689,12 +3838,13 @@ export function App() {
             result.editedFiles === 1 ? '' : 's'
           }${detail ? ` (${detail})` : ''}`,
         );
-        await refresh();
+        await refresh({ light: true });
+        await refreshGraphIssues();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
     },
-    [flashNotice, refresh, rootFile],
+    [flashNotice, refresh, refreshGraphIssues, rootFile],
   );
 
   const runCycleFix = useCallback(
@@ -3709,9 +3859,10 @@ export function App() {
       flashNotice(
         `Broke cycle by removing ${result.snippet} from ${result.relativePath}`,
       );
-      await refresh();
+      await refresh({ light: true });
+      await refreshGraphIssues();
     },
-    [flashNotice, refresh],
+    [flashNotice, refresh, refreshGraphIssues],
   );
 
   const handleGraphNodeClick = useCallback(
@@ -3985,28 +4136,42 @@ export function App() {
     patchValidationFile(liveValidation.relativePath, liveValidation.issues);
   }, [filterMode, liveValidation, patchValidationFile]);
 
-  // Always omit the selected node's issues from the graph-level list. When live
-  // validation clears a fix, analysis.issues can still be stale — those must not
-  // reappear under "All issues" just because Node issues is empty.
+  // Hide the open file's graph rows only after its live check finishes.
+  // Hiding them as soon as an edit starts dropped every remaining error
+  // until Refresh, because the in-flight check had not returned them yet.
+  const liveFileReady = Boolean(
+    liveValidation &&
+      fileContent &&
+      liveValidation.relativePath === fileContent.relativePath &&
+      !liveValidation.pending,
+  );
   const otherGraphIssues = useMemo(() => {
     if (!analysis) return [];
 
     const shown = new Set(displayedNodeIssues.map(issueIdentity));
-    const selectedIds = new Set(
+    const openNodeIds = new Set(
       [
         selectedNode?.id,
         selectedNode?.relativeKey,
         selectedNode?.hostKey,
       ].filter((id): id is string => Boolean(id)),
     );
+    const fileKey = selectedFileEntry?.key ?? null;
 
-    return analysis.issues.filter((issue) => {
-      if (issue.nodeId && selectedIds.has(issue.nodeId)) return false;
-      return !shown.has(issueIdentity(issue));
+    return remainingGraphIssues(analysis.issues, {
+      shownIdentities: shown,
+      liveFileReady,
+      openNodeIds,
+      fileNodeIds:
+        fileKey != null ? nodeIdsForFile(analysis.nodes, fileKey) : undefined,
+      edges: analysis.edges,
+      resolvedIdentities: liveFileReady ? shown : undefined,
     });
   }, [
     analysis,
     displayedNodeIssues,
+    liveFileReady,
+    selectedFileEntry?.key,
     selectedNode?.hostKey,
     selectedNode?.id,
     selectedNode?.relativeKey,
@@ -5183,6 +5348,14 @@ export function App() {
                             issues={displayedNodeIssues}
                             onSelect={handleIssueSelect}
                             onCreateMissing={openCreateMissing}
+                            onIgnoreUnusedLora={setIgnoreLoraIssue}
+                            onCopyUnusedLoraRef={(issue) =>
+                              void copyUnusedLoraRef(issue)
+                            }
+                            onCategorizeUnusedLora={setCategorizeLoraIssue}
+                            onFixUnusedLoraSeries={(issue) =>
+                              void extendUnusedLoraSeries(issue)
+                            }
                             onOpenRelatedPath={(relativePath) => {
                               setLoraTabSelectPath(relativePath.replace(/\\/g, '/'));
                               setWorkspaceTab('loras');
@@ -7307,17 +7480,6 @@ function ExpandModal({
       </div>
     </div>
   );
-}
-
-function issueIdentity(issue: IssueDto): string {
-  return [
-    issue.code,
-    issue.nodeId ?? '',
-    String(issue.line ?? ''),
-    String(issue.column ?? ''),
-    issue.message,
-    issue.snippet ?? '',
-  ].join('\u0000');
 }
 
 function missingKeyFromIssue(issue: IssueDto): string | null {

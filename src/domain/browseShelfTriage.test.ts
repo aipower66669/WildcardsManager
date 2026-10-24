@@ -61,7 +61,7 @@ describe('browseCardNeedsNotify', () => {
             {
               earlyAccess: true,
               earlyAccessEndsAt: '2026-01-01T00:00:00.000Z',
-              downloadPrice: 500,
+              earlyAccessConfig: { downloadPrice: 500 },
             },
           ],
         },

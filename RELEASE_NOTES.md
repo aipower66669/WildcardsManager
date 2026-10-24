@@ -1,250 +1,93 @@
-# Wildcards Manager v0.9.3
+# Wildcards Manager v0.10
 
-Package version: **0.9.3**  
-Release date: **October 24, 2026**
+Package version: **0.10.0**  
+Release date: **October 25, 2026**
 
-## Critical fix
-
-Builds before 0.9.3 could drop **Archive**, **Maybe**, **Notify**, and the
-**LoRA download categories** when two libraries shared one wildcards folder.
-Those lists lived in one shared `library.json`. A save or a quit could replace
-them with another library’s older copy, or save the categories as empty while
-Archive still had rows.
-
-0.9.3 keeps each library’s Civitai catalog in its own folder:
-
-`<wildcards folder name>.wcm/cache/civitai-catalog/<library id>/`
-
-Archive, Maybe, Notify, and the LoRA categories stay in one file,
-`<wildcards folder name>.wcm/library.json`, with a separate block per library
-id. That file is next to the wildcards folder, inside the ComfyUI tree. It is
-not in AppData. The `!.wcm` folders under LoRA and checkpoint roots are hashes
-and ratings, not these lists.
-
-Before a format change, the app copies `library.json` to
-`<wildcards folder name>.wcm/backups/pre-migrate-<timestamp>/`. If that copy
-fails, it does not rewrite the file. An empty category list cannot replace a
-saved one.
-
-An empty catalog folder is not treated as the real catalog, and the shared
-catalog is not deleted until the library folder has the files. On launch,
-empty Archive and Maybe lists are filled from the longest copy in that
-pre-migrate backup or in a catalog `shelf-summaries.json`. Downloaded is not
-cut down just because a rebuilt catalog matches fewer on-disk hashes. A
-catalog index that lost its slice map is reattached to the slice folders
-still on disk. Quit completely, including the tray, and start this build so
-that repair can run. The window that is already open does not have it.
-
-## If those lists were wiped
-
-Quit Wildcards Manager completely, including the tray icon. Closing the window
-is not enough while it is still running.
-
-In the live `<wildcards folder name>.wcm` folder, rename `library.json` to
-`broken-library.json`. The new name must not start with `library.json`. Copy
-`library.json` from a backup of that same `.wcm` folder (a full ComfyUI backup
-is enough; you do not need an AppData backup). Start **0.9.3**.
-
-The backup file is one shared list. This build copies it into each library’s
-block, so both libraries match that backup. Anything changed after the backup
-has to be done again. Do not copy the whole ComfyUI tree back over the live
-folder, and do not edit `library.json` by hand.
-
-## v0.9
-
-Package version at that release: **0.9.0**
-
-v0.9 generates with **Krea 2** and with **SDXL**. SDXL, Pony, and
-Illustrious share one checkpoint graph: a VAE you can replace, CLIP skip, and
-a hires pass. Each library picks that family and keeps its own Generation
-settings for Realistic, Anime, and 3D.
-
-The same release puts the Generation style, checkpoint, seed, and size on the
-Prompts title bar, samples coverage the way a real run does, and makes
-Hugging Face downloads use the Civitai dialog.
+v0.10 generates images with **SDXL**. Pony and Illustrious use that same
+checkpoint. Krea 2 stays as it was. Browse can filter those SDXL families, and
+each library keeps its own catalog, shelves, and Generation settings.
 
 The [user guide](docs/user-guide.md) is the complete reference. This note is the
 map.
 
-## What’s new in v0.9
+## SDXL generation
 
-- **SDXL, Pony, and Illustrious.** Library Manager sets `generationFamily`
-  (`krea2` or `sdxl`, default `krea2`) on each library. The SDXL graph is one
-  Checkpoint loader. CLIP comes from that file, so the CLIP field is hidden.
-  **Options → VAE** replaces the packed VAE; blank keeps it. **CLIP skip**
-  defaults to 2 (Pony and Illustrious). **Upscaler**, **Upscale factor**
-  (default 1.5), and **Hires denoise** (default 0.5) run a second pass after
-  the base sample. Sampler and Scheduler list every name Comfy reports,
-  underscores included. Open
-  `WildcardManager-ComfyUI-SDXL-Generation-Workflow.json`, then **Save
-  Workflow**. Krea 2 keeps its own graph and its own saved file.
-- **Generation settings stay with the library and the style.** Checkpoint,
-  size, prompts, and Options are stored per library, and Realistic / Anime /
-  3D each keep their own copy. Switching libraries restores that library’s
-  screen. An older single form is copied onto each library once.
-- **Prompts title bar.** On the same line as Once, Infinite, and Cancel:
-  Realistic / Anime / 3D (icons), checkpoint, seed (dice and shuffle), and
-  width × height. A change on Prompts or Generation updates the other.
-  Switching style does not change the open `!gen.txt`. Once and Infinite
-  queue that folder with the values shown there.
-- **Width and Height.** Swap exchanges the two numbers. Decrease and Increase
-  step to a nearby common size with a close aspect ratio. Both sides of a
-  stepped size are multiples of 16. The tooltip shows the size the button
-  will write.
-- **Coverage matches a real run.** Each walk picks a prompt folder at random
-  (every `!gen.txt` folder is equally likely), then a decoded line in that
-  folder, then one wildcard walk. The count is Settings → Simulation →
-  Iterations (1–1,000,000, default 10,000), with the Simulation seed. A
-  **Rare** tab sits between Ignored and Hot. Each tab lists every match.
-  Cancel stops the run.
-- **Missing-file search.** Clicking a “missing wildcard file” issue fills the
-  editor search with that wildcard.
-- **Comment / Uncomment.** The editor context menu puts or removes `# ` on
-  the selected lines.
-- **Hugging Face download dialog** matches Civitai: category, extra
-  categories, weights, extra comment, and extra prompt. The Hub URL is saved
-  on the downloaded LoRA or checkpoint, so its page URL opens that repo.
-  Cards show a sample image when the repo has one, cropped to a portrait 2:3
-  frame.
-- **Benchmark rating** uses the Checkpoint-tab catalog rating when a sample
-  folder has no ADS rating. Five stars weigh the same as an ADS rating of 10.
+**Library Manager** sets Generation family to **Krea 2** or **SDXL** (default
+Krea 2). Krea 2 keeps Load Diffusion Model, Load CLIP, and Load VAE. An SDXL
+library uses one checkpoint file for SDXL, Pony, and Illustrious. CLIP comes
+from that file, so the CLIP field is hidden. **Options → VAE** replaces the
+packed VAE; blank keeps it. **CLIP skip** defaults to 2. **Upscaler**,
+**Upscale factor** (default 1.5), and **Hires denoise** (default 0.5) run a
+second pass after the base sample. Sampler and Scheduler list every name Comfy
+reports, underscores included. Realistic, Anime, and 3D each keep their own
+checkpoint, size, and Options.
 
-## Upgrading from v0.8
+Open `ComfyUI-Workflow/WildcardManager-ComfyUI-SDXL-Generation-Workflow.json`
+in ComfyUI, set the library’s family to SDXL, then **Save Workflow**. Krea 2
+keeps its own graph and its own saved file.
 
-Libraries and sidecars do not need a migration. Generation settings you already
-saved stay on Realistic, Anime, and 3D. The first launch after this build
-copies that one form onto every library; later edits stay on the library that
-saved them.
+## SDXL families in Browse
 
-An SDXL library needs its own **Save Workflow**. Open
-`ComfyUI-Workflow/WildcardManager-ComfyUI-SDXL-Generation-Workflow.json` in
-ComfyUI with that library active. The Krea graph is left in
-`comfy-workflow-krea2.json`.
+On an SDXL library, Civitai Browse adds family chips: **All**, **SDXL**,
+**Pony**, **Illustrious**, and **NoobAI**. Library Manager chooses which of
+those families this library includes. **NoobAI** is a Browse family on that
+same SDXL graph.
 
-Re-run Coverage to replace a report that walked every decoded line. A Hugging
-Face file already on disk keeps its previous page link until you download it
-again.
+**+N new** counts models for the base model, family chip, and category you
+have open. Those cards are placed at the front of that grid. A Pony count is
+Pony. Illustrious, NoobAI, and plain SDXL stay in the catalog and show when
+that chip is selected. Category chips work the same way. Installed, archived,
+Maybe, and Notify stay off Browse.
 
-If Generation still reports missing KSampler nodes, replace
-`custom_nodes/comfyui-lora-training` with
-`ComfyUI-Workflow/comfyui-lora-training.zip`, restart ComfyUI, and **Save
-Workflow**.
+## Libraries
 
-## What the app is
+**Library Manager** holds more than one library. Each library has its own:
 
-A desktop manager for Dynamic Prompts wildcard libraries used by
-[Stable Diffusion WebUI Dynamic Prompts](https://github.com/adieyal/sd-dynamic-prompts)
-and [ComfyUI Dynamic Prompts](https://github.com/adieyal/comfyui-dynamicprompts).
+- wildcards root, LoRA folder, checkpoint folder, prompts folder, and
+  Generation output roots
+- Civitai site (`civitai.com` or `civitai.red`) and validation platform
+- Generation family, and the Generation form for Realistic, Anime, and 3D
+- **Base models to manage**, **SDXL families**, and **Civitai categories**
 
-Open a folder. See dependencies as a graph. Fix missing files and cycles. Edit
-in place. Refactor references with undo. Browse and download models. Generate
-through ComfyUI from prompt folders.
+Two libraries that share a wildcards folder keep separate checkboxes. Switching
+libraries reloads that library’s catalog and Generation screen.
 
-Noncommercial only. See [LICENSE.md](LICENSE.md).
+On disk, next to the wildcards folder (not in AppData):
 
-## Workspaces
+- Catalog: `<wildcards folder name>.wcm/cache/civitai-catalog/<library id>/`
+- Shelves: `<wildcards folder name>.wcm/libraries/<library id>/` — Civitai
+  LoRAs, checkpoints, images, and videos are separate files, Hugging Face has
+  its own file, LoRA download categories are `categories.json`, and filters
+  stay in that folder’s `library.json`
 
-| Tab | What you do there |
-| --- | --- |
-| **Wildcard files** | Graph, filters, diagnostics, editor, refactors, expansion, simulation |
-| **LoRA files** | Installed LoRAs, Civitai match, wildcard callers, training-step series |
-| **Checkpoint files** | Installed checkpoints, hash, rating, benchmark samples, Civitai page |
-| **Prompts** | `!gen.txt` folders, validation, coverage, samples, and the Generation controls for the open folder |
-| **Generation** | ComfyUI queue from a typed prompt or a prompt folder |
-| **Search** | Wildcard names/content and LoRA / checkpoint filenames |
+The first launch after an upgrade copies an old combined `library.json` into
+`backups/pre-migrate-<timestamp>/` before it writes those shelf files. If that
+copy fails, the file is left as it is. Quit completely, including the tray,
+and start **0.10.0** so that launch can run. A build from before the shelf
+split does not read the shelf files.
 
-## Library Manager
+If Archive, Maybe, Notify, or LoRA categories disappear, see
+[Troubleshooting](docs/troubleshooting.md#archive-maybe-notify-or-lora-categories-disappeared).
 
-One app, many libraries. Each library stores its own:
+**Migrate library paths…** rewrites stored pointers when a tree changes drive
+or parent. It does not move the files.
 
-- wildcards, LoRA, and checkpoint folders
-- LoRA training library (`dataset.json` previews for multi-step series)
-- prompts folder and separate Generation output roots for **Realistic**,
-  **Hentai**, and **3D**
-- checkpoint benchmark folder
-- Civitai site (`civitai.com` or `civitai.red`), validation platform, and
-  Generation family (`krea2` or `sdxl`)
+## Also in this version
 
-**Migrate library paths…** rewrites those pointers after you relocate a tree
-(drive or parent change). It does not move the files. Preview first; override
-any folder that should not follow the prefix.
-
-Wildcard lists live in a sibling `<name>.wcm/` folder so ComfyUI Dynamic
-Prompts does not scan them. Model hashes, ratings, and thumbnails stay next to
-the model roots (`!.wcm/`, `!Thumbnails/`).
-
-## Civitai and Hugging Face
-
-- LoRA and checkpoint browse, queue, Archive / Maybe / Notify, download
-  categories, Shift+click download.
-- **Images** and **Videos** community feeds, Download all, and per-feed
-  catch-up. Each needs its own folder in Settings.
-- **Blocked authors** hide a creator’s cards for that library.
-- Early-access models sit on **Notify me** until you check that they unlocked.
-- Hugging Face Hub search and download queue. The download dialog matches
-  Civitai, including extra comment and extra prompt. The Hub page is stored
-  on the downloaded file. Cards show a sample image when the repo has one.
-  Gated repos need a token under Settings → AI.
-
-Browse works without an API key. Many model downloads do not.
-
-## Generation and LM Studio
-
-Generation talks to a ComfyUI you already run. Settings → AI holds the host,
-a launch shortcut, and Test / Check install. The node pack and a ready graph
-are in [`ComfyUI-Workflow/`](ComfyUI-Workflow/):
-
-Two sample graphs ship in that folder. The Krea 2 file uses that model’s
-UNET, CLIP, and VAE. The SDXL file is one Checkpoint loader and covers SDXL,
-Pony, and Illustrious. **LT · VAE** feeds Load VAE. Options → VAE writes
-the file you pick. A blank VAE keeps the one packed in the checkpoint.
-**CLIP Set Last Layer** is on the CLIP wire at skip 2. After the base sample
-the SDXL graph upscales (default `4x_foolhardy_Remacri.pth`, factor 1.5) and
-runs a second sampler at hires denoise 0.5. Another architecture needs the
-graph adapted in ComfyUI before you save it.
-
-1. Unzip `comfyui-lora-training.zip` and `comfyui-custom-save-node.zip`
-   (`SaveImageToFolder`) into ComfyUI `custom_nodes/` and restart.
-2. Install the other packs that sample graph uses (Dynamic Prompts,
-   [LoRA tag loader](https://github.com/badjeff/comfyui_lora_tag_loader),
-   [Corza LoRA loader](https://github.com/CoreyCorza/comfyui-lora-loader),
-   [Krea 2 enhancer](https://github.com/capitan01R/ComfyUI-Krea2T-Enhancer)).
-3. Open `WildcardManager-ComfyUI-Krea2-Generation-Workflow.json` or
-   `WildcardManager-ComfyUI-SDXL-Generation-Workflow.json` in ComfyUI.
-4. In the app, **Test** (server only), **Generation → Save Workflow**, then
-   **Check install** (saved graph only). Queue a typed prompt or a prompt
-   folder.
-
-Step-by-step: [user guide](docs/user-guide.md#install-the-nodes-and-the-sample-graph).
-
-- Typed prompt or prompt-folder `!gen.txt`. Recursive includes sub-folders.
-  A fixed seed repeats the folder and the line.
-- Style profiles (Realistic, Anime, 3D), each with Generation and Options.
-  The Prompts title bar edits the same style, checkpoint, seed, and size.
-- Width and Height can swap or step to a common 16-aligned size.
-- **Benchmark** walks checkpoint files and records timings. Rating order can
-  use the catalog stars when a sample folder has no ADS rating.
-- **Edit Workflow** / **Save Workflow**. The toolbar stays quiet when the
-  graph is ready and names missing nodes when it is not.
-- **Categorize** appends a prompt into a folder’s `!gen.txt`.
-- **Substitutions** replace prompt text for a checkpoint name before wildcards
-  expand. Rules stay in that library’s `library.json`.
-
-**LM Studio** (local server) can propose edits to the open wildcard file.
-Nothing is saved until you apply the proposal.
-
-## Prompts coverage
-
-**Coverage** runs one simulated generation per Simulation iteration (default
-10,000, up to 1,000,000). Each walk picks a prompt folder at random, then a
-decoded line in that folder, then one wildcard walk. Results stay in the
-library sidecar. Tabs are Never, Ignored, Rare, Hot, All, and By prompt.
-Ignore a file to keep it off the “never used” list.
+- **Mark as Downloaded** asks **This version** or **All current versions** when
+  a card lists more than one downloadable version. Early access is left out of
+  All. A version published later stays unmarked. The download button still
+  downloads.
+- Fixing one wildcard issue removes that row. The details list does not redraw
+  every issue and then drop the fixed one.
+- Prompt coverage, the Prompts title bar, and Hugging Face downloads behave as
+  in v0.9. v0.9.3 stopped one library’s Archive, Maybe, Notify, or categories
+  from replacing another’s when they shared a wildcards folder.
 
 ## Installation
 
 Download an installer from the
-[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.9.3)
+[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.10.0)
 when one is attached, or build it yourself. Installers are unsigned.
 
 From source (Node.js 22.12+):
@@ -256,7 +99,7 @@ npm ci
 npm run dev
 ```
 
-Pushing a version tag (`v0.9.3`) runs the checks, builds
+Pushing a version tag (`v0.10.0`) runs the checks, builds
 `WildcardsManager-<version>-win-x64.exe`, and attaches it to that GitHub
 Release. Settings → App updates checks that release when the update folder
 is empty. **Check for update** only reports a newer installer. **What's new**
@@ -264,15 +107,18 @@ is a separate button for these notes. **Install** downloads and installs.
 `npm run dist` still bumps the patch and builds a local installer into
 `release/`. A folder set under App updates uses that folder instead of GitHub.
 
-## Upgrading from v0.6
+## Upgrading
 
-If you skipped v0.7 or v0.8, libraries and sidecars still do not need a manual
-migration. If you moved model or wildcard folders onto another drive, use
-Library Manager → **Migrate library paths…** instead of editing paths by hand.
+Quit Wildcards Manager completely, including the tray icon, then start 0.10.0.
+Closing the window is not enough while the tray icon is still running.
+
+Libraries do not need a hand-edited `library.json`. If you moved model or
+wildcard folders onto another drive, use Library Manager → **Migrate library
+paths…**.
 
 Install `ComfyUI-Workflow/comfyui-lora-training.zip` into ComfyUI
-`custom_nodes/` if Generation reports missing LT nodes, then load
-the matching workflow JSON and **Save Workflow**.
+`custom_nodes/` if Generation reports missing LT nodes, then load the matching
+workflow JSON and **Save Workflow**.
 
 ## Known limitations
 

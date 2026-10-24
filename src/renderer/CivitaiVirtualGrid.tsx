@@ -57,6 +57,7 @@ export function CivitaiVirtualGrid<T>({
   overscanRows = OVERSCAN_ROWS,
   onClick,
   onVisibleItems,
+  scrollToTopToken = 0,
 }: {
   items: readonly T[];
   cardMinWidth: number;
@@ -70,6 +71,8 @@ export function CivitaiVirtualGrid<T>({
   onClick?: (event: ReactMouseEvent<HTMLDivElement>) => void;
   /** Cards currently mounted (viewport + overscan). Not the full loaded list. */
   onVisibleItems?: (items: readonly T[]) => void;
+  /** Increment to jump this grid back to its first row. */
+  scrollToTopToken?: number;
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const windowRef = useRef<HTMLDivElement | null>(null);
@@ -115,6 +118,15 @@ export function CivitaiVirtualGrid<T>({
     setScrollTop((prev) => (Math.abs(prev - nextTop) < 1 ? prev : nextTop));
     setViewportHeight((prev) => (prev === nextHeight ? prev : nextHeight));
   }, [scroller]);
+
+  useEffect(() => {
+    if (!scrollToTopToken) return;
+    const root = rootRef.current;
+    const parent = scrollerRef.current ?? findScrollParent(root);
+    if (!root || !parent) return;
+    parent.scrollTop = offsetWithinScroller(root, parent);
+    setScrollTop(0);
+  }, [scrollToTopToken]);
 
   useEffect(() => {
     const parent = scroller;

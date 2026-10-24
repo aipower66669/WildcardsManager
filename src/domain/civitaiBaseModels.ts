@@ -297,6 +297,38 @@ export function matchesSdxlFamily(
   return /sdxl/i.test(text);
 }
 
+/**
+ * True when any listed base model belongs on this Browse selection.
+ * A specific SDXL family chip does not accept the other families.
+ */
+export function baseModelsMatchBrowseSelection(
+  baseModels: Array<string | undefined>,
+  opts: {
+    architectures: CivitaiArchitectureId[];
+    sdxlFamily?: CivitaiSdxlFamilyId | 'all';
+    enabledSdxlFamilies?: readonly CivitaiSdxlFamilyToggleId[];
+  },
+): boolean {
+  const bases = baseModels.filter((value): value is string =>
+    Boolean(value?.trim()),
+  );
+  if (opts.architectures.length === 0) return true;
+  const archHits = bases.filter((base) =>
+    matchesArchitectureFilter(base, opts.architectures),
+  );
+  if (archHits.length === 0) return false;
+  if (!opts.architectures.includes('sdxl')) return true;
+  const sdxlHits = archHits.filter((base) =>
+    matchesArchitectureFilter(base, ['sdxl']),
+  );
+  if (sdxlHits.length === 0) return false;
+  if (opts.sdxlFamily && opts.sdxlFamily !== 'all') {
+    return sdxlHits.some((base) => matchesSdxlFamily(base, opts.sdxlFamily!));
+  }
+  const enabled = opts.enabledSdxlFamilies ?? DEFAULT_ENABLED_SDXL_FAMILIES;
+  return sdxlHits.some((base) => matchesEnabledSdxlFamilies(base, [...enabled]));
+}
+
 /** True when baseModel belongs to one of the enabled SDXL families. */
 export function matchesEnabledSdxlFamilies(
   baseModel: string | undefined,

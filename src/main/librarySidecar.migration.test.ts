@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   libraryJsonPath,
+  libraryShelfFile,
   modelsJsonPath,
   thumbnailsDir,
   civitaiCatalogDir,
@@ -111,7 +112,9 @@ describe('library sidecar layout (sample_wildcards only)', () => {
 
     const payload = readLibraryLocalPayload(wildcardsRoot, 'lib-a');
     expect(payload?.lastRootFile).toBe('0main.txt');
-    expect(fs.existsSync(libraryJsonPath(wildcardsRoot))).toBe(true);
+    expect(
+      fs.existsSync(libraryShelfFile(wildcardsRoot, 'lib-a', 'library.json')),
+    ).toBe(true);
 
     saveModelsStore(loraRoot, {
       version: 1,

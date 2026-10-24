@@ -50,7 +50,7 @@ Open the repository’s `sample_wildcards/` folder and select `0main.txt`. The l
 
 ### 11. Can I keep more than one library?
 
-Yes. **Library Manager** stores several libraries. Each has its own wildcards root, model folders, Civitai site (`civitai.com` or `civitai.red`), validation platform (ComfyUI or Stable Diffusion), and Generation family (`krea2` or `sdxl`, default `krea2`). Switching libraries reloads that library’s catalog and the open workspace, including that library’s Generation form. Two libraries that share a wildcards folder still have separate catalog folders and separate shelf files under `.wcm/libraries/<library id>/`.
+Yes. **Library Manager** stores several libraries. Each has its own wildcards root, model folders, Civitai site (`civitai.com` or `civitai.red`), validation platform (ComfyUI or Stable Diffusion), Generation family (`krea2` or `sdxl`, default `krea2`), base models, SDXL families, and Civitai categories. Switching libraries reloads that library’s catalog and the open workspace, including that library’s Generation form. Two libraries that share a wildcards folder still have separate catalog folders and separate shelf files under `.wcm/libraries/<library id>/`.
 
 ### 12. What does each library pointer do?
 
@@ -412,7 +412,7 @@ Yes. **Detach** opens a separate window and the app reopens it detached next tim
 
 ### 98. How do browse filters work?
 
-Category tags (Character, Style, Concept, and the rest), architecture (SD 1.5, SDXL, Flux, Krea 2, WAN/Video, Other), hide installed, only new, and only possible matches are remembered per library. Card width is remembered. Covers are cached as cropped thumbs; new downloads can also keep a full-size file under `!Thumbnails/`.
+Category tags (Character, Style, Concept, and the rest), architecture (SD 1.5, SDXL, Flux, Krea 2, WAN/Video, Other), and — when the base model is SDXL — family (All, SDXL, Pony, Illustrious, NoobAI) are remembered per library. **+N new** counts models for the chip you have open. Hide installed, only new, and only possible matches are remembered too. Card width is remembered. Covers are cached as cropped thumbs; new downloads can also keep a full-size file under `!Thumbnails/`.
 
 ### 99. What does catalog sync do?
 

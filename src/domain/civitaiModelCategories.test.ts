@@ -8,6 +8,7 @@ import {
   modelCategoryTag,
   modelHasCategoryTag,
   normalizeEnabledCivitaiCategories,
+  unionModelTags,
 } from './civitaiModelCategories.js';
 
 describe('civitai model categories', () => {
@@ -15,6 +16,14 @@ describe('civitai model categories', () => {
     expect(CIVITAI_MODEL_CATEGORY_PRESETS.map((p) => p.id)).toEqual(
       expect.arrayContaining(['character', 'style', 'concept', 'poses']),
     );
+  });
+
+  it('keeps the first spelling when unioning tags', () => {
+    expect(unionModelTags(['Character'], ['character', 'style'])).toEqual([
+      'Character',
+      'style',
+    ]);
+    expect(unionModelTags(undefined, ['poses'])).toEqual(['poses']);
   });
 
   it('maps category ids to API tag values', () => {

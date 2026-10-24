@@ -198,9 +198,10 @@ export function migrateSharedCatalogToPerLibrary(
  * longest copy back.
  */
 function restoreLongerDownloadedSummaries(
-  wildcardsRoot: string,
+  wildcardsRoot: string | null | undefined,
   libraryIds: readonly string[],
 ): void {
+  if (!wildcardsRoot?.trim()) return;
   let best: unknown[] | null = null;
   let bestOrigin = '';
   for (const dir of catalogCandidates(wildcardsRoot, libraryIds)) {

@@ -51,6 +51,8 @@ function activeValidationPlatform() {
 type AnalyzeExtrasCache = {
   libraryFp: string;
   loraFp: string;
+  /** Ignore-list snapshot. A new ignore must not reuse the previous unused rows. */
+  ignoreFp: string;
   libraryWideIssues: Issue[];
   refStats: Map<string, FileRefStat>;
   callersByRoot: Map<string, DirectCaller[]>;
@@ -58,11 +60,21 @@ type AnalyzeExtrasCache = {
 
 let extrasCache: AnalyzeExtrasCache | null = null;
 
-function extrasMatch(libraryFp: string, loraFp: string): boolean {
+function ignoredUnusedFingerprint(): string {
+  const list = loadSettings().ignoredUnusedLoras ?? [];
+  return list
+    .map((path) => path.trim().replaceAll('\\', '/').toLowerCase())
+    .filter(Boolean)
+    .sort()
+    .join('\n');
+}
+
+function extrasMatch(libraryFp: string, loraFp: string, ignoreFp: string): boolean {
   return Boolean(
     extrasCache &&
       extrasCache.libraryFp === libraryFp &&
-      extrasCache.loraFp === loraFp,
+      extrasCache.loraFp === loraFp &&
+      extrasCache.ignoreFp === ignoreFp,
   );
 }
 
@@ -207,7 +219,8 @@ export function refreshUnusedLoraIssues(
 
   const libraryFp = libraryFilesFingerprint(previewFiles);
   const loraFp = loraIndexFingerprint(loraIndex);
-  if (!overlay && extrasMatch(libraryFp, loraFp) && extrasCache) {
+  const ignoreFp = ignoredUnusedFingerprint();
+  if (!overlay && extrasMatch(libraryFp, loraFp, ignoreFp) && extrasCache) {
     return extrasCache.libraryWideIssues;
   }
 
@@ -231,6 +244,7 @@ export function refreshUnusedLoraIssues(
     extrasCache = {
       libraryFp,
       loraFp,
+      ignoreFp,
       libraryWideIssues: libraryWide,
       refStats: extrasCache?.refStats ?? new Map(),
       callersByRoot: extrasCache?.callersByRoot ?? new Map(),
@@ -335,6 +349,42 @@ function assembleAnalysis(
   };
 }
 
+/**
+ * Unused / duplicate-hash rows for this library text. A text change recomputes
+ * them. Keeping the previous list, or dropping it, made one fix clear every
+ * other LoRA warning until Refresh.
+ */
+function libraryWideLoraIssues(
+  files: LibraryFile[],
+  loraIndex: NonNullable<ReturnType<typeof getConfiguredLoraIndex>>,
+): Issue[] {
+  const hashed = attachCachedAutoV2Hashes(loraIndex);
+  const libraryFp = libraryFilesFingerprint(files);
+  const loraFp = loraIndexFingerprint(hashed);
+  const ignoreFp = ignoredUnusedFingerprint();
+  if (extrasMatch(libraryFp, loraFp, ignoreFp) && extrasCache) {
+    return extrasCache.libraryWideIssues;
+  }
+  const settings = loadSettings();
+  const libraryTexts = [
+    ...files.map((file) => file.text),
+    ...listAllGenFileContents(),
+  ];
+  const libraryWide = [
+    ...validateUnusedLoras(hashed, libraryTexts, settings.ignoredUnusedLoras),
+    ...validateDuplicateLoraAutoV2(hashed),
+  ];
+  extrasCache = {
+    libraryFp,
+    loraFp,
+    ignoreFp,
+    libraryWideIssues: libraryWide,
+    refStats: extrasCache?.refStats ?? new Map(),
+    callersByRoot: extrasCache?.callersByRoot ?? new Map(),
+  };
+  return libraryWide;
+}
+
 function overlayLoraFolderIssues(
   dto: AnalysisResultDto,
   files: LibraryFile[],
@@ -355,28 +405,8 @@ function overlayLoraFolderIssues(
     extra.push(...validateLoraRefs(file.text, loraIndex, node.id));
   }
 
-  const libraryFp = libraryFilesFingerprint(files);
-  const loraFp = loraIndexFingerprint(loraIndex);
-  const reuseExtras = extrasMatch(libraryFp, loraFp);
   if (loraIndex) {
-    const libraryWide =
-      reuseExtras && extrasCache
-        ? extrasCache.libraryWideIssues
-        : extrasCache && extrasCache.libraryFp === libraryFp
-          ? extrasCache.libraryWideIssues
-          : [];
-    extra.push(...libraryWide);
-    if (!extrasCache || extrasCache.libraryFp !== libraryFp) {
-      extrasCache = {
-        libraryFp,
-        loraFp,
-        libraryWideIssues: extrasCache?.libraryWideIssues ?? [],
-        refStats: new Map(),
-        callersByRoot: new Map(),
-      };
-    } else {
-      extrasCache.loraFp = loraFp;
-    }
+    extra.push(...libraryWideLoraIssues(files, loraIndex));
   }
 
   if (extra.length === 0) return dto;

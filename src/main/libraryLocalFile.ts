@@ -441,7 +441,7 @@ export function recoverLongerLibraryShelves(
 function payloadFromUnknown(value: unknown): LibraryLocalPayload | null {
   if (isSlot(value)) return value;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const row = value as LibraryLocalPayload & { split?: unknown };
+  const row = value as Record<string, unknown>;
   if (
     row.version === LIBRARY_LOCAL_FILE_VERSION ||
     row.version === LIBRARY_SPLIT_VERSION ||
@@ -451,7 +451,7 @@ function payloadFromUnknown(value: unknown): LibraryLocalPayload | null {
   }
   const hasList = PROTECTED_LIST_KEYS.some((key) => listLen(row[key]) > 0);
   if (!hasList) return null;
-  return { ...row, version: SLOT_VERSION };
+  return { ...(value as LibraryLocalPayload), version: SLOT_VERSION };
 }
 
 function preferLongerSlot(

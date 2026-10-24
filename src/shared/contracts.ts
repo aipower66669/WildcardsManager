@@ -3530,6 +3530,8 @@ export type WcmDesktopApi = {
       type: CivitaiModelTypeDto;
       query?: string;
       architectures?: CivitaiArchitectureIdDto[];
+      /** SDXL family chip. Other families are not part of addedThisRun. */
+      sdxlFamily?: CivitaiSdxlFamilyIdDto;
       category?: CivitaiModelCategoryIdDto | null;
       /**
        * auto: fill only when the slice is empty; otherwise a quick Newest check.

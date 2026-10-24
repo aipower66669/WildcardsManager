@@ -46,8 +46,10 @@ download categories append snippets to a chosen wildcard; Shift+click reuses
 the last category. A **Search** tab covers wildcards and model filenames; a
 **Prompts** tab manages prompt folders; a **Generation** tab drives ComfyUI
 from typed prompts or `!gen.txt` folders. Each library is Krea 2 or SDXL.
-SDXL, Pony, and Illustrious share one checkpoint graph with a replaceable
-VAE, CLIP skip, and a hires pass.
+Browse on an SDXL library filters Pony, Illustrious, NoobAI, and plain SDXL
+separately. Those families, the base models, and the Civitai categories are
+stored on that library. SDXL, Pony, and Illustrious share one checkpoint graph
+with a replaceable VAE, CLIP skip, and a hires pass.
 
 ### Diagnose and repair
 

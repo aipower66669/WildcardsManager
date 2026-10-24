@@ -8,6 +8,7 @@ import {
   idChunkFileName,
   modelPageIndex,
   prependIdsIntoChunks,
+  promoteIdsToFront,
 } from './civitaiCatalogLayout.js';
 
 describe('civitaiCatalogLayout', () => {
@@ -36,6 +37,16 @@ describe('civitaiCatalogLayout', () => {
     expect(next[0]).toHaveLength(1000);
     expect(next).toHaveLength(2);
     expect(next[1]![0]).toBe(1097);
+  });
+
+  it('moves tip ids to the front and counts only ones that were not already there', () => {
+    const same = promoteIdsToFront([4, 5, 6, 1, 2, 3], [4, 5]);
+    expect(same.surfaced).toBe(0);
+    expect(same.ids).toEqual([4, 5, 6, 1, 2, 3]);
+
+    const moved = promoteIdsToFront([1, 2, 3, 4, 5], [5, 9, 2]);
+    expect(moved.surfaced).toBe(3);
+    expect(moved.ids).toEqual([5, 9, 2, 1, 3, 4]);
   });
 
   it('appends and spills a new chunk', () => {

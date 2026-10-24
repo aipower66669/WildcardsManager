@@ -9,7 +9,7 @@
 [Release notes](RELEASE_NOTES.md) · [Changelog](CHANGELOG.md)
 
 A desktop graph editor, validator, simulator, and safe refactoring tool for Stable Diffusion / ComfyUI **Dynamic Prompts** wildcard libraries. Open a folder, explore dependencies as a graph, catch missing files and
-cycles, edit wildcards in place, refactor references safely with undo, browse/download LoRAs and checkpoints from Civitai (queued downloads, LoRA download categories), browse **community Images** and Hugging Face Hub models, manage installed model folders, organize prompt folders (`!gen.txt` + samples), and drive ComfyUI generation from those prompts — **Krea 2**, or **SDXL, Pony, and Illustrious** (v0.9.1+) from one checkpoint graph with hires fix.
+cycles, edit wildcards in place, refactor references safely with undo, browse/download LoRAs and checkpoints from Civitai (queued downloads, LoRA download categories), browse **community Images** and Hugging Face Hub models, manage installed model folders, organize prompt folders (`!gen.txt` + samples), and drive ComfyUI generation from those prompts — **Krea 2**, or **SDXL, Pony, and Illustrious** from one checkpoint graph with hires fix. Browse on an SDXL library splits that catalog into **Pony**, **Illustrious**, **NoobAI**, and plain **SDXL** (v0.10).
 
 Built for wildcard libraries used by
 [Stable Diffusion WebUI Dynamic Prompts](https://github.com/adieyal/sd-dynamic-prompts)
@@ -88,7 +88,7 @@ On an SDXL library the Generation tab adds:
 - **Hires fix** — upscaler (default `4x_foolhardy_Remacri`), scale factor (default 1.5), and a second sampler at hires denoise 0.5
 - **Sampler and Scheduler** — every name Comfy reports, shown as Comfy sends them, underscores included
 
-Realistic, Anime, and 3D each keep their own checkpoint, size, and Options. Switching libraries restores that library’s three styles. Flux and other architectures still need a graph you adapt in ComfyUI before Save Workflow.
+Realistic, Anime, and 3D each keep their own checkpoint, size, and Options. Switching libraries restores that library’s three styles. Civitai Browse on an SDXL library filters **Pony**, **Illustrious**, **NoobAI**, and plain **SDXL** separately. Those families, base models, and Civitai categories are saved on that library, so two libraries that share a wildcards folder keep their own catalogs and shelves. Flux and other architectures still need a graph you adapt in ComfyUI before Save Workflow.
 
 Open `ComfyUI-Workflow/WildcardManager-ComfyUI-SDXL-Generation-Workflow.json` in ComfyUI, set the library’s family to SDXL, and **Save Workflow**. The [install steps](docs/user-guide.md#install-the-nodes-and-the-sample-graph) list the node packs.
 
@@ -201,7 +201,7 @@ dumps (real LoRA trees, prompt folders, or model catalogs).
 
 ## Releases
 
-See the [release notes](RELEASE_NOTES.md) for **v0.9.3** (Archive, Maybe, Notify, and LoRA categories stay with the library, not in AppData) and the
+See the [release notes](RELEASE_NOTES.md) for **v0.10** (SDXL families in Browse, and each library’s own catalog, shelves, and Generation settings) and the
 [changelog](CHANGELOG.md) for the complete version history.
 
 ## License

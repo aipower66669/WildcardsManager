@@ -126,7 +126,7 @@ export function parseFileContent(
   return { relativeKey, absolutePath, lines, refs, issues };
 }
 
-const LOCAL_SYNTAX_CODES = new Set([
+export const LOCAL_SYNTAX_ISSUE_CODES = new Set([
   'unbalanced_brace',
   'unbalanced_paren',
   'unbalanced_bracket',
@@ -145,7 +145,7 @@ export function localWildcardSyntaxIssues(
   absolutePath = '',
 ): FileParseResult['issues'] {
   const fromFile = parseFileContent(text, relativeKey, absolutePath).issues.filter(
-    (issue) => LOCAL_SYNTAX_CODES.has(issue.code),
+    (issue) => LOCAL_SYNTAX_ISSUE_CODES.has(issue.code),
   );
   return [...fromFile, ...validateLoraTagSyntax(text, relativeKey)];
 }
@@ -156,7 +156,7 @@ export function mergeLocalSyntaxIssues<T extends { code: string }>(
   syntax: readonly T[],
 ): T[] {
   return [
-    ...previous.filter((issue) => !LOCAL_SYNTAX_CODES.has(issue.code)),
+    ...previous.filter((issue) => !LOCAL_SYNTAX_ISSUE_CODES.has(issue.code)),
     ...syntax,
   ];
 }

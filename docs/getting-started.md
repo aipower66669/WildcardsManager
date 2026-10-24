@@ -103,8 +103,9 @@ folders. Civitai community image downloads use a configured **images folder**
 
 The app queues ComfyUI. It does not ship a ComfyUI install. Two sample graphs
 are in [`ComfyUI-Workflow/`](../ComfyUI-Workflow/): Krea 2, and one checkpoint
-graph for SDXL, Pony, and Illustrious. Another architecture needs a graph you
-adapt in ComfyUI before you save it. The
+graph for SDXL, Pony, and Illustrious. Civitai Browse on an SDXL library also
+has family chips for Pony, Illustrious, NoobAI, and plain SDXL. Another
+architecture needs a graph you adapt in ComfyUI before you save it. The
 [user guide](user-guide.md#install-the-nodes-and-the-sample-graph) names every
 extra pack, with links.
 

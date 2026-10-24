@@ -3,6 +3,7 @@ import {
   architectureIdsForBaseModel,
   baseModelsNamedInText,
   expandArchitectureApiValues,
+  baseModelsMatchBrowseSelection,
   matchesArchitectureFilter,
   matchesEnabledLibraryBaseModel,
   matchesEnabledLibraryVersion,
@@ -17,6 +18,9 @@ import {
 describe('civitai architecture filters', () => {
   it('maps Krea chip to Civitai “Krea 2” base model', () => {
     expect(expandArchitectureApiValues(['krea'])).toEqual(['Krea 2']);
+    expect(
+      expandArchitectureApiValues(['sdxl'], { sdxlFamilies: ['pony'] }),
+    ).toEqual(['Pony', 'Pony V7']);
   });
 
   it('matches official baseModel enum values only', () => {
@@ -94,6 +98,25 @@ describe('civitai architecture filters', () => {
     expect(matchesSdxlFamily('SDXL 1.0', 'sdxl')).toBe(true);
     expect(matchesSdxlFamily('Pony', 'sdxl')).toBe(false);
     expect(matchesSdxlFamily('Pony', 'all')).toBe(true);
+    expect(
+      baseModelsMatchBrowseSelection(['Pony', 'Illustrious'], {
+        architectures: ['sdxl'],
+        sdxlFamily: 'illustrious',
+      }),
+    ).toBe(true);
+    expect(
+      baseModelsMatchBrowseSelection(['Pony'], {
+        architectures: ['sdxl'],
+        sdxlFamily: 'illustrious',
+      }),
+    ).toBe(false);
+    expect(
+      baseModelsMatchBrowseSelection(['Pony', 'Illustrious'], {
+        architectures: ['sdxl'],
+        sdxlFamily: 'all',
+        enabledSdxlFamilies: ['pony', 'illustrious'],
+      }),
+    ).toBe(true);
   });
 
   it('limits SDXL sync apiValues by enabled families', () => {

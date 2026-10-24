@@ -611,6 +611,14 @@ Images) **images folder** under **Settings → Library**, before downloading.
 - Browse filters (persisted): site category tags (Character, Style, Concept, …),
   architecture (SD 1.5, SDXL, Flux, Krea 2, WAN/Video, Other), hide installed,
   only new, only possible matches.
+- While Browse is open, a tip-check looks for newer models. **+N new** counts
+  models that belong on the filters you have open: this base model, this SDXL
+  family chip, and this category. Those cards are placed at the front of the
+  grid, and the grid jumps to the top when the count is not zero. Pony, Illustrious,
+  NoobAI, and plain SDXL each have their own count. Models for another family
+  stay in the catalog and show when that family chip is selected. Category
+  chips work the same way. Installed, archived, Maybe, and Notify stay off
+  Browse.
 - Early-access models: **Notify me** moves them to the **Notify me** tab
   (hidden from Browse). Countdown labels refresh about once a minute. Use
   **Check availability** there; when unlocked they show as available so you can
@@ -728,8 +736,12 @@ from the analysis root. The wildcard editor fills the height under the file
 actions. When the node and the graph are clear, **No issues on this node**,
 **All issues (0)**, **Graph is valid**, and **Refresh** share one line. When
 either list has issues, that list grows under the editor and scrolls once it
-reaches about half the panel, so the editor stays at least that tall. Use
-**Refresh** to re-scan without changing the selected node or graph focus.
+reaches about half the panel, so the editor stays at least that tall. Fixing
+one issue removes that row in one update. The other issues stay listed. The
+list does not redraw every issue and then drop the fixed one. The buttons on
+an issue (create, cycle break, fix series, categorize, ignore) run that same
+refresh after the fix. **Refresh** re-scans the whole graph and the LoRA
+folder without changing the selected node or graph focus.
 
 | Code | Meaning |
 | --- | --- |

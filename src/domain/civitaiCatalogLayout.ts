@@ -87,6 +87,38 @@ export function prependIdsIntoChunks(
   return result;
 }
 
+/**
+ * Put `front` first, in that order, and drop those ids from their old positions.
+ * `surfaced` is how many of those ids were not already sitting in that prefix.
+ */
+export function promoteIdsToFront(
+  ids: readonly number[],
+  front: readonly number[],
+): { ids: number[]; surfaced: number } {
+  const seen = new Set<number>();
+  const head: number[] = [];
+  for (const id of front) {
+    if (!Number.isFinite(id) || seen.has(id)) continue;
+    seen.add(id);
+    head.push(id);
+  }
+  if (head.length === 0) return { ids: [...ids], surfaced: 0 };
+
+  const indexOf = new Map<number, number>();
+  for (let i = 0; i < ids.length; i += 1) {
+    const id = ids[i]!;
+    if (!indexOf.has(id)) indexOf.set(id, i);
+  }
+  let surfaced = 0;
+  for (let i = 0; i < head.length; i += 1) {
+    if (indexOf.get(head[i]!) !== i) surfaced += 1;
+  }
+  if (surfaced === 0) return { ids: [...ids], surfaced: 0 };
+
+  const rest = ids.filter((id) => !seen.has(id));
+  return { ids: [...head, ...rest], surfaced };
+}
+
 /** Append ids onto the last chunk, spilling new chunks as needed. */
 export function appendIdsIntoChunks(
   chunks: number[][],

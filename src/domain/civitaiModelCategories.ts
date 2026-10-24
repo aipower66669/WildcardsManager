@@ -99,6 +99,25 @@ export function normalizeEnabledCivitaiCategories(
   return out.length > 0 ? out : [...DEFAULT_ENABLED_CIVITAI_CATEGORIES];
 }
 
+/** Keep the first spelling of each tag. Incoming tags fill gaps on a cached model. */
+export function unionModelTags(
+  existing: readonly string[] | undefined,
+  incoming: readonly string[] | undefined,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of [...(existing ?? []), ...(incoming ?? [])]) {
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
 /** True when the model carries this category's Civitai tag (any position). */
 export function modelHasCategoryTag(
   tags: string[] | undefined,

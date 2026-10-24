@@ -2261,12 +2261,29 @@ export function CivitaiBrowserModal({
   archiveItemsRef.current = archiveItems;
   maybeItemsRef.current = maybeItems;
   const loadCatalogRef = useRef<
-    (opts?: { quiet?: boolean; append?: boolean; limit?: number }) => Promise<void>
+    (opts?: {
+      quiet?: boolean;
+      append?: boolean;
+      limit?: number;
+      revealTop?: boolean;
+    }) => Promise<void>
   >(async () => undefined);
+  const catalogLoadSeqRef = useRef(0);
+  const catalogBusySeqRef = useRef(0);
+  const [browseRevealToken, setBrowseRevealToken] = useState(0);
 
   const loadCatalog = useCallback(
-    async (opts?: { quiet?: boolean; append?: boolean; limit?: number }) => {
-      if (!opts?.quiet) setBusy(true);
+    async (opts?: {
+      quiet?: boolean;
+      append?: boolean;
+      limit?: number;
+      revealTop?: boolean;
+    }) => {
+      const seq = ++catalogLoadSeqRef.current;
+      if (!opts?.quiet) {
+        catalogBusySeqRef.current = seq;
+        setBusy(true);
+      }
       try {
         const offset = opts?.append
           ? (catalogMetaRef.current?.nextOffset ?? 0)
@@ -2280,6 +2297,7 @@ export function CivitaiBrowserModal({
           offset,
           limit,
         });
+        if (seq !== catalogLoadSeqRef.current) return;
         activeSliceKeyRef.current = result.sliceKey;
         const patched = applyLocalPatches(result.items);
         setItems((prev) => {
@@ -2310,6 +2328,9 @@ export function CivitaiBrowserModal({
         catalogMetaRef.current = meta;
         setCatalogMeta(meta);
         if (!opts?.append) setBrowseGridReady(true);
+        if (opts?.revealTop && !opts.append) {
+          setBrowseRevealToken((n) => n + 1);
+        }
         // EA page enrich only for cards the Browse grid would actually render
         // (same filters as browseItems). Empty grid → no scrape.
         const healIds = patched
@@ -2341,10 +2362,11 @@ export function CivitaiBrowserModal({
             });
         }
       } catch (e) {
+        if (seq !== catalogLoadSeqRef.current) return;
         flashStatusError(e instanceof Error ? e.message : String(e));
         if (!opts?.append) setBrowseGridReady(true);
       } finally {
-        if (!opts?.quiet) setBusy(false);
+        if (catalogBusySeqRef.current === seq) setBusy(false);
       }
     },
     [
@@ -2368,6 +2390,8 @@ export function CivitaiBrowserModal({
         .syncCatalogSlice({
           type,
           architectures: architectures.length ? architectures : undefined,
+          sdxlFamily:
+            architectures[0] === 'sdxl' ? sdxlFamily : undefined,
           category,
           mode,
           force: opts?.force === true,
@@ -2405,7 +2429,7 @@ export function CivitaiBrowserModal({
           flashStatusError(e instanceof Error ? e.message : String(e));
         });
     },
-    [architectures, category, flashStatusError, type],
+    [architectures, category, flashStatusError, sdxlFamily, type],
   );
 
   const clearTipCheckTimer = useCallback(() => {
@@ -2496,7 +2520,11 @@ export function CivitaiBrowserModal({
       if (finished) lastAdded = 0;
       if (finished || (addedSince && now - lastReloadAt > 5000)) {
         lastReloadAt = now;
-        void loadCatalog({ quiet: true });
+        void loadCatalog({
+          quiet: true,
+          revealTop:
+            progress.mode === 'incremental' && progress.addedThisRun > 0,
+        });
         // Tip-check finds new IDs; library detail enrich finds new versions of
         // models you already have (esp. checkpoints that never reappear in Newest).
         if (finished && progress.status === 'done') {
@@ -4325,10 +4353,22 @@ export function CivitaiBrowserModal({
   const isSyncing = catalogSync?.status === 'syncing';
   const catalogCachedCount =
     catalogSync?.totalCached ?? catalogMeta?.totalCached ?? 0;
+  const newArrivalLabel = (count: number) => {
+    const bits = [`+${count.toLocaleString()} new`];
+    if (architectures[0] === 'sdxl' && sdxlFamily !== 'all') {
+      bits.push(familyMetaLabel(sdxlFamily));
+    }
+    if (category) {
+      const label =
+        CATEGORY_META_ICONS[category as CivitaiModelCategoryId]?.label;
+      if (label) bits.push(label);
+    }
+    return bits.join(' · ');
+  };
   const activeCatalogStatusText = isSyncing
     ? catalogSync?.mode === 'incremental'
       ? catalogSync.addedThisRun > 0
-        ? `Checking for new models… +${catalogSync.addedThisRun.toLocaleString()} new`
+        ? `Checking for new models… ${newArrivalLabel(catalogSync.addedThisRun)}`
         : 'Checking for new models…'
       : catalogSync
         ? (() => {
@@ -4343,7 +4383,7 @@ export function CivitaiBrowserModal({
                 : '';
             const runBit =
               catalogSync.addedThisRun > 0
-                ? ` · +${catalogSync.addedThisRun.toLocaleString()} new`
+                ? ` · ${newArrivalLabel(catalogSync.addedThisRun)}`
                 : '';
             // First-time / incomplete backfill — resumes from saved cursor.
             return `Backfilling catalog… ${pageBit}${pageDetail}${runBit} · ${catalogCachedCount.toLocaleString()} indexed`;
@@ -4907,7 +4947,7 @@ export function CivitaiBrowserModal({
             ? {
                 message:
                   catalogSync.addedThisRun > 0
-                    ? `Checking for new ${typeLabel}… +${catalogSync.addedThisRun.toLocaleString()} new`
+                    ? `Checking for new ${typeLabel}… ${newArrivalLabel(catalogSync.addedThisRun)}`
                     : `Checking for new ${typeLabel}…`,
                 churning: true,
               }
@@ -5478,6 +5518,7 @@ export function CivitaiBrowserModal({
                     items={browseItems}
                     cardMinWidth={cardMinWidth}
                     getItemKey={(item) => item.id}
+                    scrollToTopToken={browseRevealToken}
                     onClick={collapsePreviewOnGridBackground}
                     onVisibleItems={onBrowseVisibleItems}
                     renderItem={(item) => renderModelCard(item, 'browse')}

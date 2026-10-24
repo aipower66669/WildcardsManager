@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import {
+  baseModelsMatchBrowseSelection,
   expandArchitectureApiValues,
   matchesArchitectureFilter,
   matchesEnabledLibraryVersion,
@@ -9,11 +10,13 @@ import {
   type CivitaiArchitectureId,
   type CivitaiSdxlFamilyId,
   type CivitaiSdxlFamilyToggleId,
+  DEFAULT_ENABLED_SDXL_FAMILIES,
 } from '../domain/civitaiBaseModels.js';
 import {
   modelCategoryIsEnabled,
   modelCategoryTag,
   modelHasCategoryTag,
+  unionModelTags,
   type CivitaiModelCategoryId,
 } from '../domain/civitaiModelCategories.js';
 import {
@@ -874,6 +877,8 @@ export type CivitaiCatalogSyncParams = {
   type: CivitaiModelTypeDto;
   query?: string;
   architectures?: CivitaiArchitectureIdDto[];
+  /** Current SDXL family chip. Other families are not part of “+N new”. */
+  sdxlFamily?: CivitaiSdxlFamilyIdDto;
   category?: CivitaiModelCategoryIdDto | null;
   /** auto = fill when empty, else incremental. */
   mode?: 'auto' | 'incremental' | 'fill';
@@ -1320,6 +1325,9 @@ function syncAllSliceExhaustedFlag(opts: {
 async function syncTaggedCategorySlice(opts: {
   type: CivitaiModelTypeDto;
   architectures: CivitaiArchitectureIdDto[];
+  sdxlFamily?: CivitaiSdxlFamilyIdDto;
+  /** Browse chip the user is looking at. Null is All categories. */
+  viewCategory?: CivitaiModelCategoryIdDto | null;
   category: CivitaiModelCategoryIdDto;
   requestedMode: 'auto' | 'incremental' | 'fill';
   force?: boolean;
@@ -1392,11 +1400,95 @@ async function syncTaggedCategorySlice(opts: {
   }
 
   const architectureIds = architectures as CivitaiArchitectureId[];
+  const libraryFamilies = (getActiveLibrary().enabledSdxlFamilies ??
+    DEFAULT_ENABLED_SDXL_FAMILIES) as CivitaiSdxlFamilyToggleId[];
+  const selectedFamily = opts.sdxlFamily ?? 'all';
+  const familyChipEnabled =
+    selectedFamily === 'all' ||
+    libraryFamilies.includes(selectedFamily as CivitaiSdxlFamilyToggleId);
+  const sdxlFamiliesForApi: CivitaiSdxlFamilyToggleId[] =
+    selectedFamily !== 'all'
+      ? [selectedFamily as CivitaiSdxlFamilyToggleId]
+      : libraryFamilies.length > 0
+        ? libraryFamilies
+        : [...DEFAULT_ENABLED_SDXL_FAMILIES];
   const baseModels =
     architectureIds.length > 0
-      ? expandArchitectureApiValues(architectureIds)
+      ? expandArchitectureApiValues(architectureIds, {
+          sdxlFamilies: sdxlFamiliesForApi,
+        })
       : undefined;
   const tag = modelCategoryTag(opts.category);
+  const visibleOnThisBrowse = (
+    models: CachedCivitaiModel[],
+    ids: number[],
+  ): number[] => {
+    const byId = new Map(models.map((model) => [model.id, model]));
+    return ids.filter((id) => {
+      const model = byId.get(id);
+      if (!model || !familyChipEnabled) return false;
+      if (
+        origin === 'https://civitai.red' &&
+        !civitaiRedKeepsModel(Boolean(model.nsfw))
+      ) {
+        return false;
+      }
+      const bases = [
+        model.baseModel,
+        ...(model.versions ?? []).map((version) => version.baseModel),
+      ];
+      if (
+        !baseModelsMatchBrowseSelection(bases, {
+          architectures: architectureIds,
+          sdxlFamily: selectedFamily,
+          enabledSdxlFamilies: libraryFamilies,
+        })
+      ) {
+        return false;
+      }
+      if (opts.viewCategory) {
+        return modelHasCategoryTag(model.tags, opts.viewCategory);
+      }
+      return modelCategoryIsEnabled(
+        model.tags,
+        enabledCivitaiCategoriesForSync(),
+      );
+    });
+  };
+  // +N is models this Browse chip will list, not a reshuffle of the shared
+  // index. Other families are still stored, behind this chip's models, so
+  // selecting that family shows them.
+  const placeOnAll = (
+    models: CachedCivitaiModel[],
+    ids: number[],
+    now: string,
+  ): number => {
+    const visible = visibleOnThisBrowse(models, ids);
+    const visibleSet = new Set(visible);
+    const prefix = new Set(
+      listSliceIdsWindow(allSliceKey, 0, Math.max(ids.length, 1)).ids,
+    );
+    let added = 0;
+    for (const id of visible) {
+      if (!prefix.has(id)) added += 1;
+    }
+    const rest = ids.filter((id) => !visibleSet.has(id));
+    if (rest.length > 0) {
+      updateCatalogSlice(allSliceKey, {
+        prependIds: rest,
+        lastSyncedAt: now,
+      });
+    }
+    if (visible.length > 0) {
+      updateCatalogSlice(allSliceKey, {
+        prependIds: visible,
+        lastSyncedAt: now,
+      });
+    } else if (rest.length === 0) {
+      updateCatalogSlice(allSliceKey, { lastSyncedAt: now });
+    }
+    return added;
+  };
 
   const knownIds = getSliceIdKnownSet(dataSliceKey);
   const filling = mode === 'fill';
@@ -1407,6 +1499,7 @@ async function syncTaggedCategorySlice(opts: {
 
   try {
     while (!opts.sync.cancelled) {
+      const isTipPage = cursor == null;
       const result = await searchCivitaiModels({
         type: opts.type,
         cursor,
@@ -1431,14 +1524,38 @@ async function syncTaggedCategorySlice(opts: {
 
       // Always merge the tip page — known IDs can still carry newer versionId /
       // version snapshots. Exiting before insert missed checkpoint updates.
-      const cached = result.items.map(toCachedModel);
+      // Stamp the tag this page was queried with. The list payload often omits
+      // it, and Browse category chips hide a model that does not carry the tag.
+      const cached = result.items.map((model) => {
+        const row = toCachedModel(model);
+        if (!tag) return row;
+        const tags = unionModelTags(row.tags, [tag]);
+        return tags.length === row.tags.length ? row : { ...row, tags };
+      });
       insertCachedModelsIfAbsent(cached);
 
       if (!filling && allKnown) {
         const now = new Date().toISOString();
-        updateCatalogSlice(dataSliceKey, { lastSyncedAt: now });
-        updateCatalogSlice(allSliceKey, { lastSyncedAt: now });
-        opts.sync.lastPageAdded = 0;
+        // Already stored under this category. Re-counting the Newest page
+        // made “+N new” include other families and cards already on screen.
+        // If Browse's All index never received an id, place it now. Only ids
+        // that pass this chip are part of +N. Other families are stored too
+        // and show when that family chip is selected.
+        const inAll = getSliceIdKnownSet(allSliceKey);
+        const missingFromAll = indexIds.filter((id) => !inAll.has(id));
+        const surfaced =
+          missingFromAll.length > 0
+            ? placeOnAll(cached, missingFromAll, now)
+            : 0;
+        if (missingFromAll.length === 0) {
+          updateCatalogSlice(allSliceKey, { lastSyncedAt: now });
+        }
+        updateCatalogSlice(dataSliceKey, {
+          lastSyncedAt: now,
+          ...(isTipPage ? { tipPageIds: indexIds } : {}),
+        });
+        opts.sync.lastPageAdded = surfaced;
+        opts.sync.addedThisRun += surfaced;
         opts.emit('syncing');
         return 'done';
       }
@@ -1452,8 +1569,6 @@ async function syncTaggedCategorySlice(opts: {
       }
       // EA page enrich is Browse-grid only (see scheduleEarlyAccessPageHeal) —
       // tip-check must not scrape every synced model.
-      opts.sync.lastPageAdded = newIds.length;
-      opts.sync.addedThisRun += newIds.length;
 
       const hayById = new Map(
         cached.map((m) => [m.id, catalogSearchHay(m)] as const),
@@ -1466,6 +1581,10 @@ async function syncTaggedCategorySlice(opts: {
           : null;
       const now = new Date().toISOString();
 
+      // Browse reads the All index from the front. A model that was already
+      // in All (another category, or an older page) but missing here must
+      // move to that front — otherwise “+N new” never shows up in the grid.
+      let surfaced = 0;
       if (filling) {
         updateCatalogSlice(dataSliceKey, {
           appendIds: newIds,
@@ -1475,6 +1594,9 @@ async function syncTaggedCategorySlice(opts: {
           lastSyncedAt: now,
         });
         if (newIds.length > 0) {
+          surfaced = visibleOnThisBrowse(cached, newIds).filter(
+            (id) => !getSliceIdKnownSet(allSliceKey).has(id),
+          ).length;
           updateCatalogSlice(allSliceKey, {
             appendIds: newIds,
             appendHays,
@@ -1493,16 +1615,16 @@ async function syncTaggedCategorySlice(opts: {
         updateCatalogSlice(dataSliceKey, {
           prependIds: newIds,
           lastSyncedAt: now,
+          ...(isTipPage ? { tipPageIds: indexIds } : {}),
         });
         if (newIds.length > 0) {
-          updateCatalogSlice(allSliceKey, {
-            prependIds: newIds,
-            lastSyncedAt: now,
-          });
+          surfaced = placeOnAll(cached, newIds, now);
         } else {
           updateCatalogSlice(allSliceKey, { lastSyncedAt: now });
         }
       }
+      opts.sync.lastPageAdded = surfaced;
+      opts.sync.addedThisRun += surfaced;
 
       opts.emit('syncing');
       // Preview downloads are active-library scoped — do not queue every sync card.
@@ -1714,6 +1836,8 @@ export async function syncCatalogSlice(
       const pass = await syncTaggedCategorySlice({
         type: params.type,
         architectures,
+        sdxlFamily: params.sdxlFamily,
+        viewCategory: reportCategory,
         category,
         requestedMode: requested,
         force,
