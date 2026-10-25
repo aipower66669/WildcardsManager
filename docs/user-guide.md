@@ -738,7 +738,9 @@ actions. When the node and the graph are clear, **No issues on this node**,
 either list has issues, that list grows under the editor and scrolls once it
 reaches about half the panel, so the editor stays at least that tall. Fixing
 one issue removes that row in one update. The other issues stay listed. The
-list does not redraw every issue and then drop the fixed one. The buttons on
+list does not redraw every issue and then drop the fixed one. Typing in the
+editor does the same for that file: a new error shows up, and fixing it
+removes that row. The buttons on
 an issue (create, cycle break, fix series, categorize, ignore) run that same
 refresh after the fix. **Refresh** re-scans the whole graph and the LoRA
 folder without changing the selected node or graph focus.

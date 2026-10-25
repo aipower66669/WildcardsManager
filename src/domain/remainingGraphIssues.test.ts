@@ -175,6 +175,37 @@ describe('issuesAfterFileEdit', () => {
     ).toEqual([hat, unused, sameFileOther]);
   });
 
+  it('regression: a typed editor error is added, and fixing it removes that row', () => {
+    const typed = {
+      code: 'unbalanced_brace',
+      line: 2,
+      message: 'Unclosed `{`',
+    };
+    const kept = { ...stillThere, snippet: '__hat__' };
+    const withError = issuesAfterFileEdit([kept], [typed], {
+      openNodeIds,
+      edges,
+      codes: LOCAL_SYNTAX_ISSUE_CODES,
+    });
+    expect(withError).toEqual([kept, typed]);
+
+    const fixed = issuesAfterFileEdit(withError, [], {
+      openNodeIds,
+      edges,
+      codes: LOCAL_SYNTAX_ISSUE_CODES,
+    });
+    expect(fixed).toEqual([kept]);
+
+    // A stale copy must not stay on the details list until Refresh.
+    expect(
+      remainingGraphIssues([typed, kept], {
+        shownIdentities: new Set(),
+        liveFileReady: false,
+        openNodeIds: new Set(['clothes']),
+      }),
+    ).toEqual([kept]);
+  });
+
   it('drops a syntax row the editor added once that line is fixed', () => {
     const typed = {
       code: 'unbalanced_brace',
