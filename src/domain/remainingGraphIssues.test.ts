@@ -85,6 +85,21 @@ describe('remainingGraphIssues', () => {
     ).toEqual([other]);
   });
 
+  it('hides a fixed editor syntax row that never got a node id', () => {
+    const typed = {
+      code: 'unbalanced_brace',
+      line: 2,
+      message: 'Unclosed `{`',
+    };
+    expect(
+      remainingGraphIssues([typed, stillThere], {
+        shownIdentities: new Set(),
+        liveFileReady: false,
+        openNodeIds: new Set(['clothes']),
+      }),
+    ).toEqual([stillThere]);
+  });
+
   it('keeps that missing ref while the check is still running', () => {
     const hat = { ...stillThere, snippet: '__hat__' };
     expect(
@@ -160,6 +175,57 @@ describe('issuesAfterFileEdit', () => {
     ).toEqual([hat, unused, sameFileOther]);
   });
 
+  it('drops a syntax row the editor added once that line is fixed', () => {
+    const typed = {
+      code: 'unbalanced_brace',
+      line: 2,
+      message: 'Unclosed `{`',
+    };
+    const otherFile = {
+      code: 'unbalanced_brace',
+      nodeId: 'other',
+      line: 1,
+      message: 'Unclosed `{` on another file',
+    };
+    expect(
+      issuesAfterFileEdit([typed, otherFile, sameFileOther], [sameFileOther], {
+        openNodeIds,
+        edges,
+        codes: LOCAL_SYNTAX_ISSUE_CODES,
+      }),
+    ).toEqual([otherFile, sameFileOther]);
+  });
+
+  it('drops a missing ref the editor added before the graph has that node', () => {
+    const fresh = {
+      code: 'missing_file',
+      nodeId: 'missing:shoe',
+      line: 2,
+      message: 'Missing __shoe__',
+      snippet: '__shoe__',
+      severity: 'error' as const,
+    };
+    const next = analysisAfterFileEdit(
+      {
+        nodes: [
+          {
+            id: 'clothes',
+            relativeKey: 'clothes',
+            hostKey: 'clothes',
+            issues: [] as Array<typeof fresh | typeof sameFileOther>,
+          },
+        ],
+        edges,
+        issues: [fresh, sameFileOther],
+        stats: { errorCount: 2, warningCount: 0 },
+      },
+      'clothes',
+      [sameFileOther],
+      FILE_CHECK_ISSUE_CODES,
+    );
+    expect(next.issues).toEqual([sameFileOther]);
+  });
+
   it('appends a live issue the graph did not have yet', () => {
     const fresh = {
       code: 'missing_lora',
@@ -194,6 +260,7 @@ describe('issuesAfterFileEdit', () => {
           issues: [] as Array<typeof hat | typeof otherMissing>,
         },
         { id: 'missing:hat', relativeKey: 'hat', issues: [hat] },
+        { id: 'missing:shoe', relativeKey: 'shoe', issues: [otherMissing] },
         {
           id: 'other',
           relativeKey: 'other',

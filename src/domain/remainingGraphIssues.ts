@@ -89,11 +89,24 @@ export function issuesAfterFileEdit<T extends GraphIssueIdentity>(
     openNodeIds: ReadonlySet<string>;
     edges: readonly { from: string; to: string; line?: number; snippet?: string }[];
     codes?: ReadonlySet<string>;
+    /** Node ids already in the graph. A live row whose node is not here was added by the editor. */
+    knownNodeIds?: ReadonlySet<string>;
   },
 ): T[] {
   const replaces = (issue: T) => {
     if (opts.codes && !opts.codes.has(issue.code)) return false;
-    return issueOwnedByFile(issue, opts);
+    // The editor's instant syntax rows have no node id. A finished check
+    // replaces them. Leaving them in place kept a fixed error until Refresh.
+    if (!issue.nodeId) return opts.codes != null;
+    if (issueOwnedByFile(issue, opts)) return true;
+    if (
+      opts.knownNodeIds &&
+      !opts.knownNodeIds.has(issue.nodeId) &&
+      !opts.openNodeIds.has(issue.nodeId)
+    ) {
+      return true;
+    }
+    return false;
   };
   const liveRelevant = opts.codes
     ? liveIssues.filter((issue) => opts.codes!.has(issue.code))
@@ -134,6 +147,7 @@ export function analysisAfterFileEdit<
     openNodeIds,
     edges: current.edges,
     codes,
+    knownNodeIds: new Set(current.nodes.map((node) => node.id)),
   });
   if (
     issues.length === current.issues.length &&
@@ -185,6 +199,11 @@ export function remainingGraphIssues<T extends GraphIssueIdentity>(
 ): T[] {
   return graphIssues.filter((issue) => {
     if (opts.shownIdentities.has(issueIdentity(issue))) return false;
+    // Instant editor rows carry no node id. The node list shows the live
+    // copy. This graph copy must not stay behind after the line is fixed.
+    if (!issue.nodeId && FILE_CHECK_ISSUE_CODES.has(issue.code)) {
+      return false;
+    }
     if (
       opts.liveFileReady &&
       issue.nodeId &&
