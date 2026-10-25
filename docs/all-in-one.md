@@ -2888,10 +2888,12 @@ runs `npm ci`, typecheck, and tests on Windows and Ubuntu. The Windows NSIS
 installer (`npm run build:win`, no version bump) starts only after both of
 those pass. It then packs `comfyui-lora-training/` into
 `ComfyUI-Workflow/comfyui-lora-training.zip` and attaches
-`WildcardsManager-*.exe`, the blockmap, `latest.yml`, that zip,
+`WildcardsManager-*.exe`, `latest.yml`, that zip,
 `ComfyUI-Workflow/comfyui-custom-save-node.zip` (`SaveImageToFolder`), and the
 Krea 2 and SDXL workflow JSON files to that GitHub Release, using
-`RELEASE_NOTES.md` as the body.
+`RELEASE_NOTES.md` as the body. electron-builder still writes
+`WildcardsManager-*.exe.blockmap` next to the installer. That file is left off
+the release. Check for update downloads the full exe.
 A failed test does not start the build. Branch pushes and pull requests do
 not start it. Manual dispatch runs the tests only. macOS and Linux are not
 built. There is no installer to download for those systems. Running from

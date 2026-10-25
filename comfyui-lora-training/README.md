@@ -30,14 +30,18 @@ only — do not change existing LT node class names, inputs, or behaviour.
 | `LoraTrainingNegativePrompt` | LT · Negative Prompt | Negative prompt text |
 | `LoraTrainingCLIP` | LT · CLIP | CLIP filename (wildcard → CLIPLoader combo) |
 | `LoraTrainingVAE` | LT · VAE | VAE filename (wildcard → VAELoader combo) |
-| `LoraTrainingClipSkip` | LT · CLIP skip | Stop layer written by the app (−2 for clip skip 2, −1 for clip skip 1). A positive 1–12 is also accepted and converted |
+| `LoraTrainingClipSkip` | LT · CLIP skip | Stop layer for **CLIP Set Last Layer**. The app writes −2 for clip skip 2 and −1 for clip skip 1. A positive 1–12 is converted the same way |
 | `LoraTrainingWidth` | LT · Width | Canvas / latent width |
 | `LoraTrainingHeight` | LT · Height | Canvas / latent height |
 | `LoraTrainingSteps` | LT · Steps | KSampler step count |
 | `LoraTrainingCfg` | LT · CFG | KSampler CFG |
 | `LoraTrainingSampler` | LT · Sampler | KSampler sampler name (wildcard → combo) |
 | `LoraTrainingScheduler` | LT · Scheduler | KSampler scheduler name (wildcard → combo) |
-| `LoraTrainingDenoise` | LT · Denoise | KSampler denoise 0..1 (same node as the upscale tool) |
+| `LoraTrainingDenoise` | LT · Denoise | Base KSampler denoise 0..1 (same node as the upscale tool). The SDXL second sampler uses **LT · Hires denoise** |
+| `LoraTrainingUpscaler` | LT · Upscaler | Upscale-model filename for the SDXL hires pass (wildcard → `UpscaleModelLoader` combo). The sample graph starts at `4x_foolhardy_Remacri.pth` |
+| `LoraTrainingUpscaleFactor` | LT · Upscale factor | Size multiplier for the hires pass (default 1.5, range 1–4). Wire into **LT · Hires size** |
+| `LoraTrainingHiresSize` | LT · Hires size | Base width × factor and height × factor, snapped to a multiple of 8, for `ImageScale` (1.5 on 1024×1024 is 1536×1536) |
+| `LoraTrainingHiresDenoise` | LT · Hires denoise | Denoise for the second KSampler only (default 0.5). The base sampler stays on **LT · Denoise** |
 | `LoraTrainingSaveOutput` | LT · Save Output | SaveImage-style sink so the app can fetch from `/history` |
 
 ## Wiring tips (LoraTraining)
@@ -58,6 +62,17 @@ only — do not change existing LT node class names, inputs, or behaviour.
 5. **LT · Steps** / **LT · CFG** / **LT · Sampler** / **LT · Scheduler** / **LT · Denoise** → convert those KSampler widgets to inputs, then connect. Blank Sampler or Scheduler in the app keeps the name already on the node.
 6. **LT · Save Output** → final IMAGE so Generation can pull the result from history.
 7. In Wildcards Manager: **Settings → AI → ComfyUI**, then Generation → **Edit Workflow** → **Save Workflow**.
+
+### SDXL, Pony, and Illustrious
+
+These nodes are on `WildcardManager-ComfyUI-SDXL-Generation-Workflow.json` only. Krea 2 does not use them. Pony and Illustrious share this checkpoint graph.
+
+1. **LT · Model** → Checkpoint loader. CLIP comes from that checkpoint, so **LT · CLIP** is not on this graph.
+2. **LT · VAE** → Load VAE. That VAE feeds the base decode, the hires encode, and the final decode. A blank VAE in the app keeps the VAE packed in the checkpoint.
+3. **LT · CLIP skip** → **CLIP Set Last Layer** on the CLIP wire out of the checkpoint. Default is stop layer −2 (clip skip 2).
+4. **LT · Upscaler** → `UpscaleModelLoader` `model_name`, then `ImageUpscaleWithModel`.
+5. **LT · Width** / **LT · Height** and **LT · Upscale factor** → **LT · Hires size** → `ImageScale`.
+6. **LT · Hires denoise** → the second KSampler. **LT · Denoise** stays on the base KSampler. Steps, CFG, Sampler, and Scheduler feed both samplers.
 
 ## Diversify (Context / Expression)
 

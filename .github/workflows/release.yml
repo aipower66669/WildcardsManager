@@ -104,7 +104,6 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             release/WildcardsManager-*.exe
-            release/*.exe.blockmap
             release/latest.yml
             ComfyUI-Workflow/comfyui-lora-training.zip
             ComfyUI-Workflow/comfyui-custom-save-node.zip

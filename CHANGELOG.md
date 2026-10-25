@@ -7,6 +7,11 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- A version tag no longer uploads `WildcardsManager-*.exe.blockmap` with the
+  GitHub Release assets. Check for update still downloads the full installer.
+
 ### Fixed
 
 - A version tag attaches `comfyui-custom-save-node.zip` (`SaveImageToFolder`)
