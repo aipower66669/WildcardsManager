@@ -9,13 +9,12 @@ import type {
 } from '../../shared/contracts.js';
 import { IPC } from '../../shared/contracts.js';
 import { GENERATION_OUTPUT_FILENAME } from '../../shared/comfy.js';
-import { applyBindings } from './applyBindings.js';
-import { applyCheckpointVaeOverride } from './checkpointVaeOverride.js';
+import { generationOutputNames } from '../../domain/generationOutputFile.js';
+import type { GenerationValues } from './applyBindings.js';
 import {
   emptySampleClock,
   noteSampleProgress,
   sampleClockDurationMs,
-  samplerNodeIds,
   type SampleClock,
 } from './benchmarkTiming.js';
 import { ComfyAdapter } from './adapter.js';
@@ -24,16 +23,15 @@ import {
   readComfyApiKey,
 } from './comfySettings.js';
 import { ensureComfyRunning } from './ensureComfyRunning.js';
-import { forceFixedSeeds, patchUiWorkflowSeed } from './forceSeeds.js';
 import {
   generationImageOutputFolder,
   resolveGenerationOutputRoot,
 } from './generationOutputRoots.js';
 import {
-  activeWorkflowFamily,
-  loadWorkflowProfile,
-} from './workflowStore.js';
-import { isWorkflowGraph } from './workflowGraph.js';
+  postGenerationPrompt,
+  samplerIdsForWorkflow,
+} from './promptPostWorkerClient.js';
+import { activeWorkflowFamily, statWorkflowProfile } from './workflowStore.js';
 import {
   getGenerationSaveInNewSubfolder,
   loadSettings,
@@ -44,6 +42,7 @@ import {
   type GenerationImagePrompts,
 } from '../../domain/generationImagePrompt.js';
 import {
+  appendAdditionalPositive,
   pickGenerationPrompt,
   resolveGenerationSeed,
 } from '../../domain/generationPromptPick.js';
@@ -52,10 +51,12 @@ import {
 } from '../../domain/genPrompts.js';
 import {
   expandGenLine,
+  ensureGenPromptFolders,
   getLoadedGenPrompts,
   listGenPromptFolders,
   listGenPromptFoldersUnder,
   loadGenPrompts,
+  warmGenerationLibraryIndex,
 } from '../promptsService.js';
 import { ensureCheckpointIndex } from '../checkpointService.js';
 import {
@@ -76,6 +77,7 @@ import {
 } from './generationPreview.js';
 import { BENCHMARK_IMAGES_PER_CHECKPOINT } from '../../domain/checkpointBenchmark.js';
 import { applyLibraryPromptSubstitutions } from '../promptSubstitutions.js';
+import { setGenerationActive } from '../generationActivity.js';
 
 let cancelled = false;
 let running = false;
@@ -102,24 +104,11 @@ function setProgress(patch: Partial<GenerationProgressDto>): void {
   emit();
 }
 
-/** Write the job seed into every LT · Seed node (`value` input — not `seed`). */
-function injectLtSeedValue(
-  graph: { [id: string]: { class_type: string; inputs: Record<string, unknown> } },
-  seed: number,
-): void {
-  for (const node of Object.values(graph)) {
-    if (node.class_type !== 'LoraTrainingSeed') continue;
-    node.inputs.value = seed >>> 0;
-  }
-}
-
-const IMAGE_FILE_RE = /\.(png|jpe?g|webp)$/i;
-
 /**
- * Newest image written for this job under the LT · Output Folder.
- * Only the generation stem (`WCG.png`, `WCG_00001_.png`, …) is considered.
- * Numbered files already older than this job are skipped on later polls so a
- * large output folder is not stat'd in full every tick.
+ * Newest image ComfyUI wrote for this job under the LT · Output Folder.
+ * Any image whose name starts with the stem counts (`WCG.png`,
+ * `WCG_00001_.png`, `WCG_<extra>_00001.png`, …). The newest mtime wins.
+ * Numbered files already older than this job are skipped on later polls.
  */
 async function findNewestOutputFile(
   dir: string,
@@ -134,22 +123,18 @@ async function findNewestOutputFile(
     return null;
   }
   const stem = GENERATION_OUTPUT_FILENAME.toLowerCase();
-  const preferred = names.filter((n) => {
-    const lower = n.toLowerCase();
-    return (
-      IMAGE_FILE_RE.test(lower) &&
-      (lower === `${stem}${path.extname(lower)}` ||
-        lower.startsWith(`${stem}_`) ||
-        lower.startsWith(`${stem}.`))
-    );
-  });
   const floor = minMtimeMs != null ? minMtimeMs - 5000 : null;
   let best: { abs: string; mtime: number } | null = null;
-  for (const name of preferred) {
+  let checked = 0;
+  for (const name of generationOutputNames(names, GENERATION_OUTPUT_FILENAME)) {
     const lower = name.toLowerCase();
     const ext = path.extname(lower);
     const exactStem = lower === `${stem}${ext}`;
     if (!exactStem && olderThanJob.has(name)) continue;
+    checked += 1;
+    if (checked % 48 === 0) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
     const abs = path.join(dir, name);
     try {
       const st = await fs.promises.stat(abs);
@@ -384,17 +369,16 @@ async function runJob(
   } | null,
 ): Promise<JobOutcome> {
   const family = activeWorkflowFamily();
-  const profile = loadWorkflowProfile(family);
-  if (!profile) {
+  const profileStat = statWorkflowProfile(family);
+  if (!profileStat) {
     throw new Error(
       family === 'sdxl'
         ? 'Open WildcardManager-ComfyUI-SDXL-Generation-Workflow.json in ComfyUI, then Save Workflow.'
         : 'Save a Comfy workflow profile first (Edit Workflow → Save Workflow)',
     );
   }
-  if (!isWorkflowGraph(profile.workflow)) {
-    throw new Error('Saved workflow profile is invalid');
-  }
+  // Parse the workflow on the worker while the prompt is chosen and expanded.
+  const samplerIdsPromise = samplerIdsForWorkflow(profileStat);
 
   const promptSource = request.promptSource === 'text' ? 'text' : 'folder';
   const styleProfile = resolveStyleProfile(request);
@@ -404,17 +388,25 @@ async function runJob(
   // the later progress update, and the next Infinite click must not look
   // like it reused this seed.
   setProgress({ status: 'running', seed, error: undefined });
+  const folder = request.relativeFolder?.trim() ?? '';
+  if (
+    promptSource !== 'text' &&
+    (!folder || request.promptFoldersRecursive === true)
+  ) {
+    await ensureGenPromptFolders();
+  }
   const picked = pickGenerationPrompt({
     promptSource,
     promptText: request.promptText ?? '',
-    relativeFolder: request.relativeFolder?.trim() ?? '',
+    promptSingle: request.promptSingle === true,
+    relativeFolder: folder,
     recursive: request.promptFoldersRecursive === true,
     seed,
     listAllFolders: listGenPromptFolders,
     listFoldersUnder: listGenPromptFoldersUnder,
-    loadLines: (folder) => {
-      loadGenPrompts(folder);
-      return getLoadedGenPrompts(folder);
+    loadLines: (genFolder) => {
+      loadGenPrompts(genFolder);
+      return getLoadedGenPrompts(genFolder);
     },
   });
   let line = picked.line;
@@ -485,18 +477,15 @@ async function runJob(
   if (!expanded.text.trim()) {
     throw new Error('Expanded prompt was empty');
   }
-  // Expand Additional Positive here too — Comfy Dynamic Prompts does it in the
-  // graph, but PNG metadata usually still stores the pre-expansion LT · Prompt
-  // text (CLIP gets a node link, not the resolved string).
+  // Additional Positive is part of this one prompt, Single prompt or not.
   const extraRaw = request.additionalPositivePrompt?.trim() ?? '';
-  const extraPositive = extraRaw
-    ? expandGenLine(extraRaw, seed).text.trim()
-    : '';
-  const positivePrompt = extraPositive
-    ? `${expanded.text.trim()}, ${extraPositive}`
-    : expanded.text.trim();
+  const extraExpanded = extraRaw ? expandGenLine(extraRaw, seed).text.trim() : '';
+  const positivePrompt = appendAdditionalPositive(
+    expanded.text,
+    extraExpanded || extraRaw,
+  );
 
-  const graph = applyBindings(profile.workflow, profile.bindings, {
+  const values: GenerationValues = {
     positivePrompt,
     negativePrompt: request.negativePrompt ?? '',
     seed: String(seed),
@@ -519,21 +508,25 @@ async function runJob(
     scheduler: request.scheduler?.trim() || undefined,
     outputFolder: ltOutputFolder,
     outputFilename: GENERATION_OUTPUT_FILENAME,
-  });
-  applyCheckpointVaeOverride(graph, request.vae);
-  // LT · Seed reads `value` (not `seed`). Always set it explicitly so a stale
-  // binding path or leftover widget key cannot leave a fixed seed in place.
-  injectLtSeedValue(graph, seed);
+  };
 
+  const samplerIds = await samplerIdsPromise;
   const clientId = randomUUID();
   const jobStartedMs = Date.now();
-  const watch = watchExecution(adapter, clientId, samplerNodeIds(graph));
+  const watch = watchExecution(adapter, clientId, samplerIds);
   let sampleDurationMs: number | null = null;
   let promptId = '';
   try {
     await watch.opened;
-    const queued = await adapter.queuePrompt(graph, clientId, {
-      uiWorkflow: profile.uiWorkflow,
+    // Bindings, the UI-workflow JSON, and the POST run off this thread.
+    const target = adapter.promptPostTarget();
+    const queued = await postGenerationPrompt({
+      stat: profileStat,
+      url: target.url,
+      headers: target.headers,
+      clientId,
+      seed,
+      values,
     });
     promptId = queued.promptId;
     watch.setPromptId(promptId);
@@ -625,7 +618,7 @@ async function readPromptsFromOutputImage(
 ): Promise<GenerationImagePrompts | null> {
   for (let attempt = 0; attempt < 10; attempt++) {
     try {
-      const bytes = fs.readFileSync(absolutePath);
+      const bytes = await fs.promises.readFile(absolutePath);
       const prompts = extractGenerationPromptsFromImage(bytes);
       if (prompts) return prompts;
     } catch {
@@ -671,6 +664,7 @@ export async function startGeneration(
   assertGenerationRequest(request);
   cancelled = false;
   running = true;
+  setGenerationActive(true);
   const promptSource = request.promptSource === 'text' ? 'text' : 'folder';
   // Keep lastImageUrl / lastPrompt until this job finishes — do not blank the
   // Last output preview while the next generation is still running.
@@ -689,6 +683,16 @@ export async function startGeneration(
   const adapter = new ComfyAdapter(conn, {
     apiKey: readComfyApiKey(),
     apiKeyHeader: conn.apiKeyHeader,
+  });
+
+  const profileStat = statWorkflowProfile(activeWorkflowFamily());
+  if (profileStat) void samplerIdsForWorkflow(profileStat);
+  setImmediate(() => {
+    try {
+      warmGenerationLibraryIndex();
+    } catch {
+      // The first expand reports a missing library.
+    }
   });
 
   try {
@@ -809,5 +813,6 @@ export async function startGeneration(
     }
   } finally {
     running = false;
+    setGenerationActive(false);
   }
 }

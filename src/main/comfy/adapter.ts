@@ -244,6 +244,17 @@ export class ComfyAdapter {
   }
 
   /**
+   * URL and headers for POST /prompt. Generation builds the JSON body on a
+   * worker so the UI workflow never crosses the main thread.
+   */
+  promptPostTarget(): { url: string; headers: Record<string, string> } {
+    return {
+      url: `${this.base()}/prompt`,
+      headers: this.headers({ 'Content-Type': 'application/json' }),
+    };
+  }
+
+  /**
    * Submit a prompt (API-format workflow graph) for execution.
    * Always includes extra_pnginfo.workflow — many save/metadata nodes require it
    * (UI queues always send it; API-only queues omit it and crash those nodes).

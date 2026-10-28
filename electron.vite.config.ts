@@ -14,7 +14,9 @@ export default defineConfig({
           analyzeWorker: resolve('src/main/analyzeWorker.ts'),
           promptCoverageWorker: resolve('src/main/promptCoverageWorker.ts'),
           historyBriefWorker: resolve('src/main/comfy/historyBriefWorker.ts'),
+          promptPostWorker: resolve('src/main/comfy/promptPostWorker.ts'),
           modelFolderWalkWorker: resolve('src/main/modelFolderWalkWorker.ts'),
+          loraSeriesDatasetWorker: resolve('src/main/loraSeriesDatasetWorker.ts'),
           // Dedicated Electron child for preview cover-crop (nativeImage).
           previewDownscaleProcess: resolve(
             'src/main/previewDownscaleProcess.ts',

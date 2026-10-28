@@ -91,3 +91,14 @@ export function patchUiWorkflowSeed(uiWorkflow: unknown, seed: number): unknown 
   }
   return doc;
 }
+
+/** Write the job seed into every LT · Seed node (`value` input — not `seed`). */
+export function injectLtSeedValue(
+  graph: { [id: string]: { class_type: string; inputs: Record<string, unknown> } },
+  seed: number,
+): void {
+  for (const node of Object.values(graph)) {
+    if (node.class_type !== 'LoraTrainingSeed') continue;
+    node.inputs.value = seed >>> 0;
+  }
+}

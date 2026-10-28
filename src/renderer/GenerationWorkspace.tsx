@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type MutableRefObject,
 } from 'react';
@@ -12,20 +13,16 @@ import {
   ArrowLeftRight,
   ArrowUp,
   LineChart,
-  Crosshair,
   Dices,
   FilePlus2,
   Shuffle,
-  FolderOpen,
   Replace,
-  Loader2,
   PanelRightClose,
   PanelRightOpen,
   RefreshCw,
   Save,
   Square,
   Tags,
-  Trash2,
   Workflow,
   Zap,
 } from 'lucide-react';
@@ -35,7 +32,6 @@ import type {
   ComfyContractCheckDto,
   ComfyModelCatalogDto,
   GenerationFormStateDto,
-  GenerationProgressDto,
   GenerationStyleProfileDto,
   GenerationStyleProfileIdDto,
   IssueDto,
@@ -63,9 +59,17 @@ import { CategorizePromptModal } from './CategorizePromptModal';
 import { PromptSubstitutionsModal } from './PromptSubstitutionsModal';
 import { CheckpointBenchmarkResultsModal } from './CheckpointBenchmarkResultsModal';
 import {
-  noteGenerationStatus,
+  isGenerationRunning,
+  subscribeGenerationRunning,
   type GenerationRunHandle,
 } from './generationRun';
+import {
+  GenerationFolderLiveHint,
+  GenerationJobStatus,
+  GenerationPreviewActions,
+  GenerationPreviewBody,
+  rememberGenerationPreview,
+} from './generationLive';
 import type { ParsedCivitaiModelPageUrl } from '../domain/civitaiSnippet.js';
 
 type Props = {
@@ -98,6 +102,7 @@ type Props = {
   expandSnapshotRef?: MutableRefObject<{
     kind: 'generation';
     promptSource: 'text' | 'folder';
+    promptSingle: boolean;
     promptText: string;
     relativeFolder: string | null;
     promptFoldersRecursive: boolean;
@@ -173,6 +178,7 @@ function emptyStyleProfile(): GenerationStyleProfileDto {
     negativePrompt: '',
     promptText: '',
     promptSource: 'folder',
+    promptSingle: false,
   };
 }
 
@@ -221,15 +227,6 @@ function watchPromptBoxHeight(
     obs.disconnect();
     if (timer) clearTimeout(timer);
   };
-}
-
-function promptCategoryBreadcrumb(relativeFolder: string | null | undefined): string {
-  const cleaned = (relativeFolder ?? '')
-    .trim()
-    .replaceAll('\\', '/')
-    .replace(/^\/+|\/+$/g, '');
-  if (!cleaned || cleaned === '_manual') return '';
-  return cleaned.split('/').filter(Boolean).join(' › ');
 }
 
 export function GenerationWorkspace({
@@ -311,10 +308,12 @@ export function GenerationWorkspace({
   const [promptIssues, setPromptIssues] = useState<IssueDto[]>([]);
   const promptEditorRef = useRef<WildcardEditorHandle | null>(null);
   const [promptSource, setPromptSource] = useState<PromptSource>('folder');
+  const [promptSingle, setPromptSingle] = useState(false);
   if (expandSnapshotRef) {
     expandSnapshotRef.current = {
       kind: 'generation',
       promptSource,
+      promptSingle,
       promptText,
       relativeFolder: selectedFolder,
       promptFoldersRecursive,
@@ -332,15 +331,6 @@ export function GenerationWorkspace({
   const [substitutionsOpen, setSubstitutionsOpen] = useState(false);
   const [substitutionCount, setSubstitutionCount] = useState(0);
   const [contract, setContract] = useState<ComfyContractCheckDto | null>(null);
-  const [progress, setProgress] = useState<GenerationProgressDto | null>(null);
-  /** Keep showing the last finished image until a newer one arrives. */
-  const [heldPreview, setHeldPreview] = useState<{
-    url: string;
-    prompt?: string;
-    negative?: string;
-    relativeFolder?: string | null;
-    seed?: number | null;
-  } | null>(null);
   const [previewCollapsed, setPreviewCollapsed] = useState(
     readLegacyPreviewCollapsed,
   );
@@ -352,7 +342,6 @@ export function GenerationWorkspace({
   const [negativePromptHeight, setNegativePromptHeight] = useState<
     number | null
   >(null);
-  const [deletingLast, setDeletingLast] = useState(false);
   const [webviewSrc, setWebviewSrc] = useState('');
   const [formHydrated, setFormHydrated] = useState(false);
   const formHydratedRef = useRef(false);
@@ -384,6 +373,7 @@ export function GenerationWorkspace({
     negativePrompt: '',
     promptText: '',
     promptSource: 'folder' as PromptSource,
+    promptSingle: false,
     benchmark: false,
   });
   const lastSavedRef = useRef({ ...formSnapshotRef.current });
@@ -562,10 +552,11 @@ export function GenerationWorkspace({
         setNegative(form.negativePrompt);
         setPromptText(form.promptText);
         setPromptSource(form.promptSource);
+        setPromptSingle(form.promptSingle === true);
         setPromptFoldersRecursive(form.promptFoldersRecursive === true);
         onSelectedFolderChange(form.relativeFolder ?? null);
         if (form.lastImageUrl) {
-          setHeldPreview({
+          rememberGenerationPreview({
             url: form.lastImageUrl,
             prompt: form.lastPrompt,
             negative: form.lastNegativePrompt,
@@ -600,7 +591,9 @@ export function GenerationWorkspace({
   }, [selectedFolder]);
 
   useEffect(() => {
-    const text = promptText;
+    const text = promptSingle
+      ? promptText.replace(/\s*\r?\n\s*/g, ' ').trim()
+      : promptText;
     if (!text.trim()) {
       setPromptIssues([]);
       return;
@@ -620,22 +613,10 @@ export function GenerationWorkspace({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [promptText]);
+  }, [promptSingle, promptText]);
 
   useEffect(() => {
     return window.wcm.comfy.onGenerationProgress((p) => {
-      noteGenerationStatus(p.status);
-      setProgress(p);
-      if (p.lastImageUrl) {
-        setHeldPreview({
-          url: p.lastImageUrl,
-          prompt: p.lastPrompt,
-          negative: p.lastNegativePrompt,
-          // Pin to the finished job’s folder — not in-flight relativeFolder.
-          relativeFolder: p.lastRelativeFolder,
-          seed: p.lastSeed,
-        });
-      }
       if (
         p.benchmarkStem != null ||
         p.status === 'done' ||
@@ -716,6 +697,7 @@ export function GenerationWorkspace({
         negativePrompt: negative,
         promptText,
         promptSource,
+        promptSingle,
       },
     };
     formSnapshotRef.current = {
@@ -741,6 +723,7 @@ export function GenerationWorkspace({
       negativePrompt: negative,
       promptText,
       promptSource,
+      promptSingle,
       benchmark,
     };
     if (skipNextPersist.current) {
@@ -780,6 +763,7 @@ export function GenerationWorkspace({
     negative,
     promptText,
     promptSource,
+    promptSingle,
     profile,
     benchmark,
   ]);
@@ -901,6 +885,11 @@ export function GenerationWorkspace({
         form.promptSource,
         saved.promptSource,
       ),
+      promptSingle: pick(
+        local.promptSingle,
+        form.promptSingle === true,
+        saved.promptSingle,
+      ),
       benchmark: pick(local.benchmark, form.benchmark === true, saved.benchmark),
     };
     const keptEdit =
@@ -923,6 +912,7 @@ export function GenerationWorkspace({
       next.negativePrompt !== form.negativePrompt ||
       next.promptText !== form.promptText ||
       next.promptSource !== form.promptSource ||
+      next.promptSingle !== (form.promptSingle === true) ||
       next.promptFoldersRecursive !== (form.promptFoldersRecursive === true) ||
       next.benchmark !== (form.benchmark === true) ||
       (next.relativeFolder ?? null) !== (form.relativeFolder ?? null);
@@ -953,6 +943,7 @@ export function GenerationWorkspace({
       next.negativePrompt === negative &&
       next.promptText === promptText &&
       next.promptSource === promptSource &&
+      next.promptSingle === promptSingle &&
       next.promptFoldersRecursive === promptFoldersRecursive &&
       next.benchmark === benchmark &&
       (next.relativeFolder ?? null) === selectedFolder;
@@ -983,6 +974,7 @@ export function GenerationWorkspace({
     setNegative(next.negativePrompt);
     setPromptText(next.promptText);
     setPromptSource(next.promptSource);
+    setPromptSingle(next.promptSingle);
     setPromptFoldersRecursive(next.promptFoldersRecursive);
     setBenchmark(next.benchmark);
     if ((next.relativeFolder ?? null) !== selectedFolder) {
@@ -1137,6 +1129,7 @@ export function GenerationWorkspace({
       negativePrompt: negative,
       promptText,
       promptSource,
+      promptSingle,
     };
     const profiles = {
       ...profilesRef.current,
@@ -1165,6 +1158,7 @@ export function GenerationWorkspace({
     setNegative(incoming.negativePrompt);
     setPromptText(incoming.promptText);
     setPromptSource(incoming.promptSource);
+    setPromptSingle(incoming.promptSingle === true);
     setPromptFoldersRecursive(incoming.promptFoldersRecursive === true);
     onSelectedFolderChange(incoming.relativeFolder);
     if (persistTimer.current) {
@@ -1194,6 +1188,7 @@ export function GenerationWorkspace({
       negativePrompt: incoming.negativePrompt,
       promptText: incoming.promptText,
       promptSource: incoming.promptSource,
+      promptSingle: incoming.promptSingle === true,
       benchmark,
       profiles,
     };
@@ -1259,6 +1254,7 @@ export function GenerationWorkspace({
           negativePrompt: negative,
           promptText,
           promptSource: nextSource,
+          promptSingle,
           benchmark,
         };
         formSnapshotRef.current = snapshot;
@@ -1290,6 +1286,7 @@ export function GenerationWorkspace({
               ? promptFoldersRecursive
               : undefined,
           promptText: nextSource === 'text' ? promptText : undefined,
+          promptSingle: nextSource === 'text' ? promptSingle : undefined,
           checkpoint: benchmark ? checkpoint || '' : checkpoint,
           clip: clip || undefined,
           vae: vae || undefined,
@@ -1318,6 +1315,7 @@ export function GenerationWorkspace({
       promptSource,
       selectedFolder,
       promptText,
+      promptSingle,
       benchmark,
       checkpoint,
       benchmarkStatus?.root,
@@ -1353,20 +1351,6 @@ export function GenerationWorkspace({
     };
   }, [runRef, start]);
 
-  const deleteLastOutput = async () => {
-    if (!heldPreview || deletingLast) return;
-    setDeletingLast(true);
-    setError(null);
-    try {
-      const result = await window.wcm.comfy.deleteLastGeneration();
-      if (result.deleted) setHeldPreview(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDeletingLast(false);
-    }
-  };
-
   /** Append the typed prompt to a prompts folder's !gen.txt (skip exact dupes). */
   const appendPromptToFolder = async (folder = selectedFolder) => {
     const line = promptText.trim();
@@ -1400,20 +1384,10 @@ export function GenerationWorkspace({
     }
   };
 
-  const running =
-    progress?.status === 'starting' ||
-    progress?.status === 'queued' ||
-    progress?.status === 'running' ||
-    progress?.status === 'saving';
-  const liveCategoryBreadcrumb = running
-    ? promptCategoryBreadcrumb(progress?.relativeFolder)
-    : '';
-  const liveJobSeed =
-    running &&
-    typeof progress?.seed === 'number' &&
-    Number.isFinite(progress.seed)
-      ? progress.seed >>> 0
-      : null;
+  const running = useSyncExternalStore(
+    subscribeGenerationRunning,
+    isGenerationRunning,
+  );
 
   const applySeedToForm = (value: number) => {
     const seedValue = value >>> 0;
@@ -1906,7 +1880,7 @@ export function GenerationWorkspace({
 
           <label
             className="field-label"
-            title="Extra text added after the !gen.txt line. __wildcards__ expand with the same seed. Leave empty to use only the folder prompt."
+            title="Added after the chosen prompt, whether Single prompt is ticked or not. __wildcards__ expand with the same seed. Leave empty to use only that prompt."
           >
             Additional Positive Prompt
           </label>
@@ -2190,38 +2164,7 @@ export function GenerationWorkspace({
               </button>
             </span>
           </div>
-          {progress ? (
-            <p className="hint generation-progress-hint">
-              {running ? <Loader2 size={12} className="spin" /> : null}{' '}
-              {progress.status === 'starting'
-                ? (progress.detail ?? 'Starting ComfyUI…')
-                : progress.status}
-              {progress.jobsCompleted
-                ? ` · ${progress.jobsCompleted} done`
-                : ''}
-              {progress.benchmarkStem
-                ? ` · ${progress.benchmarkStem} (${progress.benchmarkImageCount ?? 0}/${progress.benchmarkTargetImages ?? 10})`
-                : ''}
-              {liveJobSeed != null ? (
-                <>
-                  {' · seed '}
-                  <span className="mono">{liveJobSeed}</span>
-                  <button
-                    type="button"
-                    className="icon-btn generation-seed-fill-btn"
-                    title="Set Seed to this value"
-                    aria-label="Set Seed to this value"
-                    onClick={() => applySeedToForm(liveJobSeed)}
-                  >
-                    <Crosshair size={12} />
-                  </button>
-                </>
-              ) : null}
-            </p>
-          ) : null}
-          {progress?.error ? (
-            <p className="error-text">{progress.error}</p>
-          ) : null}
+          <GenerationJobStatus onApplySeed={applySeedToForm} />
           {error ? (
             <p
               className={
@@ -2328,32 +2271,48 @@ export function GenerationWorkspace({
                   role="group"
                   aria-label="Prompt source"
                 >
-                  <label className="generation-prompt-source-option">
+                  <div className="generation-prompt-source-choices">
+                    <label className="generation-prompt-source-option">
+                      <input
+                        type="radio"
+                        name="generation-prompt-source"
+                        checked={promptSource === 'text'}
+                        onChange={() => {
+                          setPromptSource('text');
+                          setPromptSaveNote(null);
+                        }}
+                      />
+                      <span>Use this prompt</span>
+                    </label>
+                    <label className="generation-prompt-source-option">
+                      <input
+                        type="radio"
+                        name="generation-prompt-source"
+                        checked={promptSource === 'folder'}
+                        onChange={() => {
+                          setPromptSource('folder');
+                          setPromptSaveNote(null);
+                        }}
+                      />
+                      <span>
+                        Use selected prompt folder
+                        {selectedFolder ? ` (${selectedFolder})` : ' (random)'}
+                      </span>
+                    </label>
+                  </div>
+                  <label
+                    className="generation-prompt-source-option"
+                    title="Ticked: the whole box is sent as one prompt. Unticked: the box is read as multiple prompts, the same way as a !gen.txt file."
+                  >
                     <input
-                      type="radio"
-                      name="generation-prompt-source"
-                      checked={promptSource === 'text'}
-                      onChange={() => {
-                        setPromptSource('text');
+                      type="checkbox"
+                      checked={promptSingle}
+                      onChange={(event) => {
+                        setPromptSingle(event.target.checked);
                         setPromptSaveNote(null);
                       }}
                     />
-                    <span>Use this prompt</span>
-                  </label>
-                  <label className="generation-prompt-source-option">
-                    <input
-                      type="radio"
-                      name="generation-prompt-source"
-                      checked={promptSource === 'folder'}
-                      onChange={() => {
-                        setPromptSource('folder');
-                        setPromptSaveNote(null);
-                      }}
-                    />
-                    <span>
-                      Use selected prompt folder
-                      {selectedFolder ? ` (${selectedFolder})` : ' (random)'}
-                    </span>
+                    <span>Single prompt</span>
                   </label>
                 </div>
                 <div className="generation-prompt-actions">
@@ -2450,36 +2409,10 @@ export function GenerationWorkspace({
                 </ul>
               ) : null}
               {promptSource === 'folder' ? (
-                <p className="hint generation-folder-hint">
-                  {liveCategoryBreadcrumb ||
-                  (running && !selectedFolder) ? (
-                    <>
-                      <span>
-                        {liveCategoryBreadcrumb
-                          ? `Generating “${liveCategoryBreadcrumb}”…`
-                          : 'Generating… (picking folder)'}
-                        {liveJobSeed != null
-                          ? ` · seed ${liveJobSeed}`
-                          : ''}
-                      </span>
-                      {liveJobSeed != null ? (
-                        <button
-                          type="button"
-                          className="icon-btn generation-seed-fill-btn"
-                          title="Set Seed to this value"
-                          aria-label="Set Seed to this value"
-                          onClick={() => applySeedToForm(liveJobSeed)}
-                        >
-                          <Crosshair size={12} />
-                        </button>
-                      ) : null}
-                    </>
-                  ) : selectedFolder ? (
-                    `Folder mode uses lines from ${selectedFolder}/!gen.txt. Your typed prompt above is kept for “Use this prompt”.`
-                  ) : (
-                    'Select… [Randomize] picks a different !gen.txt folder on every run.'
-                  )}
-                </p>
+                <GenerationFolderLiveHint
+                  selectedFolder={selectedFolder}
+                  onApplySeed={applySeedToForm}
+                />
               ) : null}
             </div>
           </>
@@ -2498,37 +2431,7 @@ export function GenerationWorkspace({
         <div className="panel-toolbar">
           {previewCollapsed ? null : <strong>Last output</strong>}
           <div className="row-actions">
-            {heldPreview ? (
-              <>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  title="Reveal in My File Explorer"
-                  aria-label="Reveal in My File Explorer"
-                  onClick={() => {
-                    void window.wcm.comfy.revealLastGeneration().catch((e) => {
-                      setError(e instanceof Error ? e.message : String(e));
-                    });
-                  }}
-                >
-                  <FolderOpen size={14} />
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  title="Delete last generation"
-                  aria-label="Delete last generation"
-                  disabled={deletingLast}
-                  onClick={() => void deleteLastOutput()}
-                >
-                  {deletingLast ? (
-                    <Loader2 size={14} className="spin" />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
-                </button>
-              </>
-            ) : null}
+            <GenerationPreviewActions onError={setError} />
             <button
               type="button"
               className="icon-btn"
@@ -2545,77 +2448,12 @@ export function GenerationWorkspace({
             </button>
           </div>
         </div>
-        {previewCollapsed ? null : heldPreview ? (
-          <div className="generation-preview">
-            <img src={heldPreview.url} alt="Last generation" />
-            {heldPreview.prompt ||
-            heldPreview.negative ||
-            promptCategoryBreadcrumb(heldPreview.relativeFolder) ||
-            (typeof heldPreview.seed === 'number' &&
-              Number.isFinite(heldPreview.seed)) ? (
-              <div className="generation-preview-prompts">
-                {promptCategoryBreadcrumb(heldPreview.relativeFolder) ? (
-                  <div className="generation-preview-prompt">
-                    <span className="generation-preview-prompt-label">
-                      Category
-                    </span>
-                    <div
-                      className="generation-preview-prompt-value generation-preview-category"
-                      title={heldPreview.relativeFolder ?? undefined}
-                    >
-                      {promptCategoryBreadcrumb(heldPreview.relativeFolder)}
-                    </div>
-                  </div>
-                ) : null}
-                {typeof heldPreview.seed === 'number' &&
-                Number.isFinite(heldPreview.seed) ? (
-                  <div className="generation-preview-prompt">
-                    <span className="generation-preview-prompt-label">
-                      Seed
-                    </span>
-                    <div className="generation-preview-seed-row">
-                      <div className="generation-preview-prompt-value generation-preview-seed">
-                        {heldPreview.seed >>> 0}
-                      </div>
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        title="Set Seed to this value"
-                        aria-label="Set Seed to this value"
-                        onClick={() =>
-                          applySeedToForm(heldPreview.seed as number)
-                        }
-                      >
-                        <Crosshair size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-                {heldPreview.prompt ? (
-                  <div className="generation-preview-prompt">
-                    <span className="generation-preview-prompt-label">
-                      Positive
-                    </span>
-                    <div className="generation-preview-prompt-value">
-                      {heldPreview.prompt}
-                    </div>
-                  </div>
-                ) : null}
-                {heldPreview.negative ? (
-                  <div className="generation-preview-prompt">
-                    <span className="generation-preview-prompt-label">
-                      Negative
-                    </span>
-                    <div className="generation-preview-prompt-value">
-                      {heldPreview.negative}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <p className="hint pad">Generate to preview here.</p>
+        {previewCollapsed ? null : (
+          <GenerationPreviewBody
+            seedMode="apply"
+            onApplySeed={applySeedToForm}
+            empty={<p className="hint pad">Generate to preview here.</p>}
+          />
         )}
       </aside>
       {substitutionsOpen ? (

@@ -1361,6 +1361,7 @@ export function registerIpc(): void {
         seriesBase?: unknown;
         separator?: unknown;
         force?: unknown;
+        knownPreviewPath?: unknown;
       };
       if (typeof row.seriesBase !== 'string' || !row.seriesBase.trim()) {
         throw new Error('Invalid series base');
@@ -1368,16 +1369,27 @@ export function registerIpc(): void {
       if (row.separator !== '_' && row.separator !== '-') {
         throw new Error('Invalid series separator');
       }
-      const { resolveLoraSeriesDatasetPreview } = await import(
-        './loraTrainingDatasetService.js'
+      const { resolveLoraSeriesDatasetOffThread } = await import(
+        './loraSeriesDatasetWorkerClient.js'
       );
-      return resolveLoraSeriesDatasetPreview(
+      const lib = getActiveLibrary();
+      return resolveLoraSeriesDatasetOffThread(
         {
           dir: typeof row.dir === 'string' ? row.dir : '',
           seriesBase: row.seriesBase.trim(),
           separator: row.separator,
         },
-        { force: row.force === true },
+        {
+          trainingRoot: lib.trainingLibraryFolder?.trim()
+            ? path.resolve(lib.trainingLibraryFolder)
+            : null,
+          loraRoot: lib.loraFolder?.trim() ? path.resolve(lib.loraFolder) : null,
+          force: row.force === true,
+          knownPreviewPath:
+            typeof row.knownPreviewPath === 'string'
+              ? row.knownPreviewPath
+              : null,
+        },
       );
     },
   );
@@ -1387,10 +1399,14 @@ export function registerIpc(): void {
       if (typeof absolutePath !== 'string' || !absolutePath.trim()) {
         throw new Error('Invalid image path');
       }
-      const { readTrainingLibraryImageDataUrl } = await import(
-        './loraTrainingDatasetService.js'
+      const { readTrainingLibraryImageOffThread } = await import(
+        './loraSeriesDatasetWorkerClient.js'
       );
-      return readTrainingLibraryImageDataUrl(absolutePath.trim());
+      const trainingRoot = getActiveLibrary().trainingLibraryFolder?.trim();
+      return readTrainingLibraryImageOffThread(
+        trainingRoot ? path.resolve(trainingRoot) : null,
+        absolutePath.trim(),
+      );
     },
   );
   ipcMain.handle(IPC.modelFilesInspectLora, async (_e, relativePath: unknown) => {
@@ -3581,6 +3597,7 @@ export function registerIpc(): void {
       content?: unknown;
       promptSource?: unknown;
       promptText?: unknown;
+      promptSingle?: unknown;
       promptFoldersRecursive?: unknown;
       additionalPositivePrompt?: unknown;
       checkpoint?: unknown;
@@ -3608,6 +3625,7 @@ export function registerIpc(): void {
       content: typeof req.content === 'string' ? req.content : undefined,
       promptSource: req.promptSource === 'text' ? 'text' : 'folder',
       promptText: typeof req.promptText === 'string' ? req.promptText : undefined,
+      promptSingle: req.promptSingle === true,
       promptFoldersRecursive: req.promptFoldersRecursive === true,
       additionalPositivePrompt:
         typeof req.additionalPositivePrompt === 'string'

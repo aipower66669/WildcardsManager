@@ -270,7 +270,7 @@ ComfyUI is running (or a launch shortcut is set under **Settings → AI**). **Te
 
 ### 64. What is Use this prompt versus a prompt folder?
 
-**Use this prompt** queues the text in the box, with the same multi-line `!gen.txt` rules, and writes to the style output root. A prompt folder queues one line from a `!gen.txt`. **Select… [Randomize]** (no folder) picks a folder from the seed. **Recursive**, on the Prompt folder line, includes that folder and sub-folders that have `!gen.txt`. Off uses only the selected folder. The same seed, the same dropdown, and the same Recursive setting pick the same folder and the same line. Seed 0 or below rolls a new seed from the clock on every image. A fixed seed (1 or higher) repeats that image. An empty `!gen.txt` error names the folder. Infinite skips that image and continues.
+**Use this prompt** and **Use selected prompt folder** sit on one line. **Single prompt** under them sends the whole box as one prompt when ticked, line breaks included. Unticked, the box is read as multiple prompts, the same way as a `!gen.txt` file, and one prompt is chosen. **Additional Positive** is appended to that prompt either way. Either way, a typed prompt writes to the style output root. A prompt folder queues one line from a `!gen.txt`. **Select… [Randomize]** (no folder) picks a folder from the seed. **Recursive**, on the Prompt folder line, includes that folder and sub-folders that have `!gen.txt`. Off uses only the selected folder. The same seed, the same dropdown, and the same Recursive setting pick the same folder and the same line. Seed 0 or below rolls a new seed from the clock on every image. A fixed seed (1 or higher) repeats that image. An empty `!gen.txt` error names the folder. Infinite skips that image and continues.
 
 ### 65. What do Once and Infinite do?
 
@@ -364,7 +364,7 @@ Yes. It reads the editor draft, not a separate copy on disk. Apply writes into t
 
 ### 86. Which Civitai site should I pick?
 
-**Settings → Civitai → Site**. `civitai.com` is the SFW-oriented catalog. `civitai.red` is the NSFW catalog, and its Browse lists mature models only. The choice selects the API and the account for **models**. Images and Videos have their own **SFW only / SFW + NSFW / NSFW only** filter. Create the API key on the same site you selected.
+**Settings → Civitai → Site**. `civitai.com` is the SFW-oriented catalog. `civitai.red` is the NSFW catalog. Its Browse lists R and above and leaves out PG and PG-13, including models whose `nsfw` flag is off. **All** + **Newest** uses the same type, base model, and Newest query as the website, with PG and PG-13 skipped. The choice selects the API and the account for **models**. Images and Videos have their own **SFW only / SFW + NSFW / NSFW only** filter. Create the API key on the same site you selected.
 
 ### 87. Do I need an API key to browse?
 

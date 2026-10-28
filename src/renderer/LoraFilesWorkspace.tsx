@@ -239,6 +239,8 @@ export function LoraFilesWorkspace({
 
   const [seriesDataset, setSeriesDataset] =
     useState<LoraSeriesDatasetPreviewDto | null>(null);
+  const seriesDatasetRef = useRef(seriesDataset);
+  seriesDatasetRef.current = seriesDataset;
   const [seriesDatasetBusy, setSeriesDatasetBusy] = useState(false);
   const [seriesDatasetError, setSeriesDatasetError] = useState<string | null>(
     null,
@@ -263,12 +265,18 @@ export function LoraFilesWorkspace({
 
     const load = (opts?: { rematchFolder?: boolean }) => {
       if (isFirst || opts?.rematchFolder) setSeriesDatasetBusy(true);
+      const held = seriesDatasetRef.current;
+      const knownPreviewPath =
+        held?.status === 'ok' && held.previewDataUrl
+          ? (held.previewAbsolutePath ?? null)
+          : null;
       void window.wcm.modelFiles
         .resolveLoraSeriesDataset({
           dir,
           seriesBase,
           separator,
           force: opts?.rematchFolder === true,
+          knownPreviewPath,
         })
         .then((result) => {
           if (cancelled) return;

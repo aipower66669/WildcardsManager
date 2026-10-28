@@ -7,6 +7,12 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Generation **Single prompt**, under **Use this prompt** and **Use selected
+  prompt folder**, sends the prompt box as one prompt. Unticked, the box is
+  read as multiple prompts the same way as a `!gen.txt` file.
+
 ### Changed
 
 - A version tag no longer uploads `WildcardsManager-*.exe.blockmap` with the
@@ -14,6 +20,25 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Generation **Single prompt** sends the whole prompt box. A box with several
+  lines was still split, and one prompt was chosen at random.
+- **Additional Positive** is appended to the chosen prompt, whether Single
+  prompt is ticked or not.
+- Generation stays responsive while images are running. The wildcard index is
+  reused, the Comfy prompt is built off the UI thread, and the Generation form
+  is left in place while status updates.
+- Opening a locally trained LoRA no longer freezes the window on “Looking up
+  validation sets”. The training-folder search, validation image listing, and
+  cover/thumbnail reads run off the UI thread.
+- civitai.red Browse was dropping most new Krea 2 LoRAs and checkpoints.
+  Civitai’s `nsfw` flag is now only the top tier, so R/X models with the flag
+  off never entered the catalog, and Newest stopped on the first page of
+  models already stored. Those mature models are kept. **All** + **Newest**
+  uses the same type, base model, and Newest query as the website, with PG
+  and PG-13 still left out.
+- Saving a wildcard while typing no longer jumps the caret to the start of
+  the file. The save sync updates only the text that changed, and Undo keeps
+  the characters just typed.
 - A version tag attaches `comfyui-custom-save-node.zip` (`SaveImageToFolder`)
   to the GitHub Release, next to `comfyui-lora-training.zip` and the two
   workflow files.

@@ -56,6 +56,11 @@ export type GenerationPromptPick = {
  */
 export function pickGenerationPrompt(input: {
   promptSource: 'text' | 'folder';
+  /**
+   * Use this prompt only. True sends the box as one prompt.
+   * False decodes it like a `!gen.txt` file.
+   */
+  promptSingle?: boolean;
   promptText: string;
   relativeFolder: string;
   recursive: boolean;
@@ -66,10 +71,15 @@ export function pickGenerationPrompt(input: {
 }): GenerationPromptPick {
   if (input.promptSource === 'text') {
     let line: string;
-    try {
-      line = chooseGenPrompt(input.promptText, input.seed);
-    } catch {
-      throw new Error('Enter a prompt');
+    if (input.promptSingle) {
+      line = input.promptText.trim();
+      if (!line) throw new Error('Enter a prompt');
+    } else {
+      try {
+        line = chooseGenPrompt(input.promptText, input.seed);
+      } catch {
+        throw new Error('Enter a prompt');
+      }
     }
     const folder = input.relativeFolder.trim();
     return { line, relativeFolder: folder || '_manual' };
@@ -114,4 +124,16 @@ export function promptsForFileExpand(content: string): string[] {
   return decodeGenPrompts(content)
     .map((line) => stripTestingGenTag(line).trim())
     .filter((line) => line.length > 0);
+}
+
+/** Additional Positive is part of the one prompt that is about to be queued. */
+export function appendAdditionalPositive(
+  prompt: string,
+  additional: string,
+): string {
+  const body = prompt.trim();
+  const extra = additional.trim();
+  if (!body) return extra;
+  if (!extra) return body;
+  return `${body}, ${extra}`;
 }

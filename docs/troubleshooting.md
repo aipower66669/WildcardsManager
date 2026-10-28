@@ -117,7 +117,7 @@ Site**):
 | Site | Meaning |
 | --- | --- |
 | **civitai.com** | SFW-oriented catalog |
-| **civitai.red** | NSFW catalog. Browse is mature models only |
+| **civitai.red** | NSFW catalog. Browse lists R and above. PG and PG-13 are left out |
 
 Use the site that matches the content you want. Browse/search does not need an
 API key. **Downloads often do:** if a creator requires login, download fails with

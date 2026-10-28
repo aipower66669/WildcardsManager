@@ -286,8 +286,11 @@ The **Generation** tab queues jobs against a running ComfyUI instance
 (**Settings → AI**: host, **Test** for the server, **Check install** after
 **Save Workflow**):
 
-- **Use this prompt** (typed, with the same `!gen.txt` multi-line rules) or a
-  selected prompt folder. **Recursive** sits on the Prompt folder line. With a
+- **Use this prompt** or a selected prompt folder, on one line. **Single
+  prompt** sits under them. Ticked, the whole box is sent as one prompt,
+  line breaks included. Unticked, the box is read as multiple prompts, the
+  same way as a `!gen.txt` file, and one prompt is chosen. **Additional
+  Positive** is appended to that prompt either way. **Recursive** sits on the Prompt folder line. With a
   folder selected, on includes that folder and sub-folders that have
   `!gen.txt`; off uses only that folder. **Select… [Randomize]** (no folder)
   picks a folder from the seed.
@@ -566,11 +569,14 @@ In **Settings → Civitai → Site**, pick the catalog that matches what you wan
 | Site | Catalog |
 | --- | --- |
 | **civitai.com** | SFW-oriented catalog — prefer this for work-safe browsing |
-| **civitai.red** | NSFW catalog. Browse lists mature models only. Safe models are left out |
+| **civitai.red** | NSFW catalog. Browse lists R and above. PG and PG-13 are left out |
 
 The site choice controls which API and account the app talks to for **models**.
-On **civitai.red**, Browse does not list models Civitai marks safe. The
-**Include NSFW** checkbox does not add those models to a red library.
+On **civitai.red**, Browse leaves out PG and PG-13. R, X, and XXX stay, including
+when Civitai’s `nsfw` flag is off. The **Include NSFW** checkbox does not add
+PG or PG-13 models to a red library.
+**All** + **Newest** uses the same type, base model, and Newest query as the
+website. PG and PG-13 are skipped, so the remaining cards follow that list.
 The Images tab has its own **SFW only / SFW + NSFW / NSFW only** content filter.
 
 #### API key (browse vs download)

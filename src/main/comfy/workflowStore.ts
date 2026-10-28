@@ -33,6 +33,15 @@ function migrateLegacyKreaWorkflow(): void {
   fs.copyFileSync(legacy, krea);
 }
 
+type ParsedProfileCache = {
+  family: GenerationFamily;
+  mtimeMs: number;
+  size: number;
+  profile: WorkflowProfile;
+};
+
+let parsedProfileCache: ParsedProfileCache | null = null;
+
 function hashWorkflow(workflow: Record<string, unknown>): string {
   return createHash('sha256')
     .update(JSON.stringify(workflow))
@@ -40,18 +49,46 @@ function hashWorkflow(workflow: Record<string, unknown>): string {
     .slice(0, 24);
 }
 
+/** Path and stamp for the saved workflow file. Does not parse it. */
+export function statWorkflowProfile(
+  family: GenerationFamily = activeWorkflowFamily(),
+): { path: string; mtimeMs: number; size: number } | null {
+  try {
+    migrateLegacyKreaWorkflow();
+    const file = profilePath(family);
+    const st = fs.statSync(file);
+    if (!st.isFile()) return null;
+    return { path: file, mtimeMs: st.mtimeMs, size: st.size };
+  } catch {
+    return null;
+  }
+}
+
 export function loadWorkflowProfile(
   family: GenerationFamily = activeWorkflowFamily(),
 ): WorkflowProfile | null {
   try {
-    migrateLegacyKreaWorkflow();
-    const raw = JSON.parse(
-      fs.readFileSync(profilePath(family), 'utf8'),
-    ) as WorkflowProfile;
+    const stat = statWorkflowProfile(family);
+    if (!stat) return null;
+    if (
+      parsedProfileCache &&
+      parsedProfileCache.family === family &&
+      parsedProfileCache.mtimeMs === stat.mtimeMs &&
+      parsedProfileCache.size === stat.size
+    ) {
+      return parsedProfileCache.profile;
+    }
+    const raw = JSON.parse(fs.readFileSync(stat.path, 'utf8')) as WorkflowProfile;
     if (raw?.formatVersion !== 1 || !raw.workflow || !raw.bindings) {
       return null;
     }
     if (!isWorkflowGraph(raw.workflow)) return null;
+    parsedProfileCache = {
+      family,
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+      profile: raw,
+    };
     return raw;
   } catch {
     return null;
@@ -186,6 +223,17 @@ export function saveWorkflowProfile(
   const file = profilePath(family);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(profile, null, 2)}\n`, 'utf8');
+  try {
+    const st = fs.statSync(file);
+    parsedProfileCache = {
+      family,
+      mtimeMs: st.mtimeMs,
+      size: st.size,
+      profile,
+    };
+  } catch {
+    parsedProfileCache = null;
+  }
 
   return {
     profile,

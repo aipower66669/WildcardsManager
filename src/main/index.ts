@@ -101,7 +101,9 @@ import { flushHashCachePersist } from './modelHashCache.js';
 import { migrateModelHashesToAds } from './modelHashAdsMigration.js';
 import { disposeAnalyzeWorker } from './analyzeWorkerClient.js';
 import { disposeHistoryBriefWorker } from './comfy/historyBriefWorkerClient.js';
+import { disposePromptPostWorker } from './comfy/promptPostWorkerClient.js';
 import { disposeModelFolderWalkWorker } from './modelFolderWalkWorkerClient.js';
+import { disposeLoraSeriesDatasetWorker } from './loraSeriesDatasetWorkerClient.js';
 import { disposeModelHashWorker } from './modelHashWorkerClient.js';
 import { disposePreviewDownscaleChild } from './previewDownscaleClient.js';
 import {
@@ -444,7 +446,9 @@ app.on('before-quit', () => {
   disposeModelHashWorker();
   disposeAnalyzeWorker();
   disposeHistoryBriefWorker();
+  disposePromptPostWorker();
   disposeModelFolderWalkWorker();
+  disposeLoraSeriesDatasetWorker();
   disposePreviewDownscaleChild();
 });
 

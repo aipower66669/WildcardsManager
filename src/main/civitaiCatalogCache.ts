@@ -42,6 +42,8 @@ export type CachedCivitaiModel = {
   name: string;
   type: string;
   nsfw: boolean;
+  /** Civitai browsing-level bitmask. Absent on cards stored before this field. */
+  nsfwLevel?: number;
   creator?: string;
   tags: string[];
   baseModel?: string;
@@ -137,6 +139,8 @@ type SliceDiskMeta = {
   idChunkCount: number;
   /** Newest tip page last applied for this slice. Skips reordering All again. */
   tipPageIds?: number[];
+  /** See `CIVITAI_BROWSE_TIP_RULE`. Missing means the next open must walk the tip. */
+  browseRule?: number;
 };
 
 type CatalogRootMeta = {
@@ -341,6 +345,10 @@ function readSliceMeta(sliceKey: string): SliceDiskMeta {
     tipPageIds: Array.isArray(raw.tipPageIds)
       ? raw.tipPageIds.filter((id) => typeof id === 'number' && Number.isFinite(id))
       : undefined,
+    browseRule:
+      typeof raw.browseRule === 'number' && Number.isFinite(raw.browseRule)
+        ? raw.browseRule
+        : undefined,
     idCount: Math.max(0, Number(raw.idCount) || 0),
     idChunkCount: Math.max(0, Number(raw.idChunkCount) || 0),
   };
@@ -630,6 +638,7 @@ export function getCatalogSliceStats(sliceKey: string): {
   nextCursor: string | null;
   lastSyncedAt?: string;
   tipPageIds?: number[];
+  browseRule?: number;
 } {
   ensureCatalogReady();
   const cached = sliceIdCache.get(sliceKey);
@@ -640,6 +649,7 @@ export function getCatalogSliceStats(sliceKey: string): {
       nextCursor: cached.meta.nextCursor,
       lastSyncedAt: cached.meta.lastSyncedAt,
       tipPageIds: cached.meta.tipPageIds,
+      browseRule: cached.meta.browseRule,
     };
   }
   const meta = readSliceMeta(sliceKey);
@@ -649,6 +659,7 @@ export function getCatalogSliceStats(sliceKey: string): {
     nextCursor: meta.nextCursor,
     lastSyncedAt: meta.lastSyncedAt,
     tipPageIds: meta.tipPageIds,
+    browseRule: meta.browseRule,
   };
 }
 
@@ -1246,6 +1257,21 @@ export function insertCachedModelsIfAbsent(
       if (incomingPublished && incomingPublished !== existing.publishedAt) {
         next = { ...next, publishedAt: incomingPublished };
       }
+      // The nsfw flag is only the top tier now. Store the browsing level with
+      // it, or a later prune treats an R/X card as safe and drops it.
+      if (
+        model.nsfw !== existing.nsfw ||
+        (typeof model.nsfwLevel === 'number' &&
+          model.nsfwLevel !== existing.nsfwLevel)
+      ) {
+        next = {
+          ...next,
+          nsfw: model.nsfw,
+          ...(typeof model.nsfwLevel === 'number'
+            ? { nsfwLevel: model.nsfwLevel }
+            : {}),
+        };
+      }
       const tags = unionModelTags(next.tags, model.tags);
       if (
         tags.length !== next.tags.length ||
@@ -1490,6 +1516,8 @@ export function updateCatalogSlice(
     lastSyncedAt?: string;
     /** Remember the Newest page so a later check does not reorder All again. */
     tipPageIds?: number[];
+    /** Newest keep-rule generation. See `CIVITAI_BROWSE_TIP_RULE`. */
+    browseRule?: number;
   },
 ): CatalogSliceState {
   ensureCatalogReady();
@@ -1562,6 +1590,9 @@ export function updateCatalogSlice(
   }
   if (update.tipPageIds) {
     entry.meta.tipPageIds = update.tipPageIds;
+  }
+  if (typeof update.browseRule === 'number' && Number.isFinite(update.browseRule)) {
+    entry.meta.browseRule = update.browseRule;
   }
 
   entry.meta.idCount = entry.ids.length;

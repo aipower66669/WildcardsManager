@@ -40,6 +40,16 @@ type FileCache = {
  */
 let fileCache: FileCache | null = null;
 
+/**
+ * Moves whenever cached wildcard text changes. Callers that build a library
+ * index (generation expand) reuse that index until this changes.
+ */
+let contentEpoch = 0;
+
+function bumpContentEpoch(): void {
+  contentEpoch = (contentEpoch + 1) >>> 0;
+}
+
 function emptyCache(root: string): FileCache {
   return {
     root,
@@ -58,6 +68,7 @@ function normalizeRel(relativePath: string): string {
 function clearFileCache(): void {
   fileCache = null;
   forgetFileArtifacts();
+  bumpContentEpoch();
 }
 
 function ensureCache(root: string): FileCache {
@@ -139,6 +150,7 @@ function rememberEntry(root: string, file: LibraryFile, size: number, mtimeMs: n
     size,
     mtimeMs,
   });
+  bumpContentEpoch();
 }
 
 function listFromCache(cache: FileCache): FileEntryDto[] {
@@ -224,6 +236,7 @@ function hydrateFromDisk(root: string): FileCache {
   };
   fileCache = cache;
   retainFileArtifacts(next.keys());
+  bumpContentEpoch();
   return cache;
 }
 
@@ -255,6 +268,7 @@ function reloadDirtyOnly(cache: FileCache): void {
     cache.byRel.set(rel, loaded);
   }
   cache.dirtyRels.clear();
+  bumpContentEpoch();
 }
 
 function ensureMemoryCurrent(opts?: { refresh?: boolean }): FileCache {
@@ -307,6 +321,7 @@ export const libraryService = {
     fileCache.listingStale = true;
     fileCache.dirtyRels.clear();
     forgetFileArtifacts();
+    bumpContentEpoch();
   },
 
   /** Drop one path (and children) so the next load re-reads even if mtime is stale. */
@@ -330,6 +345,7 @@ export const libraryService = {
       }
     }
     if (droppedChild) fileCache.listingStale = true;
+    bumpContentEpoch();
   },
 
   listFiles(opts?: { refresh?: boolean }): FileEntryDto[] {
@@ -340,6 +356,10 @@ export const libraryService = {
    * Fingerprint of the last `loadAllFiles()` snapshot (path + size + mtime).
    * Empty when nothing is cached.
    */
+  getContentEpoch(): number {
+    return contentEpoch;
+  },
+
   getContentFingerprint(): string {
     if (!fileCache || fileCache.root !== openRoot) return '';
     return [...fileCache.byRel.entries()]
@@ -385,6 +405,7 @@ export const libraryService = {
         mtimeMs: prev.mtimeMs,
       });
       forgetFileArtifacts(normalized);
+      bumpContentEpoch();
       return;
     }
 
@@ -396,6 +417,7 @@ export const libraryService = {
       persistedText,
     });
     forgetFileArtifacts(normalized);
+    bumpContentEpoch();
   },
 
   readFile(relativePath: string): {
@@ -483,6 +505,7 @@ export const libraryService = {
     );
     fileCache?.unsavedRels.delete(normalized);
     forgetFileArtifacts(normalized);
+    bumpContentEpoch();
   },
 
   deleteFile(relativePath: string): void {
@@ -497,6 +520,7 @@ export const libraryService = {
     fileCache?.byRel.delete(normalized);
     fileCache?.unsavedRels.delete(normalized);
     forgetFileArtifacts(normalized);
+    bumpContentEpoch();
   },
 
   loadAllFiles(opts?: { refresh?: boolean }): LibraryFile[] {

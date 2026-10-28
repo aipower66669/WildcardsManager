@@ -27,6 +27,7 @@ import {
   EditorState,
   StateEffect,
   StateField,
+  Transaction,
   type Extension,
 } from '@codemirror/state';
 import {
@@ -83,6 +84,10 @@ import {
   findCivitaiModelUrlAbove,
   type ParsedCivitaiModelPageUrl,
 } from '../domain/civitaiSnippet.js';
+import {
+  editorExternalTextChange,
+  editorExternalValueIsStale,
+} from '../domain/editorExternalText';
 import { commentLine, uncommentLine } from '../domain/lineComment';
 import { wildcardLanguage } from './wildcardLang';
 
@@ -90,30 +95,24 @@ import { wildcardLanguage } from './wildcardLang';
 const externalValueAnnotation = Annotation.define<boolean>();
 
 /**
- * Apply an external document update without yanking the caret/scroll when
- * possible. Prefers append/delete-suffix transactions so CodeMirror can map
- * the selection through the change.
+ * Apply an external document update without moving the caret to offset 0.
+ * Only the differing span is replaced, so a caret in the unchanged part of
+ * the file stays put. The sync is not an undo step: grouping it with the
+ * last keystroke made Undo rewind the characters the user had just typed.
  */
 function applyExternalDocText(view: EditorView, text: string): void {
-  const current = view.state.doc.toString();
-  if (current === text) return;
+  const change = editorExternalTextChange(view.state.doc.toString(), text);
+  if (!change) return;
 
   const scrollTop = view.scrollDOM.scrollTop;
   const scrollLeft = view.scrollDOM.scrollLeft;
 
-  let changes: { from: number; to?: number; insert: string };
-  if (text.startsWith(current)) {
-    changes = { from: current.length, insert: text.slice(current.length) };
-  } else if (current.startsWith(text)) {
-    changes = { from: text.length, to: current.length, insert: '' };
-  } else {
-    changes = { from: 0, to: current.length, insert: text };
-  }
-
-  // Omit `selection` so CodeMirror maps the existing caret through `changes`.
   view.dispatch({
-    changes,
-    annotations: externalValueAnnotation.of(true),
+    changes: change,
+    annotations: [
+      externalValueAnnotation.of(true),
+      Transaction.addToHistory.of(false),
+    ],
   });
 
   view.scrollDOM.scrollTop = scrollTop;
@@ -616,6 +615,8 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
   ) {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const viewRef = useRef<EditorView | null>(null);
+    /** Last document text the parent and the editor agreed on. */
+    const committedValueRef = useRef(value);
     const menuRef = useRef<HTMLDivElement | null>(null);
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
@@ -683,6 +684,7 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
         const view = viewRef.current;
         if (!view) return;
         applyExternalDocText(view, text);
+        committedValueRef.current = view.state.doc.toString();
       },
     }));
 
@@ -906,7 +908,18 @@ export const WildcardEditor = forwardRef<WildcardEditorHandle, Props>(
     useEffect(() => {
       const view = viewRef.current;
       if (!view) return;
+      const doc = view.state.doc.toString();
+      if (doc === value) {
+        committedValueRef.current = value;
+        return;
+      }
+      // A save echo can arrive one keystroke behind. Leave the live buffer
+      // alone; setExternalValue is what applies a real outside rewrite.
+      if (editorExternalValueIsStale(doc, committedValueRef.current, value)) {
+        return;
+      }
       applyExternalDocText(view, value);
+      committedValueRef.current = value;
     }, [value]);
 
     useEffect(() => {

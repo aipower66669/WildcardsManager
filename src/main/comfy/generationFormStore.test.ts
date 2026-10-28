@@ -66,6 +66,7 @@ describe('generationFormStore', () => {
       relativeFolder: undefined,
       promptFoldersRecursive: undefined,
       promptText: '<lora:Foo:1> bar',
+      promptSingle: false,
       checkpoint: 'model.safetensors',
       clip: undefined,
       vae: undefined,
@@ -177,6 +178,7 @@ describe('generationFormStore', () => {
           negativePrompt: 'cartoon',
           promptText: '',
           promptSource: 'folder',
+          promptSingle: false,
         },
         hentai: {
           relativeFolder: 'Hentai',
@@ -200,6 +202,7 @@ describe('generationFormStore', () => {
           negativePrompt: 'photo',
           promptText: 'typed',
           promptSource: 'text',
+          promptSingle: false,
         },
         '3d': {
           relativeFolder: null,
@@ -223,6 +226,7 @@ describe('generationFormStore', () => {
           negativePrompt: '',
           promptText: '',
           promptSource: 'folder',
+          promptSingle: false,
         },
       },
     });
@@ -329,6 +333,7 @@ describe('generationFormStore', () => {
     expect(loaded.height).toBe(1600);
     expect(loaded.promptSource).toBe('text');
     expect(loaded.promptText).toBe('typed');
+    expect(loaded.promptSingle).toBe(false);
     expect(loaded.profiles.realistic.checkpoint).toBe('real.safetensors');
     expect(loaded.profiles.hentai.checkpoint).toBe('anime.safetensors');
     expect(loaded.profiles.hentai.clip).toBe('');

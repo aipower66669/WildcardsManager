@@ -157,7 +157,12 @@ import { LibraryManagerModal } from './LibraryManagerModal';
 import { LoraFilesWorkspace } from './LoraFilesWorkspace';
 import { CheckpointFilesWorkspace } from './CheckpointFilesWorkspace';
 import { PromptsWorkspace } from './PromptsWorkspace';
-import type { GenerationRunHandle } from './generationRun';
+import {
+  isGenerationRunning,
+  subscribeGenerationRunning,
+  type GenerationRunHandle,
+} from './generationRun';
+import { publishGenerationProgress } from './generationLive';
 import { PromptCoverageModal } from './PromptCoverageModal';
 import { GenerationWorkspace } from './GenerationWorkspace';
 import { LoraDownloadCategoryManagerModal } from './LoraDownloadCategoryManagerModal';
@@ -725,6 +730,7 @@ type ExpandTarget =
   | {
       kind: 'generation';
       promptSource: 'text' | 'folder';
+      promptSingle: boolean;
       promptText: string;
       relativeFolder: string | null;
       promptFoldersRecursive: boolean;
@@ -1638,12 +1644,33 @@ export function App() {
   }, [flashNotice, refresh]);
 
   useEffect(() => {
-    const unsubscribe = window.wcm.watch.onChanged(() => {
-      // Watcher refresh: reindex files/keys without rebuilding the graph.
-      // Full analyze stays on Rebuild / file open / blur-save.
-      void refresh({ light: true });
+    return window.wcm.comfy.onGenerationProgress((progress) => {
+      publishGenerationProgress(progress);
     });
-    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    let pending = false;
+    const run = () => {
+      pending = false;
+      void refresh({ light: true });
+    };
+    const unsubscribe = window.wcm.watch.onChanged(() => {
+      // A library refresh walks the wildcard tree on the main thread.
+      // Hold it until generation is idle so clicks keep working.
+      if (isGenerationRunning()) {
+        pending = true;
+        return;
+      }
+      run();
+    });
+    const unsubscribeGeneration = subscribeGenerationRunning((active) => {
+      if (!active && pending) run();
+    });
+    return () => {
+      unsubscribe();
+      unsubscribeGeneration();
+    };
   }, [refresh]);
 
   /**
@@ -7322,6 +7349,7 @@ function ExpandModal({
             : {
                 source: 'generation',
                 promptSource: target.promptSource,
+                promptSingle: target.promptSingle,
                 promptText: target.promptText,
                 relativeFolder: target.relativeFolder ?? undefined,
                 promptFoldersRecursive: target.promptFoldersRecursive,

@@ -80,6 +80,8 @@ export type CivitaiModel = {
   name: string;
   type: string;
   nsfw?: boolean;
+  /** Bitmask. R and above stay in a civitai.red catalog even when `nsfw` is false. */
+  nsfwLevel?: number;
   description?: string;
   tags?: string[];
   creator?: { username?: string; image?: string };

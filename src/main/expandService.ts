@@ -1,16 +1,18 @@
 import { expandPrompts, type ExpandResult } from '../domain/expand.js';
 import {
+  appendAdditionalPositive,
   pickGenerationPrompt,
   promptsForFileExpand,
   resolveGenerationSeed,
 } from '../domain/generationPromptPick.js';
 import type { ExpandRequestDto, ExpandResultDto } from '../shared/contracts.js';
-import { libraryService } from './libraryService.js';
 import { applyLibraryPromptSubstitutions } from './promptSubstitutions.js';
 import {
+  ensureGenPromptFolders,
   expandGenLine,
   expandPromptTemplates,
   getLoadedGenPrompts,
+  libraryIndexForExpand,
   listGenPromptFolders,
   listGenPromptFoldersUnder,
   loadGenPrompts,
@@ -32,17 +34,29 @@ function toDto(result: ExpandResult, detail?: string): ExpandResultDto {
   };
 }
 
-export function expandPreview(request: ExpandRequestDto): ExpandResultDto {
+export async function expandPreview(
+  request: ExpandRequestDto,
+): Promise<ExpandResultDto> {
   const source = request.source ?? 'wildcard';
   if (source === 'gen-file') return expandGenFilePreview(request);
-  if (source === 'generation') return expandGenerationPreview(request);
+  if (source === 'generation') {
+    const promptSource = request.promptSource === 'text' ? 'text' : 'folder';
+    const folder = request.relativeFolder?.trim() ?? '';
+    if (
+      promptSource !== 'text' &&
+      (!folder || request.promptFoldersRecursive === true)
+    ) {
+      await ensureGenPromptFolders();
+    }
+    return expandGenerationPreview(request);
+  }
 
   const relativePath = request.relativePath?.trim();
   if (!relativePath) throw new Error('Invalid path');
-  const files = libraryService.loadAllFiles();
   const result = expandPrompts({
     rootRelativePath: relativePath,
-    files,
+    files: [],
+    index: libraryIndexForExpand(),
     mode: request.mode,
     limit: request.limit,
     seed: request.seed,
@@ -78,6 +92,7 @@ function expandGenerationPreview(request: ExpandRequestDto): ExpandResultDto {
   const picked = pickGenerationPrompt({
     promptSource,
     promptText: request.promptText ?? '',
+    promptSingle: request.promptSingle === true,
     relativeFolder: request.relativeFolder?.trim() ?? '',
     recursive: request.promptFoldersRecursive === true,
     seed,
@@ -101,12 +116,12 @@ function expandGenerationPreview(request: ExpandRequestDto): ExpandResultDto {
     seed,
   });
   const extraRaw = request.additionalPositivePrompt?.trim() ?? '';
-  const extra = extraRaw ? expandGenLine(extraRaw, seed).text.trim() : '';
+  const extraExpanded = extraRaw ? expandGenLine(extraRaw, seed).text.trim() : '';
+  const extra = extraExpanded || extraRaw;
   if (extra) {
-    result.samples = result.samples.map((sample) => {
-      const body = sample.trim();
-      return body ? `${body}, ${extra}` : extra;
-    });
+    result.samples = result.samples.map((sample) =>
+      appendAdditionalPositive(sample, extra),
+    );
   }
   const where =
     promptSource === 'text'

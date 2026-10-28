@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { net, protocol } from 'electron';
 import { expandPrompts } from '../domain/expand.js';
+import {
+  buildLibraryIndex,
+  type LibraryIndex,
+} from '../domain/resolveWildcard.js';
 import { decodeGenPrompts } from '../domain/genPrompts.js';
 import { genPromptFoldersUnder } from '../domain/genPromptFoldersUnder.js';
 import {
@@ -42,13 +46,26 @@ function isReviewSubfolderName(name: string): boolean {
 /**
  * Absolute paths of directories Windows has marked Hidden.
  * `!.wcm` is also skipped by name; this covers any other folder the user hid.
- * Cached so a generation job does not rescan the tree.
+ * Cached so a generation job does not rescan the tree. Generation itself
+ * uses the `!gen.txt` folder list cache and does not call this per image.
  */
 let hiddenDirCache: { root: string; at: number; paths: Set<string> } | null =
   null;
-const HIDDEN_DIR_TTL_MS = 15_000;
+const HIDDEN_DIR_TTL_MS = 60_000;
 
-function windowsHiddenDirectories(root: string): Set<string> {
+const HIDDEN_DIR_ARGS = ['/d', '/c', 'chcp 65001>nul & dir /a:hd /b /s'] as const;
+
+function hiddenDirsFromListing(stdout: string): Set<string> {
+  const paths = new Set<string>();
+  for (const line of stdout.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    paths.add(path.resolve(trimmed).toLowerCase());
+  }
+  return paths;
+}
+
+function hiddenDirCacheHit(root: string): Set<string> | null {
   if (process.platform !== 'win32') return new Set();
   const now = Date.now();
   if (
@@ -58,11 +75,36 @@ function windowsHiddenDirectories(root: string): Set<string> {
   ) {
     return hiddenDirCache.paths;
   }
-  const paths = new Set<string>();
+  return null;
+}
+
+function windowsHiddenDirectories(root: string): Set<string> {
+  const cached = hiddenDirCacheHit(root);
+  if (cached) return cached;
+  let paths = new Set<string>();
   try {
-    const out = execFileSync(
+    const out = execFileSync(process.env.ComSpec ?? 'cmd.exe', [...HIDDEN_DIR_ARGS], {
+      cwd: root,
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 20_000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    paths = hiddenDirsFromListing(out);
+  } catch {
+    // `dir` exits 1 when nothing is hidden.
+  }
+  hiddenDirCache = { root, at: Date.now(), paths };
+  return paths;
+}
+
+function windowsHiddenDirectoriesAsync(root: string): Promise<Set<string>> {
+  const cached = hiddenDirCacheHit(root);
+  if (cached) return Promise.resolve(cached);
+  return new Promise((resolve) => {
+    execFile(
       process.env.ComSpec ?? 'cmd.exe',
-      ['/d', '/c', 'chcp 65001>nul & dir /a:hd /b /s'],
+      [...HIDDEN_DIR_ARGS],
       {
         cwd: root,
         encoding: 'utf8',
@@ -70,17 +112,13 @@ function windowsHiddenDirectories(root: string): Set<string> {
         timeout: 20_000,
         maxBuffer: 4 * 1024 * 1024,
       },
+      (err, stdout) => {
+        const paths = err ? new Set<string>() : hiddenDirsFromListing(stdout);
+        hiddenDirCache = { root, at: Date.now(), paths };
+        resolve(paths);
+      },
     );
-    for (const line of out.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      paths.add(path.resolve(trimmed).toLowerCase());
-    }
-  } catch {
-    // `dir` exits 1 when nothing is hidden.
-  }
-  hiddenDirCache = { root, at: now, paths };
-  return paths;
+  });
 }
 
 function isOsHiddenDirectory(abs: string, hidden: Set<string>): boolean {
@@ -287,18 +325,24 @@ export function listPromptTree(): PromptTreeDto {
 
 /**
  * Relative paths of prompt folders that contain `!gen.txt`.
- * Does not count images — generation calls this at the start of every
- * random-folder job, and a full tree walk stalled the UI while Comfy loaded.
+ * The list is cached. A cold miss still walks on this thread; generation
+ * awaits `ensureGenPromptFolders` so later images do not.
  */
-export function listGenPromptFolders(): string[] {
-  const rootSetting = loadSettings().promptsFolder?.trim();
-  if (!rootSetting) return [];
-  let root: string;
+let genFolderCache: { root: string; folders: string[]; at: number } | null =
+  null;
+let genFolderRefresh: Promise<void> | null = null;
+const GEN_FOLDER_REFRESH_MS = 60_000;
+
+function readPromptsRoot(): string | null {
+  if (!loadSettings().promptsFolder?.trim()) return null;
   try {
-    root = promptsRoot();
+    return promptsRoot();
   } catch {
-    return [];
+    return null;
   }
+}
+
+function walkGenPromptFoldersSync(root: string): string[] {
   const hidden = windowsHiddenDirectories(root);
   const out: string[] = [];
   const walk = (dir: string, relative: string) => {
@@ -332,6 +376,91 @@ export function listGenPromptFolders(): string[] {
   };
   walk(root, '');
   return out;
+}
+
+async function walkGenPromptFoldersAsync(root: string): Promise<string[]> {
+  const hidden = await windowsHiddenDirectoriesAsync(root);
+  const out: string[] = [];
+  const walk = async (dir: string, relative: string) => {
+    let names: string[] = [];
+    try {
+      names = await fs.promises.readdir(dir);
+    } catch {
+      return;
+    }
+    if (relative) {
+      try {
+        const st = await fs.promises.stat(path.join(dir, GEN_FILE));
+        if (st.isFile()) out.push(relative);
+      } catch {
+        // no !gen.txt in this folder
+      }
+    }
+    for (const name of names) {
+      if (isSkippedPromptFolderName(name)) continue;
+      const abs = path.join(dir, name);
+      let st: fs.Stats;
+      try {
+        st = await fs.promises.stat(abs);
+      } catch {
+        continue;
+      }
+      if (!st.isDirectory()) continue;
+      if (isOsHiddenDirectory(abs, hidden)) continue;
+      const childRel = relative ? `${relative}/${name}` : name;
+      await walk(abs, childRel.replaceAll('\\', '/'));
+    }
+  };
+  await walk(root, '');
+  return out;
+}
+
+export function listGenPromptFolders(): string[] {
+  const root = readPromptsRoot();
+  if (!root) return [];
+  if (genFolderCache?.root === root) return genFolderCache.folders;
+  const folders = walkGenPromptFoldersSync(root);
+  genFolderCache = { root, folders, at: Date.now() };
+  return folders;
+}
+
+/** Refresh the `!gen.txt` folder list without blocking the main thread. */
+export async function refreshGenPromptFolders(): Promise<void> {
+  if (genFolderRefresh) {
+    await genFolderRefresh;
+    return;
+  }
+  const root = readPromptsRoot();
+  if (!root) {
+    genFolderCache = null;
+    return;
+  }
+  const job = walkGenPromptFoldersAsync(root)
+    .then((folders) => {
+      if (readPromptsRoot() === root) {
+        genFolderCache = { root, folders, at: Date.now() };
+      }
+    })
+    .finally(() => {
+      if (genFolderRefresh === job) genFolderRefresh = null;
+    });
+  genFolderRefresh = job;
+  await job;
+}
+
+/**
+ * Folder list for a generation pick. Returns the cache immediately and
+ * refreshes it in the background when it is older than a minute.
+ */
+export async function ensureGenPromptFolders(): Promise<string[]> {
+  const root = readPromptsRoot();
+  if (!root) return [];
+  if (!genFolderCache || genFolderCache.root !== root) {
+    await refreshGenPromptFolders();
+  } else if (Date.now() - genFolderCache.at > GEN_FOLDER_REFRESH_MS) {
+    void refreshGenPromptFolders();
+  }
+  return genFolderCache?.root === root ? genFolderCache.folders : [];
 }
 
 /**
@@ -688,9 +817,43 @@ export function getLoadedGenPrompts(relativeFolder: string): string[] {
 
 const GEN_EXPAND_PATH = '__wcm_gen_line__.txt';
 
+let generationIndex: { root: string; epoch: number; index: LibraryIndex } | null =
+  null;
+
+/** One library index per content epoch. Rebuilding it per image froze the UI. */
+function indexForGeneration(): LibraryIndex {
+  const root = libraryService.getRoot() ?? '';
+  const epoch = libraryService.getContentEpoch();
+  if (
+    generationIndex &&
+    generationIndex.root === root &&
+    generationIndex.epoch === epoch
+  ) {
+    return generationIndex.index;
+  }
+  const files = libraryService.loadAllFiles();
+  const afterRoot = libraryService.getRoot() ?? root;
+  const afterEpoch = libraryService.getContentEpoch();
+  const index = buildLibraryIndex(files);
+  generationIndex = { root: afterRoot, epoch: afterEpoch, index };
+  return index;
+}
+
+/** Build the generation index ahead of the first image. */
+export function warmGenerationLibraryIndex(): void {
+  if (!libraryService.getRoot()) return;
+  indexForGeneration();
+}
+
+/** Shared index for generation and preview expansion. */
+export function libraryIndexForExpand(): LibraryIndex {
+  return indexForGeneration();
+}
+
 /**
  * Expand prompt templates against the active wildcards library.
- * Each entry is one line, the same way a wildcard file offers alternatives.
+ * Each entry is already one prompt. A line break inside an entry stays in
+ * that prompt, so Single prompt is not split into a random line.
  */
 export function expandPromptTemplates(
   lines: string[],
@@ -701,24 +864,15 @@ export function expandPromptTemplates(
     countCombinations?: boolean;
   },
 ): ReturnType<typeof expandPrompts> {
-  const files = libraryService.loadAllFiles();
   return expandPrompts({
     rootRelativePath: GEN_EXPAND_PATH,
-    files: [
-      ...files,
-      {
-        relativePath: GEN_EXPAND_PATH,
-        absolutePath: GEN_EXPAND_PATH,
-        name: '__wcm_gen_line__',
-        ext: '.txt',
-        key: '__wcm_gen_line__',
-        text: lines.join('\n'),
-      },
-    ],
+    files: [],
+    index: indexForGeneration(),
     mode: options.mode,
     limit: options.limit,
     seed: options.seed,
     countCombinations: options.countCombinations,
+    templates: lines,
   });
 }
 

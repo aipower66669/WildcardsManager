@@ -1176,6 +1176,14 @@ button.status-bar-queue-btn:hover {
   flex: 1;
 }
 
+.generation-prompt-source-choices {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+
 .generation-prompt-source-row {
   display: flex;
   align-items: center;

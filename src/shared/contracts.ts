@@ -1192,6 +1192,11 @@ export type GenerationStyleProfileDto = {
   /** Typed “Use this prompt” text — kept even when folder mode is selected. */
   promptText: string;
   promptSource: GenerationPromptSourceDto;
+  /**
+   * Use this prompt only. Ticked: the box is one prompt.
+   * Unticked: the box is decoded like a `!gen.txt` file.
+   */
+  promptSingle: boolean;
 };
 
 /** Persisted Generation tab controls (survives reload / restart). */
@@ -1221,6 +1226,8 @@ export type GenerationFormStateDto = {
   negativePrompt: string;
   promptText: string;
   promptSource: GenerationPromptSourceDto;
+  /** Use this prompt only. Ticked sends the box as one prompt. */
+  promptSingle: boolean;
   /**
    * When true, Generation walks checkpoints into the library Benchmark folder
    * (shared across style profiles).
@@ -1282,6 +1289,11 @@ export type GenerationStartRequestDto = {
   promptFoldersRecursive?: boolean;
   /** Required when promptSource is `text`. */
   promptText?: string;
+  /**
+   * Use this prompt only. True sends `promptText` as one prompt.
+   * False decodes it like a `!gen.txt` file.
+   */
+  promptSingle?: boolean;
   /**
    * Checkpoint relative path. Prompt substitutions match its file name
    * before the line is expanded.
@@ -1421,6 +1433,8 @@ export type ExpandRequestDto = {
   content?: string;
   promptSource?: 'text' | 'folder';
   promptText?: string;
+  /** Use this prompt only. True sends the box as one prompt. */
+  promptSingle?: boolean;
   promptFoldersRecursive?: boolean;
   additionalPositivePrompt?: string;
   /**
@@ -2514,6 +2528,8 @@ export type CivitaiModelCardDto = {
   name: string;
   type: string;
   nsfw: boolean;
+  /** Civitai browsing-level bitmask, when the catalog row has one. */
+  nsfwLevel?: number;
   creator?: string;
   tags: string[];
   baseModel?: string;
@@ -3349,6 +3365,8 @@ export type WcmDesktopApi = {
       seriesBase: string;
       separator: '_' | '-';
       force?: boolean;
+      /** Cover already on screen. Main omits that data URL from the reply. */
+      knownPreviewPath?: string | null;
     }): Promise<LoraSeriesDatasetPreviewDto>;
     /** Data URL for an image under the training library root. */
     readTrainingLibraryImage(absolutePath: string): Promise<string | null>;

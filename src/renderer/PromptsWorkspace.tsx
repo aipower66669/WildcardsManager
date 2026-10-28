@@ -10,11 +10,9 @@ import {
 import {
   Box,
   Camera,
-  ClipboardCopy,
   Cpu,
   Dices,
   FilePlus2,
-  FolderOpen,
   Hash,
   Infinity,
   ListChecks,
@@ -27,7 +25,6 @@ import {
   Shuffle,
   Sparkles,
   Square,
-  Trash2,
   Zap,
 } from 'lucide-react';
 import { remapPromptFolderPath } from '../domain/promptFolderNames';
@@ -54,22 +51,18 @@ import {
 } from './PromptFolderTree';
 import {
   isGenerationRunning,
-  noteGenerationStatus,
   startPromptFolderGeneration,
   subscribeGenerationRunning,
   type GenerationRunHandle,
   type GenerationRunMode,
 } from './generationRun';
+import {
+  GenerationPreviewActions,
+  GenerationPreviewBody,
+  rememberGenerationPreview,
+} from './generationLive';
 
 type SidePanelMode = 'samples' | 'lastOutput';
-
-type HeldPreview = {
-  url: string;
-  prompt?: string;
-  negative?: string;
-  relativeFolder?: string | null;
-  seed?: number | null;
-};
 
 const SIDE_PANEL_MODE_KEY = 'wcm.prompts.sidePanelMode';
 
@@ -89,18 +82,6 @@ function writeSidePanelMode(mode: SidePanelMode): void {
   } catch {
     // ignore
   }
-}
-
-/** Prompt folder breadcrumb (`portraits/boys` → `portraits › boys`). */
-function promptCategoryBreadcrumb(
-  relativeFolder: string | null | undefined,
-): string {
-  const cleaned = (relativeFolder ?? '')
-    .trim()
-    .replaceAll('\\', '/')
-    .replace(/^\/+|\/+$/g, '');
-  if (!cleaned || cleaned === '_manual') return '';
-  return cleaned.split('/').filter(Boolean).join(' › ');
 }
 
 type Props = {
@@ -221,8 +202,6 @@ export function PromptsWorkspace({
   const [sidePanelMode, setSidePanelMode] = useState<SidePanelMode>(
     readSidePanelMode,
   );
-  const [heldPreview, setHeldPreview] = useState<HeldPreview | null>(null);
-  const [deletingLast, setDeletingLast] = useState(false);
   const [issuesByFolder, setIssuesByFolder] = useState<
     Map<string, GenPromptValidationFileDto>
   >(new Map());
@@ -391,7 +370,7 @@ export function PromptsWorkspace({
       .getGenerationForm()
       .then((form) => {
         if (cancelled || !form.lastImageUrl) return;
-        setHeldPreview({
+        rememberGenerationPreview({
           url: form.lastImageUrl,
           prompt: form.lastPrompt,
           negative: form.lastNegativePrompt,
@@ -506,16 +485,7 @@ export function PromptsWorkspace({
 
   useEffect(() => {
     return window.wcm.comfy.onGenerationProgress((p) => {
-      noteGenerationStatus(p.status);
       setGenerationNote(p.error?.trim() ? p.error : null);
-      if (!p.lastImageUrl) return;
-      setHeldPreview({
-        url: p.lastImageUrl,
-        prompt: p.lastPrompt,
-        negative: p.lastNegativePrompt,
-        relativeFolder: p.lastRelativeFolder,
-        seed: p.lastSeed,
-      });
     });
   }, []);
 
@@ -558,20 +528,6 @@ export function PromptsWorkspace({
       setGenerationNote(e instanceof Error ? e.message : String(e));
     } finally {
       setGenerationStarting(false);
-    }
-  };
-
-  const deleteLastOutput = async () => {
-    if (!heldPreview || deletingLast) return;
-    setDeletingLast(true);
-    setError(null);
-    try {
-      const result = await window.wcm.comfy.deleteLastGeneration();
-      if (result.deleted) setHeldPreview(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDeletingLast(false);
     }
   };
 
@@ -1226,37 +1182,9 @@ export function PromptsWorkspace({
               >
                 <RefreshCw size={14} />
               </button>
-            ) : heldPreview ? (
-              <>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  title="Reveal in My File Explorer"
-                  aria-label="Reveal in My File Explorer"
-                  onClick={() => {
-                    void window.wcm.comfy.revealLastGeneration().catch((e) => {
-                      setError(e instanceof Error ? e.message : String(e));
-                    });
-                  }}
-                >
-                  <FolderOpen size={14} />
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  title="Delete last generation"
-                  aria-label="Delete last generation"
-                  disabled={deletingLast}
-                  onClick={() => void deleteLastOutput()}
-                >
-                  {deletingLast ? (
-                    <Loader2 size={14} className="spin" />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
-                </button>
-              </>
-            ) : null}
+            ) : (
+              <GenerationPreviewActions onError={setError} />
+            )}
             <button
               type="button"
               className="icon-btn"
@@ -1292,87 +1220,12 @@ export function PromptsWorkspace({
               ))
             )}
           </div>
-        ) : heldPreview ? (
-          <div className="generation-preview">
-            <img src={heldPreview.url} alt="Last generation" />
-            {heldPreview.prompt ||
-            heldPreview.negative ||
-            promptCategoryBreadcrumb(heldPreview.relativeFolder) ||
-            (typeof heldPreview.seed === 'number' &&
-              Number.isFinite(heldPreview.seed)) ? (
-              <div className="generation-preview-prompts">
-                {promptCategoryBreadcrumb(heldPreview.relativeFolder) ? (
-                  <div className="generation-preview-prompt">
-                    <span className="generation-preview-prompt-label">
-                      Category
-                    </span>
-                    <div
-                      className="generation-preview-prompt-value generation-preview-category"
-                      title={heldPreview.relativeFolder ?? undefined}
-                    >
-                      {promptCategoryBreadcrumb(heldPreview.relativeFolder)}
-                    </div>
-                  </div>
-                ) : null}
-                {typeof heldPreview.seed === 'number' &&
-                Number.isFinite(heldPreview.seed) ? (
-                  <div className="generation-preview-prompt">
-                    <span className="generation-preview-prompt-label">
-                      Seed
-                    </span>
-                    <div className="generation-preview-seed-row">
-                      <div className="generation-preview-prompt-value generation-preview-seed">
-                        {heldPreview.seed >>> 0}
-                      </div>
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        title="Copy seed"
-                        aria-label="Copy seed"
-                        onClick={() => {
-                          const seed = heldPreview.seed;
-                          if (typeof seed !== 'number' || !Number.isFinite(seed)) {
-                            return;
-                          }
-                          void navigator.clipboard
-                            .writeText(String(seed >>> 0))
-                            .catch((e) =>
-                              setError(
-                                e instanceof Error ? e.message : String(e),
-                              ),
-                            );
-                        }}
-                      >
-                        <ClipboardCopy size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-                {heldPreview.prompt ? (
-                  <div className="generation-preview-prompt">
-                    <span className="generation-preview-prompt-label">
-                      Positive
-                    </span>
-                    <div className="generation-preview-prompt-value">
-                      {heldPreview.prompt}
-                    </div>
-                  </div>
-                ) : null}
-                {heldPreview.negative ? (
-                  <div className="generation-preview-prompt">
-                    <span className="generation-preview-prompt-label">
-                      Negative
-                    </span>
-                    <div className="generation-preview-prompt-value">
-                      {heldPreview.negative}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
         ) : (
-          <p className="hint pad">Generate to preview here.</p>
+          <GenerationPreviewBody
+            seedMode="copy"
+            onError={setError}
+            empty={<p className="hint pad">Generate to preview here.</p>}
+          />
         )}
       </aside>
     </main>

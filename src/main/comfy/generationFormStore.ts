@@ -53,6 +53,7 @@ function emptyStyleProfile(): GenerationStyleProfileDto {
     negativePrompt: '',
     promptText: '',
     promptSource: 'folder',
+    promptSingle: false,
   };
 }
 
@@ -84,6 +85,7 @@ const DEFAULT_FORM: GenerationFormStateDto = {
   negativePrompt: '',
   promptText: '',
   promptSource: 'folder',
+  promptSingle: false,
   benchmark: false,
 };
 
@@ -253,6 +255,9 @@ function readStyleProfile(
         ? 'text'
         : 'folder'
       : fallback.promptSource,
+    promptSingle: has('promptSingle')
+      ? row.promptSingle === true
+      : fallback.promptSingle,
   };
 }
 
@@ -340,6 +345,7 @@ function withActiveProfile(
     | 'negativePrompt'
     | 'promptText'
     | 'promptSource'
+    | 'promptSingle'
   >,
 ): GenerationFormStateDto {
   const active = form.profiles[form.activeProfile];
@@ -366,6 +372,7 @@ function withActiveProfile(
     negativePrompt: active.negativePrompt,
     promptText: active.promptText,
     promptSource: active.promptSource,
+    promptSingle: active.promptSingle === true,
   };
 }
 
@@ -597,6 +604,7 @@ export function generationRequestFromForm(
     promptFoldersRecursive:
       promptSource === 'folder' ? form.promptFoldersRecursive === true : undefined,
     promptText: promptSource === 'text' ? form.promptText : undefined,
+    promptSingle: promptSource === 'text' ? form.promptSingle === true : undefined,
     checkpoint: form.checkpoint,
     clip: form.clip || undefined,
     vae: form.vae || undefined,
@@ -724,6 +732,9 @@ export function saveGenerationForm(
     }
     if (patch.promptSource !== undefined) {
       target.promptSource = patch.promptSource === 'text' ? 'text' : 'folder';
+    }
+    if (patch.promptSingle !== undefined) {
+      target.promptSingle = patch.promptSingle === true;
     }
   }
   const next = withActiveProfile({

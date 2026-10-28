@@ -5329,7 +5329,7 @@ export function CivitaiBrowserModal({
           {tab === 'browse' ? (
             <div className="civitai-filters">
                 {origin === 'https://civitai.red' ? (
-                  <span title="This library uses civitai.red. Browse lists mature models only.">
+                  <span title="This library uses civitai.red. Browse lists R and above. PG and PG-13 are left out.">
                     Mature only
                   </span>
                 ) : (

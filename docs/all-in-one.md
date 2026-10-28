@@ -849,8 +849,11 @@ The **Generation** tab queues jobs against a running ComfyUI instance
 (**Settings → AI**: host, **Test** for the server, **Check install** after
 **Save Workflow**):
 
-- **Use this prompt** (typed, with the same `!gen.txt` multi-line rules) or a
-  selected prompt folder. **Recursive** sits on the Prompt folder line. With a
+- **Use this prompt** or a selected prompt folder, on one line. **Single
+  prompt** sits under them. Ticked, the whole box is sent as one prompt,
+  line breaks included. Unticked, the box is read as multiple prompts, the
+  same way as a `!gen.txt` file, and one prompt is chosen. **Additional
+  Positive** is appended to that prompt either way. **Recursive** sits on the Prompt folder line. With a
   folder selected, on includes that folder and sub-folders that have
   `!gen.txt`; off uses only that folder. **Select… [Randomize]** (no folder)
   picks a folder from the seed.
@@ -1129,11 +1132,14 @@ In **Settings → Civitai → Site**, pick the catalog that matches what you wan
 | Site | Catalog |
 | --- | --- |
 | **civitai.com** | SFW-oriented catalog — prefer this for work-safe browsing |
-| **civitai.red** | NSFW catalog. Browse lists mature models only. Safe models are left out |
+| **civitai.red** | NSFW catalog. Browse lists R and above. PG and PG-13 are left out |
 
 The site choice controls which API and account the app talks to for **models**.
-On **civitai.red**, Browse does not list models Civitai marks safe. The
-**Include NSFW** checkbox does not add those models to a red library.
+On **civitai.red**, Browse leaves out PG and PG-13. R, X, and XXX stay, including
+when Civitai’s `nsfw` flag is off. The **Include NSFW** checkbox does not add
+PG or PG-13 models to a red library.
+**All** + **Newest** uses the same type, base model, and Newest query as the
+website. PG and PG-13 are skipped, so the remaining cards follow that list.
 The Images tab has its own **SFW only / SFW + NSFW / NSFW only** content filter.
 
 #### API key (browse vs download)
@@ -1876,7 +1882,7 @@ Site**):
 | Site | Meaning |
 | --- | --- |
 | **civitai.com** | SFW-oriented catalog |
-| **civitai.red** | NSFW catalog. Browse is mature models only |
+| **civitai.red** | NSFW catalog. Browse lists R and above. PG and PG-13 are left out |
 
 Use the site that matches the content you want. Browse/search does not need an
 API key. **Downloads often do:** if a creator requires login, download fails with
@@ -3478,7 +3484,7 @@ ComfyUI is running (or a launch shortcut is set under **Settings → AI**). **Te
 
 ### 64. What is Use this prompt versus a prompt folder?
 
-**Use this prompt** queues the text in the box, with the same multi-line `!gen.txt` rules, and writes to the style output root. A prompt folder queues one line from a `!gen.txt`. **Select… [Randomize]** (no folder) picks a folder from the seed. **Recursive**, on the Prompt folder line, includes that folder and sub-folders that have `!gen.txt`. Off uses only the selected folder. The same seed, the same dropdown, and the same Recursive setting pick the same folder and the same line. Seed 0 or below rolls a new seed from the clock on every image. A fixed seed (1 or higher) repeats that image. An empty `!gen.txt` error names the folder. Infinite skips that image and continues.
+**Use this prompt** and **Use selected prompt folder** sit on one line. **Single prompt** under them sends the whole box as one prompt when ticked, line breaks included. Unticked, the box is read as multiple prompts, the same way as a `!gen.txt` file, and one prompt is chosen. **Additional Positive** is appended to that prompt either way. Either way, a typed prompt writes to the style output root. A prompt folder queues one line from a `!gen.txt`. **Select… [Randomize]** (no folder) picks a folder from the seed. **Recursive**, on the Prompt folder line, includes that folder and sub-folders that have `!gen.txt`. Off uses only the selected folder. The same seed, the same dropdown, and the same Recursive setting pick the same folder and the same line. Seed 0 or below rolls a new seed from the clock on every image. A fixed seed (1 or higher) repeats that image. An empty `!gen.txt` error names the folder. Infinite skips that image and continues.
 
 ### 65. What do Once and Infinite do?
 
@@ -3572,7 +3578,7 @@ Yes. It reads the editor draft, not a separate copy on disk. Apply writes into t
 
 ### 86. Which Civitai site should I pick?
 
-**Settings → Civitai → Site**. `civitai.com` is the SFW-oriented catalog. `civitai.red` is the NSFW catalog, and its Browse lists mature models only. The choice selects the API and the account for **models**. Images and Videos have their own **SFW only / SFW + NSFW / NSFW only** filter. Create the API key on the same site you selected.
+**Settings → Civitai → Site**. `civitai.com` is the SFW-oriented catalog. `civitai.red` is the NSFW catalog. Its Browse lists R and above and leaves out PG and PG-13, including models whose `nsfw` flag is off. **All** + **Newest** uses the same type, base model, and Newest query as the website, with PG and PG-13 skipped. The choice selects the API and the account for **models**. Images and Videos have their own **SFW only / SFW + NSFW / NSFW only** filter. Create the API key on the same site you selected.
 
 ### 87. Do I need an API key to browse?
 
@@ -3743,6 +3749,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 - `[TESTING]` forces that line, then is stripped before substitution and expansion.
 - `[xN]`, `[W=N]`, `[WEIGHT=N]` with integer N duplicate the line N times for weighted picking, then the tag is stripped.
 - Recursive sits on the Prompt folder label. Off: only the selected folder’s `!gen.txt`. On: that folder and sub-folders that have `!gen.txt`.
+- **Single prompt** sits under **Use this prompt** and **Use selected prompt folder**. Ticked, the prompt box is one prompt, line breaks included. Unticked, the box is decoded like a `!gen.txt` file, and one prompt is chosen. **Additional Positive** is appended to that prompt either way. The saved default is unticked.
 
 ## Generation modes and benchmark
 
@@ -3773,7 +3780,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 
 ## Civitai and Hugging Face
 
-- Model API host is per library: `civitai.com` (SFW-oriented) or `civitai.red` (NSFW). A `civitai.red` library’s Browse lists mature models only; models the API marks safe are left out of that index. **Include NSFW** does not add them. Images/Videos content filter is separate: SFW only / SFW + NSFW / NSFW only.
+- Model API host is per library: `civitai.com` (SFW-oriented) or `civitai.red` (NSFW). A `civitai.red` library’s Browse lists R and above and leaves out PG and PG-13, even when the API `nsfw` flag is off. **Include NSFW** does not add PG or PG-13. **All** + **Newest** uses the same type, base model, and Newest query as the website, with PG and PG-13 skipped. Images/Videos content filter is separate: SFW only / SFW + NSFW / NSFW only.
 - Package version in this tree is **0.10.0**. Generation family is `krea2` or `sdxl`. Browse SDXL families are All, SDXL, Pony, Illustrious, and NoobAI, enabled per library (`enabledSdxlFamilies`). NoobAI is a Browse family. It uses the SDXL generation graph when that library’s family is SDXL. There is no separate NoobAI workflow file.
 - Browse tip-check **+N new** counts models that match the open Browse filters (base model, SDXL family chip, and category). Those cards are placed at the front and the grid scrolls to the top when the count is non-zero. Pony, Illustrious, NoobAI, and plain SDXL each have their own count. Models for another family stay in the catalog and show when that family chip is selected. Category chips work the same way. Installed, archived, Maybe, and Notify stay off Browse.
 - Browse works without an API key. Downloads often 401 without a key created on the same site.

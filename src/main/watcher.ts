@@ -3,6 +3,7 @@ import type { FSWatcher } from 'node:fs';
 import { BrowserWindow } from 'electron';
 import { IPC } from '../shared/contracts.js';
 import { libraryService } from './libraryService.js';
+import { isGenerationActive, onGenerationIdle } from './generationActivity.js';
 
 let watcher: FSWatcher | null = null;
 let debounce: ReturnType<typeof setTimeout> | null = null;
@@ -10,7 +11,18 @@ let suppressUntil = 0;
 const pendingPaths = new Set<string>();
 let pendingUnknown = false;
 
+function isLibraryContentEvent(relativePath: string): boolean {
+  const base = relativePath.split('/').pop() ?? relativePath;
+  if (!base || base === '.' || base === '..') return false;
+  if (base.startsWith('!')) return false;
+  if (/\.(png|jpe?g|webp|gif|bmp|avif|safetensors|ckpt|pt|bin|tmp)$/i.test(base)) {
+    return false;
+  }
+  return true;
+}
+
 function broadcast(): void {
+  if (isGenerationActive()) return;
   if (pendingUnknown) {
     libraryService.invalidateContentCache();
   } else {
@@ -28,7 +40,11 @@ function broadcast(): void {
 function schedule(filename: string | Buffer | null | undefined): void {
   if (Date.now() < suppressUntil) return;
   if (typeof filename === 'string' && filename.trim()) {
-    pendingPaths.add(filename.replace(/\\/g, '/'));
+    const rel = filename.replace(/\\/g, '/');
+    // Images and weights saved under the library are not wildcard text.
+    // Invalidating the whole tree for each of those writes froze generation.
+    if (!isLibraryContentEvent(rel)) return;
+    pendingPaths.add(rel);
   } else {
     pendingUnknown = true;
   }
@@ -80,3 +96,8 @@ export const folderWatcher = {
     suppressUntil = Math.max(suppressUntil, Date.now() + durationMs);
   },
 };
+
+onGenerationIdle(() => {
+  if (pendingPaths.size === 0 && !pendingUnknown) return;
+  broadcast();
+});

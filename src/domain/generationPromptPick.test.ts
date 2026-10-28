@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   pickFolderBySeed,
   pickGenerationPrompt,
+  appendAdditionalPositive,
   promptsForFileExpand,
   randomFixedGenerationSeed,
   resolveGenerationSeed,
@@ -59,6 +60,17 @@ describe('pickGenerationPrompt', () => {
     });
   }
 
+  it('sends the typed box as one prompt when Single prompt is on', () => {
+    const picked = pick({
+      promptSource: 'text',
+      promptSingle: true,
+      promptText: 'plain line\n[TESTING] debug line',
+      relativeFolder: '',
+    });
+    expect(picked.line).toBe('plain line\n[TESTING] debug line');
+    expect(picked.relativeFolder).toBe('_manual');
+  });
+
   it('uses the typed prompt and prefers [TESTING]', () => {
     const picked = pick({
       promptSource: 'text',
@@ -114,5 +126,20 @@ describe('promptsForFileExpand', () => {
     expect(
       promptsForFileExpand('# note\n[TESTING] alpha\n\nbeta\n, more\n[x2] gamma'),
     ).toEqual(['alpha', 'beta, more', 'gamma', 'gamma']);
+  });
+});
+
+describe('appendAdditionalPositive', () => {
+  it('appends the additional field to a multi-line prompt', () => {
+    expect(
+      appendAdditionalPositive(
+        'first paragraph\n\nsecond paragraph # note',
+        '4k, ultra-detailed',
+      ),
+    ).toBe('first paragraph\n\nsecond paragraph # note, 4k, ultra-detailed');
+  });
+
+  it('keeps the prompt when the additional field is empty', () => {
+    expect(appendAdditionalPositive('one prompt', '  ')).toBe('one prompt');
   });
 });

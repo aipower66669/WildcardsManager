@@ -80,7 +80,7 @@ import {
   collectAutoV2HashesFromVersions,
 } from '../domain/modelHash.js';
 import { CATALOG_PAGE_SIZE } from '../domain/civitaiCatalogLayout.js';
-import { civitaiRedKeepsModel } from '../domain/civitaiNsfw.js';
+import { civitaiRedKeepsModel, CIVITAI_BROWSE_TIP_RULE, CIVITAI_NEWEST_QUIET_PAGE_STREAK, CIVITAI_NEWEST_TIP_PAGE_CAP } from '../domain/civitaiNsfw.js';
 import { startModelHashWarm } from './modelHashWarm.js';
 import { prioritizeActiveLibraryPreviews } from './modelFilesService.js';
 import {
@@ -388,6 +388,8 @@ function overlayCardFields(
     name: string;
     type: string;
     nsfw: boolean;
+    /** Civitai browsing-level bitmask. Absent on cards stored before this field. */
+    nsfwLevel?: number;
     creator?: string;
     tags: string[];
     baseModel?: string;
@@ -599,9 +601,14 @@ function overlayCardFields(
 }
 
 function modelPublishedAt(model: CivitaiModel): string | undefined {
-  const version = model.modelVersions?.[0];
-  const raw = version?.publishedAt ?? version?.createdAt;
-  return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+  let bestMs = 0;
+  for (const version of model.modelVersions ?? []) {
+    const raw = version?.publishedAt ?? version?.createdAt;
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    const ms = Date.parse(raw);
+    if (Number.isFinite(ms) && ms > bestMs) bestMs = ms;
+  }
+  return bestMs > 0 ? new Date(bestMs).toISOString() : undefined;
 }
 
 function toCard(
@@ -623,6 +630,10 @@ function toCard(
       name: model.name,
       type: model.type,
       nsfw: Boolean(model.nsfw),
+      nsfwLevel:
+        typeof model.nsfwLevel === 'number' && Number.isFinite(model.nsfwLevel)
+          ? Math.round(model.nsfwLevel)
+          : undefined,
       creator: model.creator?.username,
       tags: Array.isArray(model.tags) ? model.tags : [],
       baseModel: version?.baseModel,
@@ -664,6 +675,10 @@ function toCachedModel(model: CivitaiModel): CachedCivitaiModel {
     name: model.name,
     type: model.type,
     nsfw: Boolean(model.nsfw),
+    nsfwLevel:
+      typeof model.nsfwLevel === 'number' && Number.isFinite(model.nsfwLevel)
+        ? Math.round(model.nsfwLevel)
+        : undefined,
     creator: model.creator?.username,
     tags: Array.isArray(model.tags) ? model.tags : [],
     baseModel: version?.baseModel,
@@ -706,6 +721,7 @@ function cachedToCard(
       name: cached.name,
       type: cached.type,
       nsfw: cached.nsfw,
+      nsfwLevel: cached.nsfwLevel,
       creator: cached.creator,
       tags: cached.tags,
       baseModel: cached.baseModel,
@@ -959,7 +975,9 @@ function applyBrowseFilters(
     }
   }
   if (getCivitaiOrigin() === 'https://civitai.red') {
-    filtered = filtered.filter((item) => civitaiRedKeepsModel(item.nsfw));
+    filtered = filtered.filter((item) =>
+      civitaiRedKeepsModel(item.nsfw, item.nsfwLevel),
+    );
   }
   const enabledCategories = getActiveLibrary()
     .enabledCivitaiCategories as CivitaiModelCategoryId[];
@@ -1057,7 +1075,7 @@ function pruneRedBrowseSlice(sliceKey: string, origin: string): void {
   retainCatalogSliceIds(sliceKey, (id) => {
     const model = getCachedModel(origin, id);
     if (!model) return true;
-    return civitaiRedKeepsModel(model.nsfw);
+    return civitaiRedKeepsModel(model.nsfw, model.nsfwLevel);
   });
 }
 
@@ -1317,10 +1335,10 @@ function syncAllSliceExhaustedFlag(opts: {
 }
 
 /**
- * Sync one tagged category slice. Progress counters live on `sync`;
- * `reportSliceKey` is what the UI is watching (may be the All key).
- * New ids are also mirrored into the untagged All slice so All browse
- * stays fresh without an untagged API crawl.
+ * Sync one slice. Progress counters live on `sync`.
+ * All Browse is one untagged Newest query (type + base model), the same
+ * list as the website. A category chip still queries that tag, then the
+ * grid filters the All index by the model's tags.
  */
 async function syncTaggedCategorySlice(opts: {
   type: CivitaiModelTypeDto;
@@ -1329,6 +1347,11 @@ async function syncTaggedCategorySlice(opts: {
   /** Browse chip the user is looking at. Null is All categories. */
   viewCategory?: CivitaiModelCategoryIdDto | null;
   category: CivitaiModelCategoryIdDto;
+  /**
+   * All Browse. One untagged Newest query, same filters as the website
+   * (type + base model + Newest), instead of merging fourteen tag feeds.
+   */
+  untagged?: boolean;
   requestedMode: 'auto' | 'incremental' | 'fill';
   force?: boolean;
   sync: ActiveSync;
@@ -1339,13 +1362,6 @@ async function syncTaggedCategorySlice(opts: {
 }): Promise<'done' | 'cancelled' | 'error'> {
   const origin = getCivitaiOrigin();
   const architectures = opts.architectures;
-  const dataSliceKey = buildCatalogSliceKey({
-    origin,
-    type: opts.type,
-    category: opts.category,
-    architectures,
-    query: '',
-  });
   const allSliceKey = buildCatalogSliceKey({
     origin,
     type: opts.type,
@@ -1353,6 +1369,15 @@ async function syncTaggedCategorySlice(opts: {
     architectures,
     query: '',
   });
+  const dataSliceKey = opts.untagged
+    ? allSliceKey
+    : buildCatalogSliceKey({
+        origin,
+        type: opts.type,
+        category: opts.category,
+        architectures,
+        query: '',
+      });
   pruneRedBrowseSlice(allSliceKey, origin);
   pruneRedBrowseSlice(dataSliceKey, origin);
 
@@ -1380,8 +1405,10 @@ async function syncTaggedCategorySlice(opts: {
   opts.sync.mode = mode;
 
   // Idle tip-check cooldown (Settings → Civitai auto-sync interval).
-  // Incomplete fills still run; force bypasses the interval.
-  if (mode === 'incremental' && !opts.force) {
+  // A slice that has not finished the current tip rule still walks, so a
+  // keep-rule change is not skipped because this morning's check already ran.
+  const tipRuleStale = (stats.browseRule ?? 0) < CIVITAI_BROWSE_TIP_RULE;
+  if (mode === 'incremental' && !opts.force && !tipRuleStale) {
     const intervalMin = getCivitaiCatalogAutoSyncIntervalMinutes();
     if (intervalMin <= 0) {
       opts.sync.lastPageAdded = 0;
@@ -1418,7 +1445,7 @@ async function syncTaggedCategorySlice(opts: {
           sdxlFamilies: sdxlFamiliesForApi,
         })
       : undefined;
-  const tag = modelCategoryTag(opts.category);
+  const tag = opts.untagged ? undefined : modelCategoryTag(opts.category);
   const visibleOnThisBrowse = (
     models: CachedCivitaiModel[],
     ids: number[],
@@ -1429,7 +1456,7 @@ async function syncTaggedCategorySlice(opts: {
       if (!model || !familyChipEnabled) return false;
       if (
         origin === 'https://civitai.red' &&
-        !civitaiRedKeepsModel(Boolean(model.nsfw))
+        !civitaiRedKeepsModel(Boolean(model.nsfw), model.nsfwLevel)
       ) {
         return false;
       }
@@ -1492,6 +1519,10 @@ async function syncTaggedCategorySlice(opts: {
 
   const knownIds = getSliceIdKnownSet(dataSliceKey);
   const filling = mode === 'fill';
+  const alignAllTip = dataSliceKey === allSliceKey && !filling;
+  const tipKept: CachedCivitaiModel[] = [];
+  const tipKnownAtStart = alignAllTip ? new Set(knownIds) : null;
+  let quietPages = 0;
   let cursor: string | undefined =
     filling && typeof stats.nextCursor === 'string' && stats.nextCursor
       ? stats.nextCursor
@@ -1512,20 +1543,20 @@ async function syncTaggedCategorySlice(opts: {
       opts.sync.pagesFetched += 1;
       opts.sync.lastPageReceived = result.items.length;
 
-      const pageIds = result.items.map((m) => m.id);
-      const indexIds =
+      const keptModels =
         origin === 'https://civitai.red'
-          ? result.items
-              .filter((model) => civitaiRedKeepsModel(Boolean(model.nsfw)))
-              .map((model) => model.id)
-          : pageIds;
-      const allKnown =
-        pageIds.length > 0 && pageIds.every((id) => knownIds.has(id));
+          ? result.items.filter((model) =>
+              civitaiRedKeepsModel(Boolean(model.nsfw), model.nsfwLevel),
+            )
+          : result.items;
+      // Keep the API's Newest order. That is the website list (PG/PG-13
+      // already removed on civitai.red).
+      const indexIds = keptModels.map((model) => model.id);
 
-      // Always merge the tip page — known IDs can still carry newer versionId /
-      // version snapshots. Exiting before insert missed checkpoint updates.
-      // Stamp the tag this page was queried with. The list payload often omits
-      // it, and Browse category chips hide a model that does not carry the tag.
+      // Always merge the page — known IDs can still carry newer version
+      // snapshots. Stamp the tag this page was queried with. The list payload
+      // often omits it, and Browse category chips hide a model that does not
+      // carry the tag.
       const cached = result.items.map((model) => {
         const row = toCachedModel(model);
         if (!tag) return row;
@@ -1533,31 +1564,12 @@ async function syncTaggedCategorySlice(opts: {
         return tags.length === row.tags.length ? row : { ...row, tags };
       });
       insertCachedModelsIfAbsent(cached);
-
-      if (!filling && allKnown) {
-        const now = new Date().toISOString();
-        // Already stored under this category. Re-counting the Newest page
-        // made “+N new” include other families and cards already on screen.
-        // If Browse's All index never received an id, place it now. Only ids
-        // that pass this chip are part of +N. Other families are stored too
-        // and show when that family chip is selected.
-        const inAll = getSliceIdKnownSet(allSliceKey);
-        const missingFromAll = indexIds.filter((id) => !inAll.has(id));
-        const surfaced =
-          missingFromAll.length > 0
-            ? placeOnAll(cached, missingFromAll, now)
-            : 0;
-        if (missingFromAll.length === 0) {
-          updateCatalogSlice(allSliceKey, { lastSyncedAt: now });
+      if (alignAllTip) {
+        const byId = new Map(cached.map((model) => [model.id, model]));
+        for (const id of indexIds) {
+          const row = byId.get(id);
+          if (row) tipKept.push(row);
         }
-        updateCatalogSlice(dataSliceKey, {
-          lastSyncedAt: now,
-          ...(isTipPage ? { tipPageIds: indexIds } : {}),
-        });
-        opts.sync.lastPageAdded = surfaced;
-        opts.sync.addedThisRun += surfaced;
-        opts.emit('syncing');
-        return 'done';
       }
 
       const newIds: number[] = [];
@@ -1585,7 +1597,7 @@ async function syncTaggedCategorySlice(opts: {
       // in All (another category, or an older page) but missing here must
       // move to that front — otherwise “+N new” never shows up in the grid.
       let surfaced = 0;
-      if (filling) {
+      if (!alignAllTip && filling) {
         updateCatalogSlice(dataSliceKey, {
           appendIds: newIds,
           appendHays,
@@ -1611,13 +1623,23 @@ async function syncTaggedCategorySlice(opts: {
             architectures,
           });
         }
-      } else {
+      } else if (!alignAllTip) {
         updateCatalogSlice(dataSliceKey, {
           prependIds: newIds,
           lastSyncedAt: now,
           ...(isTipPage ? { tipPageIds: indexIds } : {}),
         });
-        if (newIds.length > 0) {
+        if (dataSliceKey !== allSliceKey) {
+          const inAll = getSliceIdKnownSet(allSliceKey);
+          const missingFromAll = indexIds.filter((id) => !inAll.has(id));
+          if (missingFromAll.length > 0) {
+            surfaced = placeOnAll(cached, missingFromAll, now);
+          } else if (newIds.length > 0) {
+            surfaced = placeOnAll(cached, newIds, now);
+          } else {
+            updateCatalogSlice(allSliceKey, { lastSyncedAt: now });
+          }
+        } else if (newIds.length > 0) {
           surfaced = placeOnAll(cached, newIds, now);
         } else {
           updateCatalogSlice(allSliceKey, { lastSyncedAt: now });
@@ -1627,7 +1649,6 @@ async function syncTaggedCategorySlice(opts: {
       opts.sync.addedThisRun += surfaced;
 
       opts.emit('syncing');
-      // Preview downloads are active-library scoped — do not queue every sync card.
 
       if (!nextCursor) {
         updateCatalogSlice(dataSliceKey, {
@@ -1639,11 +1660,16 @@ async function syncTaggedCategorySlice(opts: {
           type: opts.type,
           architectures,
         });
-        return 'done';
+        break;
       }
 
-      if (!filling && newIds.length === 0) {
-        return 'done';
+      if (!filling) {
+        if (newIds.length === 0) quietPages += 1;
+        else quietPages = 0;
+        // Newest pages mix older models ahead of newer ones. Stopping on the
+        // first already-known page left the rest of the website list out.
+        if (quietPages >= CIVITAI_NEWEST_QUIET_PAGE_STREAK) break;
+        if (opts.sync.pagesFetched >= CIVITAI_NEWEST_TIP_PAGE_CAP) break;
       }
 
       cursor = nextCursor;
@@ -1651,7 +1677,38 @@ async function syncTaggedCategorySlice(opts: {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
 
-    return 'cancelled';
+    if (alignAllTip && tipKept.length > 0 && !opts.sync.cancelled) {
+      const seen = new Set<number>();
+      const ordered: CachedCivitaiModel[] = [];
+      for (const model of tipKept) {
+        if (seen.has(model.id)) continue;
+        seen.add(model.id);
+        ordered.push(model);
+      }
+      const orderedIds = ordered.map((model) => model.id);
+      const now = new Date().toISOString();
+      updateCatalogSlice(allSliceKey, {
+        prependIds: orderedIds,
+        lastSyncedAt: now,
+        tipPageIds: orderedIds.slice(0, SYNC_PAGE_LIMIT),
+      });
+      const surfaced = visibleOnThisBrowse(
+        ordered,
+        orderedIds.filter((id) => !tipKnownAtStart?.has(id)),
+      ).length;
+      opts.sync.lastPageAdded = surfaced;
+      opts.sync.addedThisRun += surfaced;
+      opts.emit('syncing');
+    }
+
+    if (!opts.sync.cancelled) {
+      updateCatalogSlice(dataSliceKey, {
+        browseRule: CIVITAI_BROWSE_TIP_RULE,
+        lastSyncedAt: new Date().toISOString(),
+      });
+    }
+
+    return opts.sync.cancelled ? 'cancelled' : 'done';
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     opts.emit('error', message);
@@ -1714,7 +1771,7 @@ export async function syncCatalogSlice(
     return payload;
   }
 
-  // "All" syncs each enabled category (never an untagged crawl).
+  // "All" is one untagged Newest query. A selected category still syncs that tag.
   const categoriesToSync: CivitaiModelCategoryIdDto[] =
     reportCategory == null
       ? [...enabled]
@@ -1729,20 +1786,14 @@ export async function syncCatalogSlice(
     seedEmptyCatalogSlice(reportSliceKey);
   }
 
-  // Avoid a “Checking for new models…” flash when every category is within the
-  // idle tip-check interval (and none still need a fill backfill).
+  // Avoid a “Checking for new models…” flash when this slice is within the
+  // idle tip-check interval (and does not still need a fill).
   if (requested !== 'fill' && !force) {
     const intervalMin = getCivitaiCatalogAutoSyncIntervalMinutes();
-    const anyWork = categoriesToSync.some((category) => {
-      const dataSliceKey = buildCatalogSliceKey({
-        origin,
-        type: params.type,
-        category,
-        architectures,
-        query: '',
-      });
-      const stats = getCatalogSliceStats(dataSliceKey);
+    const sliceDue = (key: string): boolean => {
+      const stats = getCatalogSliceStats(key);
       const needsFill = stats.idCount === 0 || !stats.exhausted;
+      if ((stats.browseRule ?? 0) < CIVITAI_BROWSE_TIP_RULE) return true;
       if (requested === 'auto' && needsFill) return true;
       if (intervalMin <= 0) return false;
       const lastMs = stats.lastSyncedAt
@@ -1750,7 +1801,21 @@ export async function syncCatalogSlice(
         : Number.NaN;
       if (!Number.isFinite(lastMs)) return true;
       return Date.now() - lastMs >= intervalMin * 60_000;
-    });
+    };
+    const anyWork =
+      reportCategory == null
+        ? sliceDue(reportSliceKey)
+        : categoriesToSync.some((category) =>
+            sliceDue(
+              buildCatalogSliceKey({
+                origin,
+                type: params.type,
+                category,
+                architectures,
+                query: '',
+              }),
+            ),
+          );
     if (!anyWork) {
       // Keep All.exhausted aligned even when we skip API work this tick.
       if (reportCategory == null) {
@@ -1828,7 +1893,29 @@ export async function syncCatalogSlice(
 
   try {
     let outcome: 'done' | 'cancelled' | 'error' = 'done';
-    for (const category of categoriesToSync) {
+    const passes: Array<{
+      category: CivitaiModelCategoryIdDto;
+      untagged?: boolean;
+      requestedMode: 'auto' | 'incremental' | 'fill';
+    }> =
+      reportCategory == null
+        ? [
+            {
+              // All matches the website query: type + base model + Newest.
+              category: categoriesToSync[0] ?? 'character',
+              untagged: true,
+              requestedMode:
+                requested === 'fill' ||
+                getCatalogSliceStats(reportSliceKey).idCount === 0
+                  ? 'fill'
+                  : 'incremental',
+            },
+          ]
+        : categoriesToSync.map((category) => ({
+            category,
+            requestedMode: requested,
+          }));
+    for (const passOpts of passes) {
       if (sync.cancelled) {
         outcome = 'cancelled';
         break;
@@ -1838,8 +1925,9 @@ export async function syncCatalogSlice(
         architectures,
         sdxlFamily: params.sdxlFamily,
         viewCategory: reportCategory,
-        category,
-        requestedMode: requested,
+        category: passOpts.category,
+        untagged: passOpts.untagged,
+        requestedMode: passOpts.requestedMode,
         force,
         sync,
         emit,

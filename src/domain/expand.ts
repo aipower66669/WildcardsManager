@@ -23,6 +23,16 @@ export type ExpandInput = {
    * random sample; counting a deep wildcard tree blocks the UI for seconds.
    */
   countCombinations?: boolean;
+  /**
+   * Prompt bodies to expand. When set, the root file is not split into
+   * lines, so a line break stays inside that one prompt.
+   */
+  templates?: string[];
+  /**
+   * Library index from an earlier build. When set, `files` is ignored.
+   * Generation keeps one index and expands each image against it.
+   */
+  index?: LibraryIndex;
 };
 
 export type ExpandResult = {
@@ -95,6 +105,13 @@ function activeLines(text: string): string[] {
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l.length > 0 && !l.startsWith('#'));
+}
+
+/** One prompt per entry. Line breaks inside an entry stay in that prompt. */
+function templateLines(templates: string[]): string[] {
+  return templates
+    .map((line) => line.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim())
+    .filter((line) => line.length > 0);
 }
 
 function cleanup(text: string): string {
@@ -548,7 +565,7 @@ function toKey(relativePath: string): string {
 }
 
 export function expandPrompts(input: ExpandInput): ExpandResult {
-  const index = buildLibraryIndex(input.files);
+  const index = input.index ?? buildLibraryIndex(input.files);
   const rootKey = toKey(input.rootRelativePath);
   const rootFile =
     index.byKey.get(rootKey) ?? index.byKeyLower.get(rootKey.toLowerCase());
@@ -581,7 +598,7 @@ export function expandPrompts(input: ExpandInput): ExpandResult {
     issues: [...issueMap.values()],
   });
 
-  if (!rootFile) {
+  if (!rootFile && input.templates == null) {
     addIssue({
       severity: 'error',
       code: 'missing_file',
@@ -590,15 +607,20 @@ export function expandPrompts(input: ExpandInput): ExpandResult {
     return baseResult([], 0, false, input.mode === 'random' ? (input.seed ?? 0) : null);
   }
 
-  const rootLines = isStructured(rootFile.ext)
-    ? (index.structuredDocuments
-        .get(rootFile.key)
-        ?.entries.flatMap((entry) =>
-          entry.values.map((value) => value.text),
-        ) ?? [])
-    : activeLines(rootFile.text);
-  for (const issue of index.structuredDocuments.get(rootFile.key)?.issues ?? []) {
-    addIssue(issue);
+  const rootLines =
+    input.templates != null
+      ? templateLines(input.templates)
+      : isStructured(rootFile!.ext)
+        ? (index.structuredDocuments
+            .get(rootFile!.key)
+            ?.entries.flatMap((entry) =>
+              entry.values.map((value) => value.text),
+            ) ?? [])
+        : activeLines(rootFile!.text);
+  if (rootFile) {
+    for (const issue of index.structuredDocuments.get(rootFile.key)?.issues ?? []) {
+      addIssue(issue);
+    }
   }
   const countCombinations = input.countCombinations !== false;
   let total = 0;

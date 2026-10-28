@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildLibraryIndex } from './resolveWildcard.js';
 import {
   expandPrompts,
   forEachSimulatedPromptLine,
@@ -98,6 +99,56 @@ describe('expandPrompts — exhaustive', () => {
 });
 
 describe('expandPrompts — random', () => {
+  it('keeps every line of one template instead of picking a line', () => {
+    const body = 'first paragraph\n\n# keep this line\nsecond paragraph';
+    const files = [file('root', 'alpha\nbeta')];
+    const result = expandPrompts({
+      rootRelativePath: 'root.txt',
+      files,
+      mode: 'random',
+      seed: 1,
+      limit: 1,
+      countCombinations: false,
+      templates: [body],
+    });
+    expect(result.samples).toEqual([body]);
+  });
+
+  it('expands a wildcard inside a multiline template and keeps the other lines', () => {
+    const files = [file('root', 'ignored'), file('color', 'red\nblue')];
+    const result = expandPrompts({
+      rootRelativePath: 'root.txt',
+      files,
+      mode: 'random',
+      seed: 2,
+      limit: 1,
+      countCombinations: false,
+      templates: ['top\n__color__\nbottom'],
+    });
+    expect(result.samples).toHaveLength(1);
+    const sample = result.samples[0] ?? '';
+    expect(sample.startsWith('top\n')).toBe(true);
+    expect(sample.endsWith('\nbottom')).toBe(true);
+    expect(sample === 'top\nred\nbottom' || sample === 'top\nblue\nbottom').toBe(
+      true,
+    );
+  });
+
+  it('expands templates from a prebuilt index without a root file', () => {
+    const index = buildLibraryIndex([file('color', 'red')]);
+    const result = expandPrompts({
+      rootRelativePath: '__wcm_gen_line__.txt',
+      files: [],
+      index,
+      mode: 'random',
+      seed: 1,
+      limit: 1,
+      countCombinations: false,
+      templates: ['a __color__ car'],
+    });
+    expect(result.samples).toEqual(['a red car']);
+  });
+
   it('is deterministic for a fixed seed', () => {
     const files = [
       file('root', '{a|b|c|d} __thing__'),
