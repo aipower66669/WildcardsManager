@@ -119,6 +119,29 @@ describe('pickGenerationPrompt', () => {
     expect(first.relativeFolder).toBe(pickFolderBySeed(folders, 7));
     expect(first.line).toBe(`line ${first.relativeFolder}`);
   });
+
+  it('picks different lines inside one Randomize folder', () => {
+    const folders = Array.from({ length: 40 }, (_, i) => `cat-${i}`);
+    const prompts = Array.from({ length: 25 }, (_, i) => `line ${i}`);
+    const byFolder = new Map<string, Set<string>>();
+    for (let seed = 1; seed <= 4000; seed += 1) {
+      const picked = pickGenerationPrompt({
+        promptSource: 'folder',
+        promptText: '',
+        relativeFolder: '',
+        recursive: false,
+        seed,
+        listAllFolders: () => folders,
+        listFoldersUnder: () => [],
+        loadLines: () => prompts,
+      });
+      const seen = byFolder.get(picked.relativeFolder) ?? new Set<string>();
+      seen.add(picked.line);
+      byFolder.set(picked.relativeFolder, seen);
+    }
+    const stuck = [...byFolder.entries()].filter(([, lines]) => lines.size < 2);
+    expect(stuck).toEqual([]);
+  });
 });
 
 describe('promptsForFileExpand', () => {

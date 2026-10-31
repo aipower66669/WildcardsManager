@@ -293,7 +293,9 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   Positive** is appended to that prompt either way. **Recursive** sits on the Prompt folder line. With a
   folder selected, on includes that folder and sub-folders that have
   `!gen.txt`; off uses only that folder. **Select… [Randomize]** (no folder)
-  picks a folder from the seed.
+  picks a folder from the seed, then a prompt from that file with the next
+  roll of the same seed. A later image that lands on the same folder can
+  pick a different line.
 - Style profiles (**Realistic** / **Anime** / **3D**). The middle button says
   **Anime**. Library Manager names that profile’s output folder **Generation
   output (Hentai)** and stores the id `hentai`. Those three styles share the

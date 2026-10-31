@@ -183,7 +183,7 @@ WildcardsManager-<version>-<os>-<arch>.<ext>
 ```
 
 Local `npm run dist` / `dist:win` / `dist:mac` / `dist:linux` **auto-increment
-the patch** (`0.10.0` → `0.10.1`) before building so in-app **Check for update**
+the patch** (`0.11.0` → `0.11.1`) before building so in-app **Check for update**
 sees a newer installer, then **delete older** `WildcardsManager-*` artifacts in
 `release/` (keeps only the current version’s `.exe` / `.blockmap` / etc.). CI
 skips the bump (`GITHUB_ACTIONS` / `CI`) so tagged releases keep the version
@@ -226,8 +226,8 @@ Before tagging:
 5. create and push the tag:
 
    ```powershell
-   git tag v0.10.0
-   git push origin v0.10.0
+   git tag v0.11.0
+   git push origin v0.11.0
    ```
 
 `CHANGELOG.md` is the permanent version history and follows Keep a Changelog.

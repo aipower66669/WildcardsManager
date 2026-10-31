@@ -201,7 +201,7 @@ dumps (real LoRA trees, prompt folders, or model catalogs).
 
 ## Releases
 
-See the [release notes](RELEASE_NOTES.md) for **v0.10** (SDXL families in Browse, and each library’s own catalog, shelves, and Generation settings) and the
+See the [release notes](RELEASE_NOTES.md) for **v0.11** (civitai.red Browse keeps R and above, and Generation stays responsive) and the
 [changelog](CHANGELOG.md) for the complete version history.
 
 ## License

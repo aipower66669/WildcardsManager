@@ -156,16 +156,31 @@ export function appendGenPromptIfMissing(
   return { content: next, added: true, alreadyExists: false };
 }
 
+const MULBERRY32_INCREMENT = 0x6d2b79f5;
+
 /** Seeded PRNG in [0, 1). Same seed → same sequence. */
 export function createMulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
+    a = (a + MULBERRY32_INCREMENT) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/**
+ * Seed whose first draw is the draw after `draws` calls of
+ * `createMulberry32(seed)`.
+ */
+export function mulberry32SeedAfter(seed: number, draws: number): number {
+  let a = seed >>> 0;
+  const steps = Math.max(0, Math.floor(draws));
+  for (let i = 0; i < steps; i += 1) {
+    a = (a + MULBERRY32_INCREMENT) | 0;
+  }
+  return a >>> 0;
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   chooseGenPrompt,
   createMulberry32,
   decodeGenPrompts,
+  mulberry32SeedAfter,
   pickGenPrompt,
   stripTestingGenTag,
 } from './genPrompts.js';
@@ -51,8 +52,10 @@ export type GenerationPromptPick = {
 
 /**
  * Same folder and line selection as one Generation job.
- * Randomize and Recursive each draw one folder from `seed`. Nothing is
- * remembered from the previous image.
+ * Randomize and Recursive each draw one folder from the first roll of `seed`.
+ * The line in that file uses the next roll, so one category is not stuck on
+ * one prompt. A specific folder with Recursive off still uses the first roll
+ * for the line. Nothing is remembered from the previous image.
  */
 export function pickGenerationPrompt(input: {
   promptSource: 'text' | 'folder';
@@ -86,12 +89,14 @@ export function pickGenerationPrompt(input: {
   }
 
   let folder = input.relativeFolder.trim();
+  let folderFromSeed = false;
   if (!folder) {
     const choices = input.listAllFolders();
     if (choices.length === 0) {
       throw new Error('No prompt folders with !gen.txt to randomize');
     }
     folder = pickFolderBySeed(choices, input.seed);
+    folderFromSeed = true;
   } else if (input.recursive) {
     const parent = folder;
     const choices = input.listFoldersUnder(parent);
@@ -101,10 +106,16 @@ export function pickGenerationPrompt(input: {
       );
     }
     folder = pickFolderBySeed(choices, input.seed);
+    folderFromSeed = true;
   }
+  // Folder and line both used the first roll. Seeds that land in one folder
+  // then share a slice of that roll, so that file's images stay on one line.
+  const lineSeed = folderFromSeed
+    ? mulberry32SeedAfter(input.seed, 1)
+    : input.seed;
   let line: string;
   try {
-    line = pickGenPrompt(input.loadLines(folder), input.seed);
+    line = pickGenPrompt(input.loadLines(folder), lineSeed);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.startsWith('!gen.txt')) {

@@ -54,6 +54,11 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
   v0.10 adds Browse family chips (All, SDXL, Pony, Illustrious, NoobAI) and
   keeps each library’s enabled families, base models, and Civitai categories
   on that library. **+N new** counts the open family and category.
+  v0.11 keeps R and above on a civitai.red library when Civitai’s `nsfw` flag
+  is off, and **All** + **Newest** follows that website query for the open
+  type and base model. Generation stays responsive while images run. **Single
+  prompt** sends the whole prompt box as one prompt. **Additional Positive**
+  is appended to that prompt.
   Sampler and Scheduler show the Comfy name, underscores included. Generation
   parameters and Options are saved per library and per style.
 - **Civitai Images and Videos** browse/download/archive + background Download

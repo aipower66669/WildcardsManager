@@ -7,6 +7,15 @@ and uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Infinite with **Select… [Randomize]** was stuck on one line of each
+  `!gen.txt`. The folder and the line both used the first roll of the seed,
+  so every image that landed in one category repeated that prompt. The line
+  now uses the next roll.
+
+## [0.11.0] - 2026-10-29
+
 ### Added
 
 - Generation **Single prompt**, under **Use this prompt** and **Use selected
@@ -611,7 +620,8 @@ First public release.
 - Mutations validate supported extensions and use atomic replacement.
 - Ambiguous glob references are reported rather than silently rewritten.
 
-[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/aipower66669/WildcardsManager/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/aipower66669/WildcardsManager/compare/v0.9.0...v0.9.3
 [0.9.0]: https://github.com/aipower66669/WildcardsManager/compare/v0.8.0...v0.9.0

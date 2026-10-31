@@ -92,7 +92,7 @@ what you are trying to do.
   examples for diagnostics.
 - [`screenshot.png`](screenshot.png) — README image; replace with a better
   capture without changing links.
-- [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) — current public release (v0.10)
+- [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) — current public release (v0.11)
   overview, installation, and known limitations.
 - [`../CHANGELOG.md`](../CHANGELOG.md) — version-by-version notable changes.
 - [`../LICENSE.md`](../LICENSE.md) — software and sample-library licenses.
@@ -856,7 +856,9 @@ The **Generation** tab queues jobs against a running ComfyUI instance
   Positive** is appended to that prompt either way. **Recursive** sits on the Prompt folder line. With a
   folder selected, on includes that folder and sub-folders that have
   `!gen.txt`; off uses only that folder. **Select… [Randomize]** (no folder)
-  picks a folder from the seed.
+  picks a folder from the seed, then a prompt from that file with the next
+  roll of the same seed. A later image that lands on the same folder can
+  pick a different line.
 - Style profiles (**Realistic** / **Anime** / **3D**). The middle button says
   **Anime**. Library Manager names that profile’s output folder **Generation
   output (Hentai)** and stores the id `hentai`. Those three styles share the
@@ -2875,7 +2877,7 @@ WildcardsManager-<version>-<os>-<arch>.<ext>
 ```
 
 Local `npm run dist` / `dist:win` / `dist:mac` / `dist:linux` **auto-increment
-the patch** (`0.10.0` → `0.10.1`) before building so in-app **Check for update**
+the patch** (`0.11.0` → `0.11.1`) before building so in-app **Check for update**
 sees a newer installer, then **delete older** `WildcardsManager-*` artifacts in
 `release/` (keeps only the current version’s `.exe` / `.blockmap` / etc.). CI
 skips the bump (`GITHUB_ACTIONS` / `CI`) so tagged releases keep the version
@@ -2918,8 +2920,8 @@ Before tagging:
 5. create and push the tag:
 
    ```powershell
-   git tag v0.10.0
-   git push origin v0.10.0
+   git tag v0.11.0
+   git push origin v0.11.0
    ```
 
 `CHANGELOG.md` is the permanent version history and follows Keep a Changelog.
@@ -3020,6 +3022,11 @@ Status key: **Shipped**, **Next**, **Later**, **Considering**.
   v0.10 adds Browse family chips (All, SDXL, Pony, Illustrious, NoobAI) and
   keeps each library’s enabled families, base models, and Civitai categories
   on that library. **+N new** counts the open family and category.
+  v0.11 keeps R and above on a civitai.red library when Civitai’s `nsfw` flag
+  is off, and **All** + **Newest** follows that website query for the open
+  type and base model. Generation stays responsive while images run. **Single
+  prompt** sends the whole prompt box as one prompt. **Additional Positive**
+  is appended to that prompt.
   Sampler and Scheduler show the Comfy name, underscores included. Generation
   parameters and Options are saved per library and per style.
 - **Civitai Images and Videos** browse/download/archive + background Download
@@ -3484,7 +3491,7 @@ ComfyUI is running (or a launch shortcut is set under **Settings → AI**). **Te
 
 ### 64. What is Use this prompt versus a prompt folder?
 
-**Use this prompt** and **Use selected prompt folder** sit on one line. **Single prompt** under them sends the whole box as one prompt when ticked, line breaks included. Unticked, the box is read as multiple prompts, the same way as a `!gen.txt` file, and one prompt is chosen. **Additional Positive** is appended to that prompt either way. Either way, a typed prompt writes to the style output root. A prompt folder queues one line from a `!gen.txt`. **Select… [Randomize]** (no folder) picks a folder from the seed. **Recursive**, on the Prompt folder line, includes that folder and sub-folders that have `!gen.txt`. Off uses only the selected folder. The same seed, the same dropdown, and the same Recursive setting pick the same folder and the same line. Seed 0 or below rolls a new seed from the clock on every image. A fixed seed (1 or higher) repeats that image. An empty `!gen.txt` error names the folder. Infinite skips that image and continues.
+**Use this prompt** and **Use selected prompt folder** sit on one line. **Single prompt** under them sends the whole box as one prompt when ticked, line breaks included. Unticked, the box is read as multiple prompts, the same way as a `!gen.txt` file, and one prompt is chosen. **Additional Positive** is appended to that prompt either way. Either way, a typed prompt writes to the style output root. A prompt folder queues one line from a `!gen.txt`. **Select… [Randomize]** (no folder) picks a folder from the seed, then a prompt from that file with the next roll of the same seed. A later image that lands on the same folder can pick a different line. **Recursive**, on the Prompt folder line, includes that folder and sub-folders that have `!gen.txt`. Off uses only the selected folder. The same seed, the same dropdown, and the same Recursive setting pick the same folder and the same line. Seed 0 or below rolls a new seed from the clock on every image. A fixed seed (1 or higher) repeats that image. An empty `!gen.txt` error names the folder. Infinite skips that image and continues.
 
 ### 65. What do Once and Infinite do?
 
@@ -3740,7 +3747,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 
 - UI seed ≤ 0 or not a finite number → `resolveGenerationSeed` rolls `(Date.now() + counter) >>> 0` every image. The dice button sets −1.
 - The shuffle button writes one integer in `1 .. 0xfffffffe` and leaves it. Later runs keep it.
-- A fixed seed repeats the same image on Once and Infinite. Folder pick is `pickFolderBySeed`: sort the candidate folders, then mulberry32(seed). No folder deck. Empty dropdown = every `!gen.txt` folder. Recursive = the selected folder and descendants. A specific folder with Recursive off uses only that folder.
+- A fixed seed repeats the same image on Once and Infinite. Folder pick is `pickFolderBySeed`: sort the candidate folders, then mulberry32(seed). When that pick chooses the folder (empty dropdown or Recursive), the line uses the next mulberry32 draw (`mulberry32SeedAfter(seed, 1)`), not the same first draw. No folder deck. Empty dropdown = every `!gen.txt` folder. Recursive = the selected folder and descendants. A specific folder with Recursive off uses only that folder, and the line uses the first draw.
 - The Last output crosshair writes only the seed. It does not change the dropdown or Recursive.
 - Empty `!gen.txt` errors are prefixed with the folder. Infinite records the seed, skips, and continues.
 
@@ -3781,7 +3788,7 @@ Applied in the generation queue and in Generation expand preview, after the `[TE
 ## Civitai and Hugging Face
 
 - Model API host is per library: `civitai.com` (SFW-oriented) or `civitai.red` (NSFW). A `civitai.red` library’s Browse lists R and above and leaves out PG and PG-13, even when the API `nsfw` flag is off. **Include NSFW** does not add PG or PG-13. **All** + **Newest** uses the same type, base model, and Newest query as the website, with PG and PG-13 skipped. Images/Videos content filter is separate: SFW only / SFW + NSFW / NSFW only.
-- Package version in this tree is **0.10.0**. Generation family is `krea2` or `sdxl`. Browse SDXL families are All, SDXL, Pony, Illustrious, and NoobAI, enabled per library (`enabledSdxlFamilies`). NoobAI is a Browse family. It uses the SDXL generation graph when that library’s family is SDXL. There is no separate NoobAI workflow file.
+- Package version in this tree is **0.11.0**. Generation family is `krea2` or `sdxl`. Browse SDXL families are All, SDXL, Pony, Illustrious, and NoobAI, enabled per library (`enabledSdxlFamilies`). NoobAI is a Browse family. It uses the SDXL generation graph when that library’s family is SDXL. There is no separate NoobAI workflow file.
 - Browse tip-check **+N new** counts models that match the open Browse filters (base model, SDXL family chip, and category). Those cards are placed at the front and the grid scrolls to the top when the count is non-zero. Pony, Illustrious, NoobAI, and plain SDXL each have their own count. Models for another family stay in the catalog and show when that family chip is selected. Category chips work the same way. Installed, archived, Maybe, and Notify stay off Browse.
 - Browse works without an API key. Downloads often 401 without a key created on the same site.
 - Model tabs: Browse, Queued, Downloaded, Maybe, Archive, Notify me. **Archive shown** archives on-screen cards only.

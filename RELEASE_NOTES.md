@@ -1,93 +1,56 @@
-# Wildcards Manager v0.10
+# Wildcards Manager v0.11
 
-Package version: **0.10.0**  
-Release date: **October 25, 2026**
+Package version: **0.11.0**  
+Release date: **October 29, 2026**
 
-v0.10 generates images with **SDXL**. Pony and Illustrious use that same
-checkpoint. Krea 2 stays as it was. Browse can filter those SDXL families, and
-each library keeps its own catalog, shelves, and Generation settings.
+v0.11 puts the missing civitai.red models back in Browse. Civitai’s `nsfw`
+flag is now only the top tier, so R and X LoRAs and checkpoints were left out
+and the morning Newest check stopped early. Those models are kept. Generation
+also stays responsive while images are running.
 
 The [user guide](docs/user-guide.md) is the complete reference. This note is the
 map.
 
-## SDXL generation
+## Browse on civitai.red
 
-**Library Manager** sets Generation family to **Krea 2** or **SDXL** (default
-Krea 2). Krea 2 keeps Load Diffusion Model, Load CLIP, and Load VAE. An SDXL
-library uses one checkpoint file for SDXL, Pony, and Illustrious. CLIP comes
-from that file, so the CLIP field is hidden. **Options → VAE** replaces the
-packed VAE; blank keeps it. **CLIP skip** defaults to 2. **Upscaler**,
-**Upscale factor** (default 1.5), and **Hires denoise** (default 0.5) run a
-second pass after the base sample. Sampler and Scheduler list every name Comfy
-reports, underscores included. Realistic, Anime, and 3D each keep their own
-checkpoint, size, and Options.
+Browse lists **R and above**. PG and PG-13 stay out, including when the `nsfw`
+flag is off. **Include NSFW** does not add PG or PG-13.
 
-Open `ComfyUI-Workflow/WildcardManager-ComfyUI-SDXL-Generation-Workflow.json`
-in ComfyUI, set the library’s family to SDXL, then **Save Workflow**. Krea 2
-keeps its own graph and its own saved file.
+**All** + **Newest** uses the same type, base model, and Newest query as the
+website. The head of that list follows the website order. **+N new** counts
+models that were not already in that catalog. Open **LoRAs** and **Checkpoints**
+once after upgrading so each index walks the current tip. Images and Videos
+already request R, X, and XXX by browsing level.
 
-## SDXL families in Browse
+## Generation
 
-On an SDXL library, Civitai Browse adds family chips: **All**, **SDXL**,
-**Pony**, **Illustrious**, and **NoobAI**. Library Manager chooses which of
-those families this library includes. **NoobAI** is a Browse family on that
-same SDXL graph.
+The window stays clickable while images run. The wildcard index is reused, the
+Comfy prompt is built off the UI thread, and the Generation form stays put
+while status updates.
 
-**+N new** counts models for the base model, family chip, and category you
-have open. Those cards are placed at the front of that grid. A Pony count is
-Pony. Illustrious, NoobAI, and plain SDXL stay in the catalog and show when
-that chip is selected. Category chips work the same way. Installed, archived,
-Maybe, and Notify stay off Browse.
+**Single prompt**, under **Use this prompt** and **Use selected prompt
+folder**, sends the whole box as one prompt. A prompt can already span several
+lines. Unticked, the box is read like a `!gen.txt` file and one prompt is
+chosen. **Additional Positive** is appended to that prompt either way.
 
-## Libraries
-
-**Library Manager** holds more than one library. Each library has its own:
-
-- wildcards root, LoRA folder, checkpoint folder, prompts folder, and
-  Generation output roots
-- Civitai site (`civitai.com` or `civitai.red`) and validation platform
-- Generation family, and the Generation form for Realistic, Anime, and 3D
-- **Base models to manage**, **SDXL families**, and **Civitai categories**
-
-Two libraries that share a wildcards folder keep separate checkboxes. Switching
-libraries reloads that library’s catalog and Generation screen.
-
-On disk, next to the wildcards folder (not in AppData):
-
-- Catalog: `<wildcards folder name>.wcm/cache/civitai-catalog/<library id>/`
-- Shelves: `<wildcards folder name>.wcm/libraries/<library id>/` — Civitai
-  LoRAs, checkpoints, images, and videos are separate files, Hugging Face has
-  its own file, LoRA download categories are `categories.json`, and filters
-  stay in that folder’s `library.json`
-
-The first launch after an upgrade copies an old combined `library.json` into
-`backups/pre-migrate-<timestamp>/` before it writes those shelf files. If that
-copy fails, the file is left as it is. Quit completely, including the tray,
-and start **0.10.0** so that launch can run. A build from before the shelf
-split does not read the shelf files.
-
-If Archive, Maybe, Notify, or LoRA categories disappear, see
-[Troubleshooting](docs/troubleshooting.md#archive-maybe-notify-or-lora-categories-disappeared).
-
-**Migrate library paths…** rewrites stored pointers when a tree changes drive
-or parent. It does not move the files.
+Opening a locally trained LoRA no longer freezes the window on “Looking up
+validation sets”.
 
 ## Also in this version
 
-- **Mark as Downloaded** asks **This version** or **All current versions** when
-  a card lists more than one downloadable version. Early access is left out of
-  All. A version published later stays unmarked. The download button still
-  downloads.
-- Fixing one wildcard issue removes that row. The details list does not redraw
-  every issue and then drop the fixed one.
-- Prompt coverage, the Prompts title bar, and Hugging Face downloads behave as
-  in v0.9. v0.9.3 stopped one library’s Archive, Maybe, Notify, or categories
-  from replacing another’s when they shared a wildcards folder.
+- Saving a wildcard while typing no longer jumps the caret to the start of the
+  file. Undo keeps the characters just typed.
+- A version tag attaches `comfyui-custom-save-node.zip` (`SaveImageToFolder`)
+  next to `comfyui-lora-training.zip` and the two workflow files.
+  `WildcardsManager-*.exe.blockmap` is not uploaded. Check for update still
+  downloads the full installer.
+- SDXL generation, Browse family chips, and per-library shelves from v0.10 are
+  unchanged.
 
 ## Installation
 
 Download an installer from the
-[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.10.0)
+[GitHub release](https://github.com/aipower66669/WildcardsManager/releases/tag/v0.11.0)
 when one is attached, or build it yourself. Installers are unsigned.
 
 From source (Node.js 22.12+):
@@ -99,7 +62,7 @@ npm ci
 npm run dev
 ```
 
-Pushing a version tag (`v0.10.0`) runs the checks, builds
+Pushing a version tag (`v0.11.0`) runs the checks, builds
 `WildcardsManager-<version>-win-x64.exe`, and attaches it to that GitHub
 Release. Settings → App updates checks that release when the update folder
 is empty. **Check for update** only reports a newer installer. **What's new**
@@ -109,8 +72,12 @@ is a separate button for these notes. **Install** downloads and installs.
 
 ## Upgrading
 
-Quit Wildcards Manager completely, including the tray icon, then start 0.10.0.
+Quit Wildcards Manager completely, including the tray icon, then start 0.11.0.
 Closing the window is not enough while the tray icon is still running.
+
+Then open Browse on **LoRAs** and on **Checkpoints** so each catalog picks up
+the models the old check skipped. The first pass can take a bit, and **+N**
+can be large. Those cards show at the top of **All**.
 
 Libraries do not need a hand-edited `library.json`. If you moved model or
 wildcard folders onto another drive, use Library Manager → **Migrate library
